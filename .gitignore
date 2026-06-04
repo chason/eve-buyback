@@ -1,0 +1,38 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / TypeScript ----
+node_modules/
+.npm/
+*.tsbuildinfo
+frontend/dist/
+frontend/build/
+.vite/
+
+# ---- Env / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Claude Code (local-only) ----
+.claude/settings.local.json
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
