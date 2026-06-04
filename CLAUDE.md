@@ -7,18 +7,33 @@ A web application with a **Python API backend** and a **TypeScript frontend**.
 
 ## Status
 
-🚧 Early scaffolding. The stack below is the intended direction; directories are
-created as features land. Update this section as things become real.
+🚧 Early scaffolding. Architecture is decided but code isn't written yet;
+directories are created as features land. Update this section as things become real.
+
+**The plan lives in [`docs/architecture.md`](docs/architecture.md); decisions and
+their rationale are in [`docs/adr/`](docs/adr/). Read those before making
+architectural changes.**
+
+## What this is
+
+A self-hostable, multi-tenant **EVE Online corporation buyback** app: members get
+priced quotes for items (e.g. "90% Jita Buy"), Buyback Managers configure pricing
+rules, prices come from Fuzzwork market aggregates. See the architecture doc for the
+domain model, auth flow, and pricing-rule resolution.
 
 ## Stack
 
-| Layer    | Choice                          | Notes                                  |
-| -------- | ------------------------------- | -------------------------------------- |
-| Backend  | Python + FastAPI                | REST/JSON API                          |
-| Frontend | TypeScript + React (Vite)       | SPA that talks to the API              |
-| Tooling  | `uv`/`venv` (py), `npm` (front) | Pin exact tooling once chosen          |
+| Layer       | Choice                                   | Notes                                   |
+| ----------- | ---------------------------------------- | --------------------------------------- |
+| Backend     | Python + FastAPI + Pydantic v2 (async)   | REST/JSON API under `/api/v1` (ADR-0001)|
+| Persistence | SQLAlchemy 2.0 + Alembic on SQLite       | Postgres-ready (ADR-0002)               |
+| Frontend    | TypeScript + React (Vite) + TanStack Query | SPA; types generated from OpenAPI (ADR-0011, 0013) |
+| Auth        | EVE SSO → backend session cookie         | No persisted EVE tokens (ADR-0004)      |
+| Market data | Fuzzwork aggregates, cached              | (ADR-0006)                              |
+| Tooling     | `uv`/`venv` (py), `npm` (front)          | Pin exact tooling once chosen           |
 
-If any of these change, edit this table first so the rest of the doc stays honest.
+If any of these change, edit this table **and the relevant ADR** so the rest of the
+doc stays honest.
 
 ## Layout
 
