@@ -44,12 +44,14 @@ two halves talk.
 
 ## Git hooks
 
-A pre-commit hook (`.githooks/pre-commit`) runs the backend `ruff check` and
-`pytest` and blocks the commit if either fails. Enable it once per clone:
+A pre-commit hook (`.githooks/pre-commit`) runs the backend `ruff check` +
+`pytest` and the frontend typecheck (`tsc`), and blocks the commit if any fail.
+Enable it once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-It requires `uv` on your PATH. Bypass for a single commit with
+It requires `uv` and `npm` on your PATH (it installs frontend deps automatically
+if `node_modules` is missing). Bypass for a single commit with
 `git commit --no-verify`.
