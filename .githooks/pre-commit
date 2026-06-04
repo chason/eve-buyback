@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-# Pre-commit hook: backend lint + tests and frontend typecheck must pass
-# before committing.
+# Pre-commit hook: run checks only for the parts of the tree being committed.
+#   - staged backend/  changes -> ruff check + pytest
+#   - staged frontend/ changes -> typecheck (tsc)
 #
 # Enable once per clone:
 #   git config core.hooksPath .githooks
@@ -12,35 +13,50 @@
 set -eu
 
 root=$(git rev-parse --show-toplevel)
+staged=$(git diff --cached --name-only)
+
+run_backend=0
+run_frontend=0
+echo "$staged" | grep -q '^backend/'  && run_backend=1 || true
+echo "$staged" | grep -q '^frontend/' && run_frontend=1 || true
+
+if [ "$run_backend" = 0 ] && [ "$run_frontend" = 0 ]; then
+  echo "pre-commit: no backend/ or frontend/ changes staged; nothing to check."
+  exit 0
+fi
 
 # --- Backend: ruff + pytest -------------------------------------------------
-cd "$root/backend"
-if ! command -v uv >/dev/null 2>&1; then
-  echo "pre-commit: 'uv' is not on PATH - cannot run backend checks." >&2
-  echo "            Install uv (https://docs.astral.sh/uv/) or bypass with 'git commit --no-verify'." >&2
-  exit 1
+if [ "$run_backend" = 1 ]; then
+  cd "$root/backend"
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "pre-commit: 'uv' is not on PATH - cannot run backend checks." >&2
+    echo "            Install uv (https://docs.astral.sh/uv/) or bypass with 'git commit --no-verify'." >&2
+    exit 1
+  fi
+  echo "pre-commit: backend ruff check ..."
+  uv run ruff check .
+  echo "pre-commit: backend pytest ..."
+  uv run pytest -q
+else
+  echo "pre-commit: no backend/ changes staged; skipping backend checks."
 fi
-
-echo "pre-commit: backend ruff check ..."
-uv run ruff check .
-
-echo "pre-commit: backend pytest ..."
-uv run pytest -q
 
 # --- Frontend: typecheck ----------------------------------------------------
-cd "$root/frontend"
-if ! command -v npm >/dev/null 2>&1; then
-  echo "pre-commit: 'npm' is not on PATH - cannot run frontend checks." >&2
-  echo "            Install Node.js (https://nodejs.org/) or bypass with 'git commit --no-verify'." >&2
-  exit 1
+if [ "$run_frontend" = 1 ]; then
+  cd "$root/frontend"
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "pre-commit: 'npm' is not on PATH - cannot run frontend checks." >&2
+    echo "            Install Node.js (https://nodejs.org/) or bypass with 'git commit --no-verify'." >&2
+    exit 1
+  fi
+  if [ ! -d node_modules ]; then
+    echo "pre-commit: installing frontend dependencies (npm ci) ..."
+    npm ci --silent
+  fi
+  echo "pre-commit: frontend typecheck ..."
+  npm run --silent typecheck
+else
+  echo "pre-commit: no frontend/ changes staged; skipping frontend checks."
 fi
-
-if [ ! -d node_modules ]; then
-  echo "pre-commit: installing frontend dependencies (npm ci) ..."
-  npm ci --silent
-fi
-
-echo "pre-commit: frontend typecheck ..."
-npm run --silent typecheck
 
 echo "pre-commit: all checks passed."

@@ -44,9 +44,10 @@ two halves talk.
 
 ## Git hooks
 
-A pre-commit hook (`.githooks/pre-commit`) runs the backend `ruff check` +
-`pytest` and the frontend typecheck (`tsc`), and blocks the commit if any fail.
-Enable it once per clone:
+A pre-commit hook (`.githooks/pre-commit`) runs checks for the parts of the tree
+you're committing: staged `backend/` changes trigger `ruff check` + `pytest`, and
+staged `frontend/` changes trigger the typecheck (`tsc`). It blocks the commit if
+any fail. Enable it once per clone:
 
 ```bash
 git config core.hooksPath .githooks
