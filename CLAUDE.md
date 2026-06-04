@@ -76,6 +76,8 @@ npm run build                            # typecheck (tsc) + production build
   backend over HTTP (configure the base URL via env, don't hardcode).
 - Match the style of surrounding code. Add tests alongside new behavior.
 - Don't commit secrets — use `.env` files (already gitignored).
+- A pre-commit hook (`.githooks/pre-commit`) runs backend `ruff check` + `pytest`.
+  Enable per clone: `git config core.hooksPath .githooks` (needs `uv` on PATH).
 
 ## Notes for Claude
 

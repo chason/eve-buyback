@@ -41,3 +41,15 @@ npm run build                # typecheck + production build
 Run the backend and frontend together in dev; the Vite proxy forwards `/api` to
 `http://127.0.0.1:8000`. The home page shows the backend health status, proving the
 two halves talk.
+
+## Git hooks
+
+A pre-commit hook (`.githooks/pre-commit`) runs the backend `ruff check` and
+`pytest` and blocks the commit if either fails. Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+It requires `uv` on your PATH. Bypass for a single commit with
+`git commit --no-verify`.

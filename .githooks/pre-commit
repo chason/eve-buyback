@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Pre-commit hook: backend lint + tests must pass before committing.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Bypass in a pinch:
+#   git commit --no-verify
+#
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root/backend"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "pre-commit: 'uv' is not on PATH - cannot run backend checks." >&2
+  echo "            Install uv (https://docs.astral.sh/uv/) or bypass with 'git commit --no-verify'." >&2
+  exit 1
+fi
+
+echo "pre-commit: ruff check ..."
+uv run ruff check .
+
+echo "pre-commit: pytest ..."
+uv run pytest -q
+
+echo "pre-commit: all checks passed."
