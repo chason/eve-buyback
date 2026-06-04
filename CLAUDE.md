@@ -39,25 +39,35 @@ doc stays honest.
 
 ```
 buyback/
-├── backend/      # Python API (FastAPI app, models, tests)
-└── frontend/     # TypeScript SPA (Vite + React)
+├── backend/              # Python API
+│   ├── app/
+│   │   ├── main.py       # FastAPI app factory + lifespan
+│   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
+│   │   ├── db.py         # async engine/session + Base
+│   │   ├── api/v1/       # routers (health; auth/rules/quote land later)
+│   │   └── models/       # SQLAlchemy models (empty until next milestone)
+│   ├── alembic/          # migrations (async env.py)
+│   └── tests/            # pytest
+├── frontend/             # TypeScript SPA (Vite + React + TanStack Query)
+│   └── src/{api,}        # fetch wrapper + health view; App.tsx
+├── docs/                 # architecture.md + adr/
+└── .github/workflows/    # CI
 ```
 
 ## Commands
 
-Fill these in as the projects are scaffolded. Expected shape:
-
 ```bash
 # Backend (from backend/)
-uv venv && uv pip install -r requirements.txt   # or pyproject/poetry
-uvicorn app.main:app --reload                    # run dev server
-pytest                                           # run tests
+uv sync --extra dev                      # create venv + install deps
+uv run uvicorn app.main:app --reload     # dev server :8000
+uv run pytest                            # tests
+uv run ruff check .                      # lint
+uv run alembic upgrade head              # apply migrations (once models exist)
 
 # Frontend (from frontend/)
 npm install
-npm run dev                                       # Vite dev server
-npm run build
-npm test
+npm run dev                              # Vite dev server :5173 (proxies /api)
+npm run build                            # typecheck (tsc) + production build
 ```
 
 ## Conventions
