@@ -2,7 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.auth.sso import OAuthToken, VerifiedCharacter, get_sso_client
-from app.eve.esi import CorporationInfo, get_esi_client
+from app.eve.esi import CharacterInfo, CorporationInfo, get_esi_client
 from app.main import app
 
 
@@ -27,11 +27,17 @@ class FakeEsi:
 
     ceo_id = 99999
 
+    async def get_character(self, character_id: int) -> CharacterInfo:
+        return CharacterInfo(name="Test Pilot", corporation_id=98000001)
+
     async def get_character_corporation(self, character_id: int) -> int:
         return 98000001
 
     async def get_corporation(self, corporation_id: int) -> CorporationInfo:
         return CorporationInfo(name="Test Corp", ceo_id=self.ceo_id, ticker="TEST")
+
+    async def get_character_roles(self, character_id: int, access_token: str) -> list[str]:
+        return []
 
 
 class FakeEsiCeo(FakeEsi):
@@ -78,6 +84,7 @@ async def test_login_flow_member(client):
         assert body["corporation_id"] == 98000001
         assert body["corporation_name"] == "Test Corp"
         assert body["role"] == "member"
+        assert body["corporation_registered"] is False
 
         me = await http.get("/api/v1/auth/me")
         assert me.status_code == 200

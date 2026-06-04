@@ -23,3 +23,7 @@ class SessionUser(BaseModel):
     corporation_id: int
     corporation_name: str
     role: Role
+    # EVE Director role — enables corp registration (ADR-0015).
+    is_director: bool = False
+    # Whether this corporation is a registered tenant.
+    corporation_registered: bool = False

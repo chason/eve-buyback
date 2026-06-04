@@ -8,6 +8,16 @@ export interface SessionUser {
   corporation_id: number
   corporation_name: string
   role: Role
+  is_director: boolean
+  corporation_registered: boolean
+}
+
+export interface Corporation {
+  corporation_id: number
+  name: string
+  ceo_character_id: number
+  registered_by_character_id: number
+  registered_at: string
 }
 
 export interface LoginUrlResponse {
@@ -43,4 +53,13 @@ export async function logout(): Promise<void> {
     method: "POST",
     credentials: "include",
   })
+}
+
+export async function registerCorporation(): Promise<Corporation> {
+  const res = await fetch(`${API_BASE}/corporations`, {
+    method: "POST",
+    credentials: "include",
+  })
+  if (!res.ok) throw new Error(`Register failed: ${res.status}`)
+  return (await res.json()) as Corporation
 }

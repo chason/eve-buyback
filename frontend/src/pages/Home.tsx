@@ -1,7 +1,54 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { getLoginUrl, getMe, logout } from "../api/auth"
+import {
+  getLoginUrl,
+  getMe,
+  logout,
+  registerCorporation,
+  type SessionUser,
+} from "../api/auth"
 import { getHealth } from "../api/health"
+
+function CorporationStatus({ user }: { user: SessionUser }) {
+  const queryClient = useQueryClient()
+  const register = useMutation({
+    mutationFn: registerCorporation,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  })
+
+  if (user.corporation_registered) {
+    return (
+      <p>
+        Corp <strong>{user.corporation_name}</strong> is registered. Your role:{" "}
+        <code>{user.role}</code>
+      </p>
+    )
+  }
+
+  const canRegister = user.role === "ceo" || user.is_director
+  if (canRegister) {
+    return (
+      <div>
+        <p>
+          <strong>{user.corporation_name}</strong> isn't registered yet.
+        </p>
+        <button onClick={() => register.mutate()} disabled={register.isPending}>
+          Register {user.corporation_name}
+        </button>
+        {register.isError && (
+          <p style={{ color: "crimson" }}>{(register.error as Error).message}</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <p>
+      Your corporation ({user.corporation_name}) isn't registered yet. Ask your CEO or
+      a Director to register it.
+    </p>
+  )
+}
 
 export default function Home() {
   const queryClient = useQueryClient()
@@ -33,9 +80,7 @@ export default function Home() {
               <p>
                 Logged in as <strong>{me.data.character_name}</strong>
               </p>
-              <p>
-                Corp: {me.data.corporation_name} · Role: <code>{me.data.role}</code>
-              </p>
+              <CorporationStatus user={me.data} />
               <button onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
                 Log out
               </button>

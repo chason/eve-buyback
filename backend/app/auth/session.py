@@ -1,10 +1,13 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 
-from app.schemas.auth import SessionUser
+from app.schemas.auth import Role, SessionUser
 
 SESSION_USER_KEY = "user"
+
+ROLE_ORDER: dict[Role, int] = {"member": 0, "manager": 1, "ceo": 2}
 
 
 def set_session_user(request: Request, user: SessionUser) -> None:
@@ -32,3 +35,17 @@ def require_user(user: CurrentUser) -> SessionUser:
 
 
 RequireUser = Annotated[SessionUser, Depends(require_user)]
+
+
+def require_role(minimum: Role) -> Callable[[SessionUser], SessionUser]:
+    """Dependency factory: require at least `minimum` (member < manager < ceo)."""
+
+    def dependency(user: RequireUser) -> SessionUser:
+        if ROLE_ORDER[user.role] < ROLE_ORDER[minimum]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {minimum} role",
+            )
+        return user
+
+    return dependency

@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     eve_client_id: str = ""
     eve_client_secret: str = ""
     eve_redirect_uri: str = "http://localhost:5173/auth/callback"
-    eve_scopes: str = "publicData"
+    # Roles scope lets us detect Directors for corp registration (ADR-0015).
+    eve_scopes: str = "publicData esi-characters.read_corporation_roles.v1"
 
     @property
     def session_https_only(self) -> bool:

@@ -24,5 +24,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0012](0012-single-deployable-packaging.md) | Single deployable; backend serves the SPA | Accepted |
 | [0013](0013-frontend-stack.md) | Frontend: React + Vite + TanStack Query | Accepted |
 | [0014](0014-persisted-appraisals.md) | Persisted, immutable appraisals with shareable ids | Accepted |
+| [0015](0015-corp-registration-ceo-or-director.md) | Corp registration by CEO or Director | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

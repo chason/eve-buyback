@@ -31,6 +31,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 12 | **Single deployable** (backend serves the built SPA), config via env | [0012](adr/0012-single-deployable-packaging.md) |
 | 13 | Frontend: **React + Vite + TanStack Query** | [0013](adr/0013-frontend-stack.md) |
 | 14 | **Persisted, immutable appraisals** with shareable ids | [0014](adr/0014-persisted-appraisals.md) |
+| 15 | Corp registration by **CEO or Director** (adds roles scope) | [0015](adr/0015-corp-registration-ceo-or-director.md) |
 
 ## 3. System context
 
@@ -135,9 +136,11 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
 ```
 
 - **Unregistered corp:** members see "your corp isn't registered yet"; a logged-in
-  **CEO** may register their corp (becomes admin).
-- **Scopes:** `publicData` only — "Buyback Manager" is *our* role, not an EVE role,
-  so no corp-roles scope is needed.
+  **CEO or Director** may register their corp ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
+  A non-CEO Director who registers is auto-granted Buyback Manager.
+- **Scopes:** `publicData` + `esi-characters.read_corporation_roles.v1` — the roles
+  scope is read once at login (Director check) and the token is not persisted
+  ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
 - **CSRF:** cookie auth + `SameSite=Lax` plus a required custom header / CSRF token
   on mutations.
 
@@ -245,7 +248,8 @@ Fuzzwork usage, image/link helpers, and caching.
   `weightedAverage`, or `max`/`min`? (Defaulting to `percentile`; confirm.)
 - Should the corp's hub be limited to Jita for MVP, or selectable among the major
   hubs (Amarr/Dodixie/Rens/Hek)?
-- Should a non-CEO Director be able to register the corp, or strictly the CEO?
+- ~~Should a non-CEO Director be able to register the corp?~~ Resolved: CEO **or**
+  Director ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
 - Should every submit persist an appraisal, or add an ephemeral "preview" mode to
   avoid clutter while typing? (MVP persists on submit — [ADR-0014](adr/0014-persisted-appraisals.md).)
 - Appraisal retention: keep indefinitely (MVP) or add pruning/archival later?

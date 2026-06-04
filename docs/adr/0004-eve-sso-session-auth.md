@@ -1,6 +1,6 @@
 # 0004. EVE SSO login with backend-issued session cookie
 
-- **Status:** Accepted
+- **Status:** Accepted (scope amended by [0015](0015-corp-registration-ceo-or-director.md))
 - **Date:** 2026-06-04
 
 ## Context
