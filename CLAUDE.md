@@ -41,10 +41,13 @@ doc stays honest.
 buyback/
 ├── backend/              # Python API
 │   ├── app/
-│   │   ├── main.py       # FastAPI app factory + lifespan
+│   │   ├── main.py       # FastAPI app factory + lifespan (+ SessionMiddleware)
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
 │   │   ├── db.py         # async engine/session + Base
-│   │   ├── api/v1/       # routers (health; auth/rules/quote land later)
+│   │   ├── api/v1/       # routers (health, auth; rules/quote land later)
+│   │   ├── auth/         # EVE SSO client, session helpers, role deps
+│   │   ├── eve/          # ESI client (public character/corp lookups)
+│   │   ├── schemas/      # Pydantic request/response DTOs
 │   │   └── models/       # SQLAlchemy models (empty until next milestone)
 │   ├── alembic/          # migrations (async env.py)
 │   └── tests/            # pytest
