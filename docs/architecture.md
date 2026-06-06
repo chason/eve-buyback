@@ -32,6 +32,10 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 13 | Frontend: **React + Vite + TanStack Query** | [0013](adr/0013-frontend-stack.md) |
 | 14 | **Persisted, immutable appraisals** with shareable ids | [0014](adr/0014-persisted-appraisals.md) |
 | 15 | Corp registration by **CEO or Director** (adds roles scope) | [0015](adr/0015-corp-registration-ceo-or-director.md) |
+| 16 | **Per-request role resolution** from the DB (instant manager revoke) | [0016](adr/0016-per-request-role-resolution.md) |
+| 17 | **CSRF**: `SameSite=Lax` + required custom header on mutations | [0017](adr/0017-csrf-custom-header.md) |
+| 18 | **Layered backend**: interface / application / domain / data / plugins | [0018](adr/0018-layered-backend-architecture.md) |
+| 19 | **Progressive docs** via layer-local `CLAUDE.md` | [0019](adr/0019-progressive-layer-documentation.md) |
 
 ## 3. System context
 
@@ -126,13 +130,13 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
 3. Browser → POST /api/v1/auth/login {code, state}
 4. Backend → exchange code (server-side secret) → verify → {character_id, name}
 5. Backend → ESI: character→corp_id; corp→ceo_id        (public, no scope)
-6. Backend → resolve role:
-     ceo      if character_id == corp.ceo_id
-     manager  if ManagerAssignment(corp_id, character_id) exists
-     member   otherwise
-   set httpOnly Secure SameSite=Lax session cookie; no EVE token stored
-7. Subsequent requests authorized from the session; corp membership re-derived
-   from ESI on each login so corp changes are picked up.
+6. Backend → store **identity** in the cookie (character, corp, plus `is_ceo` /
+   `is_director` from ESI at login). httpOnly Secure SameSite=Lax; no EVE token stored.
+7. On **every** request the app **role is resolved from the DB** — `ceo` if the
+   identity is the CEO, `manager` if a `ManagerAssignment` exists, else `member` — so a
+   manager revoke takes effect on the next request
+   ([ADR-0016](adr/0016-per-request-role-resolution.md)). CEO/Director status and corp
+   membership re-derive from ESI at next login.
 ```
 
 - **Unregistered corp:** members see "your corp isn't registered yet"; a logged-in
@@ -141,8 +145,8 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
 - **Scopes:** `publicData` + `esi-characters.read_corporation_roles.v1` — the roles
   scope is read once at login (Director check) and the token is not persisted
   ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
-- **CSRF:** cookie auth + `SameSite=Lax` plus a required custom header / CSRF token
-  on mutations.
+- **CSRF:** cookie auth + `SameSite=Lax` plus a required custom header on mutations
+  ([ADR-0017](adr/0017-csrf-custom-header.md)).
 
 ## 8. Market data & caching
 
@@ -191,30 +195,38 @@ snapshot and returns a `public_id` for later reference ([ADR-0014](adr/0014-pers
 
 ## 11. Repository layout
 
+The backend follows a strict **layered architecture** with dependencies pointing
+inward only ([ADR-0018](adr/0018-layered-backend-architecture.md)); see `CLAUDE.md`
+(root + per-layer) for the rules.
+
 ```
 buyback/
 ├── backend/
 │   ├── pyproject.toml
 │   ├── app/
-│   │   ├── main.py          # app + lifespan + static SPA serving
+│   │   ├── main.py          # app factory + lifespan; wires middleware, routers, error handlers
 │   │   ├── config.py        # pydantic-settings (env)
-│   │   ├── db.py            # async engine/session
-│   │   ├── models/         # SQLAlchemy 2.0 models
-│   │   ├── schemas/        # Pydantic request/response DTOs
-│   │   ├── api/v1/         # routers: auth, corporations, rules, managers, quote
-│   │   ├── auth/           # SSO client, session, FastAPI deps (require_role)
-│   │   ├── pricing/        # rule resolution + quote engine
-│   │   ├── market/         # Fuzzwork client + cache
-│   │   ├── sde/            # seed + reference access
-│   │   └── scheduler.py    # APScheduler refresh job
+│   │   ├── interface/       # API layer: v1/ routers + deps, security, middleware, error mapping
+│   │   ├── application/     # use cases (auth, corporations; pricing + appraisals later)
+│   │   ├── domain/          # pure functions (roles, auth; rule-resolution later)
+│   │   ├── data/            # db engine, models/, records.py, repositories/ (+ SDE/price models later)
+│   │   ├── plugins/         # outside-API gateways: EVE ESI, SSO (+ Fuzzwork market later)
+│   │   └── schemas/         # API request/response DTOs
 │   ├── alembic/            # migrations
 │   └── tests/
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.ts      # dev proxy → backend
-│   └── src/{api,auth,pages,components}/
+│   └── src/{api,pages}/     # (auth/, components/ as they land)
 └── docs/{architecture.md, adr/}
 ```
+
+Upcoming M4/M5 work slots in **by layer** rather than as new top-level packages: the
+Fuzzwork client is a `plugins/` gateway; SDE and price-cache models + repositories go
+in `data/`; the pricing/appraisal use cases go in `application/`; rule-resolution
+helpers go in `domain/`; routers stay thin in `interface/v1/`. The market-refresh
+scheduler ([ADR-0010](adr/0010-in-process-scheduling.md)) wires in at the app boundary
+in `main.py`.
 
 Reuse the `eve-esi` project skill's patterns for the ESI client, SSO exchange,
 Fuzzwork usage, image/link helpers, and caching.

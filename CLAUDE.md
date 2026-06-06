@@ -96,6 +96,10 @@ When you add a feature, add a use case in `application/`, push pure logic down i
 and keep the router in `interface/v1/` thin. New outside-API integrations go in
 `plugins/`.
 
+Some layers carry their own `CLAUDE.md` with layer-local conventions (currently
+`app/data/` and `app/application/`); these load automatically when you work in that
+directory. Read them before changing files there.
+
 ## Commands
 
 ```bash
