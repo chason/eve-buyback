@@ -1,6 +1,11 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Placeholder signing key shipped for local dev only. Booting with this outside
+# development would let anyone forge a session cookie (e.g. role="ceo").
+INSECURE_SESSION_SECRET = "dev-insecure-change-me"
 
 
 class Settings(BaseSettings):
@@ -20,7 +25,7 @@ class Settings(BaseSettings):
     market_hub_id: int = 60003760
 
     # Session cookie signing (ADR-0004). CHANGE in production.
-    session_secret: str = "dev-insecure-change-me"
+    session_secret: str = INSECURE_SESSION_SECRET
     session_cookie_name: str = "buyback_session"
     session_max_age: int = 60 * 60 * 8  # 8 hours
 
@@ -35,6 +40,20 @@ class Settings(BaseSettings):
     def session_https_only(self) -> bool:
         """Require Secure cookies outside local development."""
         return self.environment != "development"
+
+    @model_validator(mode="after")
+    def _require_secure_session_secret(self) -> "Settings":
+        """Refuse to boot with the placeholder/empty signing key outside dev."""
+        if self.environment != "development" and (
+            not self.session_secret.strip()
+            or self.session_secret == INSECURE_SESSION_SECRET
+        ):
+            raise ValueError(
+                "BUYBACK_SESSION_SECRET must be set to a strong, unique value when "
+                "BUYBACK_ENVIRONMENT is not 'development'. The placeholder default "
+                "would let anyone forge a session cookie."
+            )
+        return self
 
 
 @lru_cache
