@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from "./client"
+import { apiSend } from "./client"
 
 export type Role = "member" | "manager" | "ceo"
 
@@ -35,16 +35,21 @@ export async function getMe(): Promise<SessionUser | null> {
   return (await res.json()) as SessionUser
 }
 
-export const getLoginUrl = () => apiGet<LoginUrlResponse>("/auth/login-url")
+/** Begin login: returns the EVE authorize URL to redirect the browser to. */
+export async function beginLogin(): Promise<LoginUrlResponse> {
+  const res = await apiSend("POST", "/auth/login")
+  if (!res.ok) throw new Error(`Login start failed: ${res.status}`)
+  return (await res.json()) as LoginUrlResponse
+}
 
 export async function login(code: string, state: string): Promise<SessionUser> {
-  const res = await apiSend("POST", "/auth/login", { code, state })
+  const res = await apiSend("POST", "/auth/session", { code, state })
   if (!res.ok) throw new Error(`Login failed: ${res.status}`)
   return (await res.json()) as SessionUser
 }
 
 export async function logout(): Promise<void> {
-  await apiSend("POST", "/auth/logout")
+  await apiSend("DELETE", "/auth/session")
 }
 
 export async function registerCorporation(): Promise<Corporation> {

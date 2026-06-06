@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import {
-  getLoginUrl,
+  beginLogin,
   getMe,
   logout,
   registerCorporation,
@@ -61,7 +61,7 @@ export default function Home() {
   })
 
   async function startLogin() {
-    const { authorization_url } = await getLoginUrl()
+    const { authorization_url } = await beginLogin()
     window.location.href = authorization_url
   }
 

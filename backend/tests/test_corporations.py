@@ -74,13 +74,13 @@ def _clear_overrides():
 
 
 async def _login(http: AsyncClient) -> dict:
-    url_resp = await http.get("/api/v1/auth/login-url")
-    state = url_resp.json()["state"]
-    login_resp = await http.post(
-        "/api/v1/auth/login", json={"code": "auth-code", "state": state}
+    begin = await http.post("/api/v1/auth/login")
+    state = begin.json()["state"]
+    session_resp = await http.post(
+        "/api/v1/auth/session", json={"code": "auth-code", "state": state}
     )
-    assert login_resp.status_code == 200
-    return login_resp.json()
+    assert session_resp.status_code == 200
+    return session_resp.json()
 
 
 async def test_ceo_can_register():

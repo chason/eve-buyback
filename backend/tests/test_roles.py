@@ -53,9 +53,9 @@ async def test_manager_revocation_takes_effect_without_relogin():
             base_url="http://test",
             headers={"X-Buyback-CSRF": "1"},
         ) as http:
-            state = (await http.get("/api/v1/auth/login-url")).json()["state"]
+            state = (await http.post("/api/v1/auth/login")).json()["state"]
             login = await http.post(
-                "/api/v1/auth/login", json={"code": "auth-code", "state": state}
+                "/api/v1/auth/session", json={"code": "auth-code", "state": state}
             )
             assert login.json()["role"] == "member"
 

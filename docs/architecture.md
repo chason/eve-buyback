@@ -125,9 +125,9 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
 [ADR-0005](adr/0005-authorization-roles.md)):
 
 ```
-1. Browser → GET /api/v1/auth/login-url     → { url, state }   (PKCE + state)
+1. Browser → POST /api/v1/auth/login         → { url, state }   (PKCE + state)
 2. Browser → EVE SSO authorize → user approves → redirect to SPA with ?code&state
-3. Browser → POST /api/v1/auth/login {code, state}
+3. Browser → POST /api/v1/auth/session {code, state}
 4. Backend → exchange code (server-side secret) → verify → {character_id, name}
 5. Backend → ESI: character→corp_id; corp→ceo_id        (public, no scope)
 6. Backend → store **identity** in the cookie (character, corp, plus `is_ceo` /
@@ -173,9 +173,9 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
-| GET | `/auth/login-url` | public | Build SSO URL + state |
-| POST | `/auth/login` | public | Exchange code → session |
-| POST | `/auth/logout` | member | Clear session |
+| POST | `/auth/login` | public | Begin login: mint state + return SSO URL |
+| POST | `/auth/session` | public | Complete login: exchange code → session |
+| DELETE | `/auth/session` | member | Log out (clear session) |
 | GET | `/auth/me` | member | Current character, corp, role |
 | POST | `/corporations` | CEO | Register caller's corp |
 | GET | `/corporations/me` | member | Corp + buyback config (read) |

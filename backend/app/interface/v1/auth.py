@@ -18,9 +18,10 @@ OAUTH_STATE_KEY = "oauth_state"
 PKCE_VERIFIER_KEY = "pkce_verifier"
 
 
-@router.get("/login-url", response_model=LoginUrlResponse)
-async def login_url(request: Request, sso: SsoDep) -> LoginUrlResponse:
-    """Build the EVE SSO authorization URL and stash state + PKCE in the session."""
+@router.post("/login", response_model=LoginUrlResponse)
+async def begin_login(request: Request, sso: SsoDep) -> LoginUrlResponse:
+    """Begin login: mint state + PKCE (stashed in the session) and return the EVE
+    authorization URL for the SPA to redirect to."""
     challenge = auth_app.begin_login(sso)
     request.session[OAUTH_STATE_KEY] = challenge.state
     request.session[PKCE_VERIFIER_KEY] = challenge.verifier
@@ -29,15 +30,15 @@ async def login_url(request: Request, sso: SsoDep) -> LoginUrlResponse:
     )
 
 
-@router.post("/login", response_model=SessionUser)
-async def login(
+@router.post("/session", response_model=SessionUser)
+async def create_session(
     payload: LoginRequest,
     request: Request,
     sso: SsoDep,
     esi: EsiDep,
     session: SessionDep,
 ) -> SessionUser:
-    """Validate the OAuth state, then hand off to the login use case."""
+    """Complete login: validate the OAuth state, exchange the code, open a session."""
     expected_state = request.session.get(OAUTH_STATE_KEY)
     verifier = request.session.get(PKCE_VERIFIER_KEY)
     if not expected_state or not verifier or payload.state != expected_state:
@@ -56,8 +57,9 @@ async def login(
     return SessionUser(**user.model_dump())
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(request: Request) -> None:
+@router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(request: Request) -> None:
+    """Log out: clear the session cookie."""
     clear_session(request)
 
 

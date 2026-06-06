@@ -12,13 +12,13 @@ def _client(**kwargs) -> AsyncClient:
 
 async def test_unsafe_request_without_header_rejected():
     async with _client() as http:
-        resp = await http.post("/api/v1/auth/logout")
+        resp = await http.delete("/api/v1/auth/session")
     assert resp.status_code == 403
 
 
 async def test_unsafe_request_with_header_allowed():
     async with _client(headers={CSRF_HEADER: "1"}) as http:
-        resp = await http.post("/api/v1/auth/logout")
+        resp = await http.delete("/api/v1/auth/session")
     assert resp.status_code == 204
 
 

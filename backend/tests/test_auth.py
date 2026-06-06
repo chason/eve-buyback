@@ -62,17 +62,17 @@ def client(request: pytest.FixtureRequest):
 
 
 async def _login(http: AsyncClient) -> dict:
-    url_resp = await http.get("/api/v1/auth/login-url")
-    assert url_resp.status_code == 200
-    state = url_resp.json()["state"]
-    assert url_resp.json()["authorization_url"].startswith(
+    begin = await http.post("/api/v1/auth/login")
+    assert begin.status_code == 200
+    state = begin.json()["state"]
+    assert begin.json()["authorization_url"].startswith(
         "https://login.eveonline.com"
     )
-    login_resp = await http.post(
-        "/api/v1/auth/login", json={"code": "auth-code", "state": state}
+    session_resp = await http.post(
+        "/api/v1/auth/session", json={"code": "auth-code", "state": state}
     )
-    assert login_resp.status_code == 200
-    return login_resp.json()
+    assert session_resp.status_code == 200
+    return session_resp.json()
 
 
 async def test_me_requires_auth(client):
@@ -95,7 +95,7 @@ async def test_login_flow_member(client):
         assert me.status_code == 200
         assert me.json()["character_name"] == "Test Pilot"
 
-        logout = await http.post("/api/v1/auth/logout")
+        logout = await http.delete("/api/v1/auth/session")
         assert logout.status_code == 204
 
         me_after = await http.get("/api/v1/auth/me")
@@ -111,8 +111,8 @@ async def test_login_flow_ceo(client):
 
 async def test_login_rejects_bad_state(client):
     async with client as http:
-        await http.get("/api/v1/auth/login-url")
+        await http.post("/api/v1/auth/login")
         resp = await http.post(
-            "/api/v1/auth/login", json={"code": "auth-code", "state": "wrong-state"}
+            "/api/v1/auth/session", json={"code": "auth-code", "state": "wrong-state"}
         )
     assert resp.status_code == 400
