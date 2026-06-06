@@ -1,7 +1,7 @@
 from httpx import ASGITransport, AsyncClient
 
+from app.interface.middleware import CSRF_HEADER
 from app.main import app
-from app.middleware import CSRF_HEADER
 
 
 def _client(**kwargs) -> AsyncClient:

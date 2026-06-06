@@ -33,6 +33,6 @@ if engine.dialect.name == "sqlite":
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency yielding an async DB session."""
+    """Yield an async DB session (injected at the interface boundary)."""
     async with SessionLocal() as session:
         yield session

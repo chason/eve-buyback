@@ -1,6 +1,3 @@
-import base64
-import hashlib
-import secrets
 from urllib.parse import urlencode
 
 import httpx
@@ -24,20 +21,13 @@ class VerifiedCharacter(BaseModel):
     name: str
 
 
-def generate_state() -> str:
-    return secrets.token_urlsafe(24)
-
-
-def generate_pkce() -> tuple[str, str]:
-    """Return (verifier, S256 challenge) for the PKCE flow."""
-    verifier = secrets.token_urlsafe(64)
-    digest = hashlib.sha256(verifier.encode()).digest()
-    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-    return verifier, challenge
-
-
 class EveSsoClient:
-    """EVE SSO OAuth2 client. The backend is the confidential client (ADR-0004)."""
+    """EVE SSO OAuth2 client. The backend is the confidential client (ADR-0004).
+
+    A plugin (outside-API gateway): pure transport to EVE SSO. PKCE/state values
+    are generated in the domain layer and passed in; this client only builds URLs
+    and exchanges/verifies tokens, returning Pydantic models.
+    """
 
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
         self._settings = settings

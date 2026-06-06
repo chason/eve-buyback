@@ -5,11 +5,11 @@ re-login or cookie refresh."""
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
-from app.auth.sso import OAuthToken, VerifiedCharacter, get_sso_client
-from app.db import SessionLocal
-from app.eve.esi import CharacterInfo, CorporationInfo, get_esi_client
+from app.data.db import SessionLocal
+from app.data.models import ManagerAssignment
 from app.main import app
-from app.models import ManagerAssignment
+from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
+from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
 
 CHAR_ID = 12345
 CORP_ID = 98000001

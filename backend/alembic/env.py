@@ -4,10 +4,10 @@ from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import app.models  # noqa: F401  -- register model metadata on Base
+import app.data.models  # noqa: F401  -- register model metadata on Base
 from alembic import context
 from app.config import get_settings
-from app.db import Base
+from app.data.db import Base
 
 config = context.config
 

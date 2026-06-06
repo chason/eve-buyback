@@ -1,9 +1,9 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.auth.sso import OAuthToken, VerifiedCharacter, get_sso_client
-from app.eve.esi import CharacterInfo, CorporationInfo, get_esi_client
 from app.main import app
+from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
+from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
 
 
 class FakeSso:

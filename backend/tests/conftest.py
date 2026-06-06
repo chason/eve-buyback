@@ -10,8 +10,8 @@ os.environ["BUYBACK_DATABASE_URL"] = "sqlite+aiosqlite:///./test_buyback.db"
 
 import pytest_asyncio  # noqa: E402
 
-from app import models  # noqa: E402,F401 -- populate Base.metadata
-from app.db import Base, engine  # noqa: E402
+import app.data.models  # noqa: E402,F401 -- populate Base.metadata
+from app.data.db import Base, engine  # noqa: E402
 
 
 @pytest_asyncio.fixture(autouse=True)

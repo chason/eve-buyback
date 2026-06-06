@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from app.deps import SessionDep
+from app.interface.deps import SessionDep
 
 router = APIRouter()
 

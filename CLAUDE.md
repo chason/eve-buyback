@@ -39,17 +39,16 @@ doc stays honest.
 
 ```
 buyback/
-├── backend/              # Python API
+├── backend/              # Python API — layered (see "Backend architecture" below)
 │   ├── app/
-│   │   ├── main.py       # FastAPI app factory + lifespan (+ Session/CSRF middleware)
+│   │   ├── main.py       # app factory + lifespan; wires middleware, routers, error handlers
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
-│   │   ├── db.py         # async engine/session + Base
-│   │   ├── middleware.py # CSRF custom-header guard on unsafe /api requests
-│   │   ├── api/v1/       # routers (health, auth, corporations; rules/quote later)
-│   │   ├── auth/         # EVE SSO client, session helpers, require_role deps
-│   │   ├── eve/          # ESI client (public character/corp lookups)
-│   │   ├── schemas/      # Pydantic request/response DTOs
-│   │   └── models/       # SQLAlchemy: Corporation, Character, ManagerAssignment
+│   │   ├── interface/    # INTERFACE: FastAPI routers (v1/) + deps, security, middleware, error mapping
+│   │   ├── application/  # APPLICATION: use cases (auth, corporations) + typed errors
+│   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers)
+│   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
+│   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO); return pydantic
+│   │   └── schemas/      # API request/response DTOs (interface contracts)
 │   ├── alembic/          # migrations (async env.py)
 │   └── tests/            # pytest
 ├── frontend/             # TypeScript SPA (Vite + React + TanStack Query)
@@ -57,6 +56,45 @@ buyback/
 ├── docs/                 # architecture.md + adr/
 └── .github/workflows/    # CI
 ```
+
+## Backend architecture (layers)
+
+The backend is organized into strict layers. **Dependencies point inward/downward
+only** — an outer layer may import the one beneath it, never the reverse:
+
+```
+interface  →  application  →  domain
+                  ↓
+                data        plugins
+```
+
+- **`interface/`** — the API. FastAPI routers under `v1/` plus session/auth
+  dependencies (`security.py`), the CSRF middleware, the DB-session provider
+  (`deps.py`), and the `ApplicationError → HTTP status` mapping (`errors.py`).
+  Routers contain **only** API concerns (status codes, request/response wiring,
+  reading the session cookie) and **call the application layer**. No business logic,
+  no database access.
+- **`application/`** — **use cases**, one function per user action (e.g.
+  `complete_login`, `register_corporation`). A use case orchestrates: it calls
+  `plugins/` and `domain/` functions and `data/` repositories, owns the unit of work
+  (`session.commit()`), and raises typed `errors.py` exceptions on rule violations.
+  It knows nothing about HTTP.
+- **`domain/`** — small, **single-purpose pure functions** with no I/O
+  (e.g. `derive_role`, `role_at_least`, `generate_pkce`). Use cases compose these.
+- **`data/`** — all database logic. `models/` holds SQLAlchemy ORM entities;
+  `repositories/` holds query/write functions, kept in **separate files** from the
+  models. **Repositories never return ORM entities** — they return the Pydantic
+  read-models in `records.py`, so the DB shape never leaks upward.
+- **`plugins/`** — gateways to **outside APIs** (EVE ESI, EVE SSO). Pure transport;
+  like the data layer, they **return Pydantic models** whenever they hand back data.
+- **`schemas/`** — Pydantic **API DTOs** (the request/response contract). The
+  interface layer maps `data` records / `application` results to these DTOs; the
+  internal model shape and the public API contract stay decoupled.
+
+When you add a feature, add a use case in `application/`, push pure logic down into
+`domain/`, put persistence in a `data/` repository (returning a `records.py` model),
+and keep the router in `interface/v1/` thin. New outside-API integrations go in
+`plugins/`.
 
 ## Commands
 

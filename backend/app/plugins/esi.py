@@ -17,7 +17,11 @@ class CharacterInfo(BaseModel):
 
 
 class EsiClient:
-    """Minimal ESI client for public character/corporation lookups."""
+    """Minimal ESI client for public character/corporation lookups.
+
+    A plugin (outside-API gateway): it speaks HTTP to EVE's ESI and always
+    returns Pydantic models, never raw JSON, to the application layer.
+    """
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
