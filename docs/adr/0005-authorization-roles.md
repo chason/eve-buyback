@@ -1,6 +1,6 @@
 # 0005. Authorization roles: member / Buyback Manager / CEO
 
-- **Status:** Accepted (registration authority amended by [0015](0015-corp-registration-ceo-or-director.md))
+- **Status:** Accepted (registration authority amended by [0015](0015-corp-registration-ceo-or-director.md); role resolution timing amended by [0016](0016-per-request-role-resolution.md))
 - **Date:** 2026-06-04
 
 ## Context

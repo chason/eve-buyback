@@ -1,13 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-from app.auth.session import RequireUser, require_role, set_session_user
+from app.auth.session import RequireIdentity, RequireUser, require_role
 from app.deps import SessionDep
 from app.eve.esi import EsiClient, get_esi_client
 from app.models import Character, Corporation, ManagerAssignment
-from app.schemas.auth import Role, SessionUser
+from app.schemas.auth import SessionUser
 from app.schemas.corporation import CorporationOut, ManagerCreateRequest, ManagerOut
 
 router = APIRouter(prefix="/corporations", tags=["corporations"])
@@ -17,9 +17,9 @@ CeoUser = Annotated[SessionUser, Depends(require_role("ceo"))]
 
 
 async def get_current_corporation(
-    user: RequireUser, session: SessionDep
+    identity: RequireIdentity, session: SessionDep
 ) -> Corporation:
-    corp = await session.get(Corporation, user.corporation_id)
+    corp = await session.get(Corporation, identity.corporation_id)
     if corp is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -33,7 +33,7 @@ CurrentCorporation = Annotated[Corporation, Depends(get_current_corporation)]
 
 @router.post("", response_model=CorporationOut, status_code=status.HTTP_201_CREATED)
 async def register_corporation(
-    request: Request, user: RequireUser, session: SessionDep, esi: EsiDep
+    user: RequireUser, session: SessionDep, esi: EsiDep
 ) -> Corporation:
     """Register the caller's corporation. Allowed for the CEO or a Director (ADR-0015)."""
     if not (user.role == "ceo" or user.is_director):
@@ -57,7 +57,8 @@ async def register_corporation(
     session.add(corp)
 
     # A non-CEO Director who registers is auto-granted Buyback Manager (ADR-0015).
-    new_role: Role = user.role
+    # No session rewrite needed: the role is resolved from the DB on the caller's
+    # next request, which will see this assignment (ADR-0016).
     if user.role != "ceo":
         session.add(
             ManagerAssignment(
@@ -66,15 +67,9 @@ async def register_corporation(
                 granted_by_character_id=user.character_id,
             )
         )
-        new_role = "manager"
 
     await session.commit()
     await session.refresh(corp)
-
-    set_session_user(
-        request,
-        user.model_copy(update={"corporation_registered": True, "role": new_role}),
-    )
     return corp
 
 

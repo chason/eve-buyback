@@ -25,5 +25,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0013](0013-frontend-stack.md) | Frontend: React + Vite + TanStack Query | Accepted |
 | [0014](0014-persisted-appraisals.md) | Persisted, immutable appraisals with shareable ids | Accepted |
 | [0015](0015-corp-registration-ceo-or-director.md) | Corp registration by CEO or Director | Accepted |
+| [0016](0016-per-request-role-resolution.md) | Resolve the app role from the DB per request | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

@@ -2,14 +2,23 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
 
-from app.auth.session import RequireUser, clear_session, set_session_user
+from app.auth.session import (
+    RequireUser,
+    clear_session,
+    resolve_user,
+    set_session_identity,
+)
 from app.auth.sso import EveSsoClient, generate_pkce, generate_state, get_sso_client
 from app.deps import SessionDep
 from app.eve.esi import EsiClient, get_esi_client
-from app.models import Character, Corporation, ManagerAssignment
-from app.schemas.auth import LoginRequest, LoginUrlResponse, Role, SessionUser
+from app.models import Character
+from app.schemas.auth import (
+    LoginRequest,
+    LoginUrlResponse,
+    SessionIdentity,
+    SessionUser,
+)
 
 router = APIRouter(prefix="/auth")
 
@@ -40,26 +49,6 @@ async def login_url(request: Request, sso: SsoDep) -> LoginUrlResponse:
         authorization_url=sso.build_authorize_url(state=state, code_challenge=challenge),
         state=state,
     )
-
-
-async def _resolve_role(
-    session: SessionDep, *, character_id: int, corporation_id: int, is_ceo: bool
-) -> tuple[Role, bool]:
-    """Return (app role, corporation_registered) from the database."""
-    corp = await session.get(Corporation, corporation_id)
-    registered = corp is not None
-    if is_ceo:
-        return "ceo", registered
-    if registered:
-        existing = await session.execute(
-            select(ManagerAssignment).where(
-                ManagerAssignment.corporation_id == corporation_id,
-                ManagerAssignment.character_id == character_id,
-            )
-        )
-        if existing.scalar_one_or_none() is not None:
-            return "manager", True
-    return "member", registered
 
 
 @router.post("/login", response_model=SessionUser)
@@ -97,29 +86,23 @@ async def login(
         char.name = character.name
         char.last_login_at = datetime.now(UTC)
 
-    is_ceo = character.character_id == corporation.ceo_id
-    role, corporation_registered = await _resolve_role(
-        session,
-        character_id=character.character_id,
-        corporation_id=corporation_id,
-        is_ceo=is_ceo,
-    )
     await session.commit()
 
-    user = SessionUser(
+    # Cookie holds stable identity only; role is resolved from the DB each
+    # request (ADR-0016). is_ceo/is_director come from ESI and live in the cookie.
+    identity = SessionIdentity(
         character_id=character.character_id,
         character_name=character.name,
         corporation_id=corporation_id,
         corporation_name=corporation.name,
-        role=role,
         is_director=is_director,
-        corporation_registered=corporation_registered,
+        is_ceo=character.character_id == corporation.ceo_id,
     )
 
     request.session.pop(OAUTH_STATE_KEY, None)
     request.session.pop(PKCE_VERIFIER_KEY, None)
-    set_session_user(request, user)
-    return user
+    set_session_identity(request, identity)
+    return await resolve_user(identity, session)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
