@@ -6,6 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.v1 import api_router
 from app.config import get_settings
+from app.middleware import CsrfHeaderMiddleware
 
 
 @asynccontextmanager
@@ -23,6 +24,9 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Buyback API", version="0.1.0", lifespan=lifespan)
+
+    # Require a custom header on state-changing API requests (ADR-0017).
+    app.add_middleware(CsrfHeaderMiddleware)
 
     # Signed session cookie; stores identity only, never EVE tokens (ADR-0004).
     app.add_middleware(

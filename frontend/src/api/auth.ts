@@ -1,4 +1,4 @@
-import { apiGet } from "./client"
+import { apiGet, apiSend } from "./client"
 
 export type Role = "member" | "manager" | "ceo"
 
@@ -38,28 +38,17 @@ export async function getMe(): Promise<SessionUser | null> {
 export const getLoginUrl = () => apiGet<LoginUrlResponse>("/auth/login-url")
 
 export async function login(code: string, state: string): Promise<SessionUser> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, state }),
-  })
+  const res = await apiSend("POST", "/auth/login", { code, state })
   if (!res.ok) throw new Error(`Login failed: ${res.status}`)
   return (await res.json()) as SessionUser
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-  })
+  await apiSend("POST", "/auth/logout")
 }
 
 export async function registerCorporation(): Promise<Corporation> {
-  const res = await fetch(`${API_BASE}/corporations`, {
-    method: "POST",
-    credentials: "include",
-  })
+  const res = await apiSend("POST", "/corporations")
   if (!res.ok) throw new Error(`Register failed: ${res.status}`)
   return (await res.json()) as Corporation
 }

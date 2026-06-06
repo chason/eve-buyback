@@ -52,7 +52,12 @@ def client(request: pytest.FixtureRequest):
     app.dependency_overrides[get_sso_client] = lambda: FakeSso()
     app.dependency_overrides[get_esi_client] = lambda: esi_cls()
     transport = ASGITransport(app=app)
-    yield AsyncClient(transport=transport, base_url="http://test")
+    # Default CSRF header so mutating requests pass the middleware (ADR-0017).
+    yield AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"X-Buyback-CSRF": "1"},
+    )
     app.dependency_overrides.clear()
 
 

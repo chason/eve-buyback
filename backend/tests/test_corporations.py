@@ -59,7 +59,12 @@ class OtherCorpEsi(CeoEsi):
 def _client(esi: BaseEsi) -> AsyncClient:
     app.dependency_overrides[get_sso_client] = lambda: FakeSso()
     app.dependency_overrides[get_esi_client] = lambda: esi
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    # Default CSRF header so mutating requests pass the middleware (ADR-0017).
+    return AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-Buyback-CSRF": "1"},
+    )
 
 
 @pytest.fixture(autouse=True)

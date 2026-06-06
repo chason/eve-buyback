@@ -41,9 +41,10 @@ doc stays honest.
 buyback/
 ├── backend/              # Python API
 │   ├── app/
-│   │   ├── main.py       # FastAPI app factory + lifespan (+ SessionMiddleware)
+│   │   ├── main.py       # FastAPI app factory + lifespan (+ Session/CSRF middleware)
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
 │   │   ├── db.py         # async engine/session + Base
+│   │   ├── middleware.py # CSRF custom-header guard on unsafe /api requests
 │   │   ├── api/v1/       # routers (health, auth, corporations; rules/quote later)
 │   │   ├── auth/         # EVE SSO client, session helpers, require_role deps
 │   │   ├── eve/          # ESI client (public character/corp lookups)
