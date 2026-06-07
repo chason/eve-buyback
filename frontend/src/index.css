@@ -88,10 +88,12 @@ label:has(> .search-results) > input {
 }
 
 /* Helper text under a checkbox (checkbox labels lay out inline, so an inside
-   <small> would collide — render it as a muted block on its own line instead). */
+   <small> would collide — render it as a muted block on its own line instead).
+   Indented to line up with the checkbox's label text, not the checkbox. */
 .field-hint {
   display: block;
-  margin: -0.5rem 0 var(--pico-spacing);
+  /* checkbox width (1.25rem) + its gap (0.5rem), measured at the label's font size */
+  margin: -0.5rem 0 var(--pico-spacing) 1.75rem;
   color: var(--pico-muted-color);
 }
 
