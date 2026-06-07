@@ -193,6 +193,40 @@ async def test_appraisal_from_paste_resolves_names():
         assert body["rejected_count"] == 1
 
 
+async def test_appraisal_paste_ambiguous_name_is_rejected():
+    # EVE SDE has duplicate type names; a pasted name that matches more than one
+    # type must NOT silently resolve to an arbitrary one — it's rejected.
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_market_groups(
+            session, [{"market_group_id": 1, "parent_id": None, "name": "Ore"}]
+        )
+        await sde_repo.bulk_upsert_types(
+            session,
+            [
+                {"type_id": 34, "name": "Tritanium", "group_id": 18,
+                 "market_group_id": 1, "volume": 0.01, "published": True},
+                {"type_id": 35, "name": "Tritanium", "group_id": 18,
+                 "market_group_id": 1, "volume": 0.01, "published": True},
+            ],
+        )
+        await session.commit()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.post(
+            "/api/v1/appraisals", json={"paste": "Tritanium 1000"}
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["rejected_count"] == 1
+        assert Decimal(body["accepted_total"]) == 0
+        line = body["lines"][0]
+        assert line["status"] == "rejected"
+        assert line["type_id"] is None
+        assert line["reason"] == "Ambiguous name (2 matches)"
+
+
 async def test_appraisal_requires_items_or_paste():
     _use_fuzzwork({})  # so the fuzzwork dependency resolves; body validation fails first
     async with make_client(CeoEsi()) as http:

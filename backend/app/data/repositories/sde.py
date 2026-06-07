@@ -40,15 +40,25 @@ async def get_types(
 
 async def get_types_by_names(
     session: AsyncSession, names: Sequence[str]
-) -> dict[str, SdeTypeRecord]:
+) -> dict[str, list[SdeTypeRecord]]:
     """Exact, case-insensitive name lookup, keyed by lowercased name (for paste
-    resolution). Unmatched names are simply absent."""
+    resolution). Returns **all** matches per name — EVE SDE has duplicate type
+    names, so a name can map to more than one type. The caller decides how to
+    handle ambiguity (resolve a single match, reject otherwise). Unmatched names
+    are simply absent."""
     if not names:
         return {}
     lowered = {n.lower() for n in names}
-    stmt = select(SdeType).where(func.lower(SdeType.name).in_(lowered))
+    stmt = select(SdeType).where(func.lower(SdeType.name).in_(lowered)).order_by(
+        SdeType.type_id
+    )
     rows = (await session.execute(stmt)).scalars().all()
-    return {r.name.lower(): SdeTypeRecord.model_validate(r) for r in rows}
+    by_name: dict[str, list[SdeTypeRecord]] = {}
+    for r in rows:
+        by_name.setdefault(r.name.lower(), []).append(
+            SdeTypeRecord.model_validate(r)
+        )
+    return by_name
 
 
 async def get_market_group(

@@ -46,6 +46,7 @@ class _WorkItem:
     type_id: int | None
     fallback_name: str | None
     quantity: int
+    reason: str | None = None
 
 
 async def create_appraisal(
@@ -135,14 +136,31 @@ async def _gather_items(
             session, [p.name for p in parsed]
         )
         for p in parsed:
-            match = by_name.get(p.name.lower())
-            work.append(
-                _WorkItem(
-                    type_id=match.type_id if match else None,
-                    fallback_name=None if match else p.name,
-                    quantity=p.quantity,
+            matches = by_name.get(p.name.lower(), [])
+            if len(matches) == 1:
+                work.append(
+                    _WorkItem(
+                        type_id=matches[0].type_id,
+                        fallback_name=None,
+                        quantity=p.quantity,
+                    )
                 )
-            )
+            else:
+                # 0 matches → unknown; >1 → an ambiguous EVE-SDE duplicate name.
+                # Never silently guess which type the paster meant — reject it.
+                reason = (
+                    f"Ambiguous name ({len(matches)} matches)"
+                    if matches
+                    else "Unknown item"
+                )
+                work.append(
+                    _WorkItem(
+                        type_id=None,
+                        fallback_name=p.name,
+                        quantity=p.quantity,
+                        reason=reason,
+                    )
+                )
     return work
 
 
@@ -180,7 +198,9 @@ def _compute_line(
     parent_of: dict[int, int | None],
 ) -> dict:
     if w.type_id is None:
-        return _rejected(None, w.fallback_name or "Unknown", w.quantity, "Unknown item")
+        return _rejected(
+            None, w.fallback_name or "Unknown", w.quantity, w.reason or "Unknown item"
+        )
 
     sde_type = types.get(w.type_id)
     if sde_type is None:
