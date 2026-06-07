@@ -32,5 +32,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0020](0020-decimal-money-values.md) | Decimal (not float) for money and quantity values | Accepted |
 | [0021](0021-appraisal-computation-and-storage.md) | Appraisal computation, storage, and closed-set typing | Accepted |
 | [0022](0022-no-sequential-pks-in-api.md) | Don't expose sequential surrogate PKs in the API | Accepted |
+| [0023](0023-frontend-styling-and-typegen.md) | Frontend styling (Pico.css) and OpenAPI type generation | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
