@@ -53,16 +53,19 @@ async def test_rule_crud_lifecycle():
             json={"target_kind": "type", "target_id": 34, "percentage": "95"},
         )
         assert created.status_code == 201
-        public_id = created.json()["public_id"]
-        assert len(public_id) == 12  # opaque, non-sequential handle (ADR-0022)
-        assert "id" not in created.json()  # the integer PK is never exposed
-        assert created.json()["basis"] is None  # inherits config default
+        body = created.json()
+        # No surrogate id is exposed; the rule is identified by its target (ADR-0022).
+        assert "id" not in body and "public_id" not in body
+        assert (body["target_kind"], body["target_id"]) == ("type", 34)
+        assert body["basis"] is None  # inherits config default
 
         listed = await http.get("/api/v1/corporations/me/rules")
-        assert [r["public_id"] for r in listed.json()] == [public_id]
+        assert [(r["target_kind"], r["target_id"]) for r in listed.json()] == [
+            ("type", 34)
+        ]
 
         patched = await http.patch(
-            f"/api/v1/corporations/me/rules/{public_id}",
+            "/api/v1/corporations/me/rules/type/34",
             json={"basis": "sell", "enabled": False},
         )
         assert patched.status_code == 200
@@ -70,7 +73,7 @@ async def test_rule_crud_lifecycle():
         assert patched.json()["enabled"] is False
         assert Decimal(patched.json()["percentage"]) == 95  # unchanged
 
-        removed = await http.delete(f"/api/v1/corporations/me/rules/{public_id}")
+        removed = await http.delete("/api/v1/corporations/me/rules/type/34")
         assert removed.status_code == 204
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
 
@@ -121,11 +124,13 @@ async def test_market_group_rule_crud_and_validation():
 
 
 async def test_patch_missing_rule_404():
+    await _seed_sde()
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
+        # No rule exists for this target yet.
         resp = await http.patch(
-            "/api/v1/corporations/me/rules/4242", json={"percentage": "50"}
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "50"}
         )
         assert resp.status_code == 404
 

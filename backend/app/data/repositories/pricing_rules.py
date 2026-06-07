@@ -1,4 +1,7 @@
-"""Pricing rule CRUD (ADR-0007). Returns records; the application owns commit."""
+"""Pricing rule CRUD (ADR-0007). Returns records; the application owns commit.
+
+Rules are addressed by their natural key — `(corporation_id, target_kind,
+target_id)` — which is unique; no surrogate id is exposed (ADR-0022)."""
 
 from decimal import Decimal
 
@@ -22,13 +25,6 @@ async def list_rules(
     return [PricingRuleRecord.model_validate(r) for r in rows]
 
 
-async def get_rule(
-    session: AsyncSession, public_id: str
-) -> PricingRuleRecord | None:
-    row = await _get_by_public_id(session, public_id)
-    return PricingRuleRecord.model_validate(row) if row is not None else None
-
-
 async def get_rule_for_target(
     session: AsyncSession,
     *,
@@ -36,19 +32,18 @@ async def get_rule_for_target(
     target_kind: TargetKind,
     target_id: int,
 ) -> PricingRuleRecord | None:
-    stmt = select(PricingRule).where(
-        PricingRule.corporation_id == corporation_id,
-        PricingRule.target_kind == target_kind,
-        PricingRule.target_id == target_id,
+    row = await _get_row(
+        session,
+        corporation_id=corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
     )
-    row = (await session.execute(stmt)).scalar_one_or_none()
     return PricingRuleRecord.model_validate(row) if row is not None else None
 
 
 async def create_rule(
     session: AsyncSession,
     *,
-    public_id: str,
     corporation_id: int,
     target_kind: TargetKind,
     target_id: int,
@@ -57,7 +52,6 @@ async def create_rule(
     enabled: bool,
 ) -> PricingRuleRecord:
     rule = PricingRule(
-        public_id=public_id,
         corporation_id=corporation_id,
         target_kind=target_kind,
         target_id=target_id,
@@ -72,10 +66,20 @@ async def create_rule(
 
 
 async def update_rule(
-    session: AsyncSession, public_id: str, **fields
+    session: AsyncSession,
+    *,
+    corporation_id: int,
+    target_kind: TargetKind,
+    target_id: int,
+    fields: dict,
 ) -> PricingRuleRecord | None:
-    """Patch the given fields on a rule. Returns None if it doesn't exist."""
-    row = await _get_by_public_id(session, public_id)
+    """Patch fields on the corp's rule for a target. Returns None if absent."""
+    row = await _get_row(
+        session,
+        corporation_id=corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
+    )
     if row is None:
         return None
     for key, value in fields.items():
@@ -85,17 +89,36 @@ async def update_rule(
     return PricingRuleRecord.model_validate(row)
 
 
-async def delete_rule(session: AsyncSession, public_id: str) -> bool:
-    """Delete a rule; return False if it didn't exist."""
-    row = await _get_by_public_id(session, public_id)
+async def delete_rule(
+    session: AsyncSession,
+    *,
+    corporation_id: int,
+    target_kind: TargetKind,
+    target_id: int,
+) -> bool:
+    """Delete the corp's rule for a target; return False if it didn't exist."""
+    row = await _get_row(
+        session,
+        corporation_id=corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
+    )
     if row is None:
         return False
     await session.delete(row)
     return True
 
 
-async def _get_by_public_id(
-    session: AsyncSession, public_id: str
+async def _get_row(
+    session: AsyncSession,
+    *,
+    corporation_id: int,
+    target_kind: TargetKind,
+    target_id: int,
 ) -> PricingRule | None:
-    stmt = select(PricingRule).where(PricingRule.public_id == public_id)
+    stmt = select(PricingRule).where(
+        PricingRule.corporation_id == corporation_id,
+        PricingRule.target_kind == target_kind,
+        PricingRule.target_id == target_id,
+    )
     return (await session.execute(stmt)).scalar_one_or_none()

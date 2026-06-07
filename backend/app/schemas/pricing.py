@@ -25,7 +25,7 @@ class ConfigUpdateRequest(BaseModel):
 class RuleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    public_id: str
+    # A rule is identified by its target; no surrogate id is exposed (ADR-0022).
     target_kind: TargetKind
     target_id: int
     basis: Basis | None

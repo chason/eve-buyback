@@ -106,7 +106,6 @@ class BuybackConfigRecord(BaseModel):
 class PricingRuleRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    public_id: str
     corporation_id: int
     target_kind: TargetKind
     target_id: int

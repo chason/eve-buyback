@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.application import pricing as pricing_app
 from app.application.auth import AuthenticatedUser
+from app.domain.pricing import TargetKind
 from app.interface.deps import SessionDep
 from app.interface.security import RequireUser, require_role
 from app.schemas.pricing import (
@@ -51,9 +52,10 @@ async def create_rule(
     return RuleOut(**rule.model_dump())
 
 
-@router.patch("/rules/{public_id}", response_model=RuleOut)
+@router.patch("/rules/{target_kind}/{target_id}", response_model=RuleOut)
 async def update_rule(
-    public_id: str,
+    target_kind: TargetKind,
+    target_id: int,
     payload: RuleUpdateRequest,
     user: ManagerUser,
     session: SessionDep,
@@ -61,16 +63,25 @@ async def update_rule(
     rule = await pricing_app.update_rule(
         session,
         corporation_id=user.corporation_id,
-        public_id=public_id,
+        target_kind=target_kind,
+        target_id=target_id,
         fields=payload.model_dump(exclude_unset=True),
     )
     return RuleOut(**rule.model_dump())
 
 
-@router.delete("/rules/{public_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/rules/{target_kind}/{target_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_rule(
-    public_id: str, user: ManagerUser, session: SessionDep
+    target_kind: TargetKind,
+    target_id: int,
+    user: ManagerUser,
+    session: SessionDep,
 ) -> None:
     await pricing_app.delete_rule(
-        session, corporation_id=user.corporation_id, public_id=public_id
+        session,
+        corporation_id=user.corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
     )

@@ -2,52 +2,63 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-07
-- **Relates to:** [0003](0003-multi-tenant-corp-scoping.md) (tenancy), [0014](0014-persisted-appraisals.md) (appraisal `public_id`)
+- **Relates to:** [0003](0003-multi-tenant-corp-scoping.md) (tenancy), [0007](0007-pricing-rule-taxonomy.md) (rule targeting), [0014](0014-persisted-appraisals.md) (appraisal `public_id`)
 
 ## Context
 
 Most identifiers the API exposes are **EVE-assigned natural ids** (`character_id`,
 `corporation_id`, `type_id`, `market_group_id`, …) — externally meaningful and
-correct to surface. Appraisals already follow [ADR-0014](0014-persisted-appraisals.md):
-the internal integer PK stays hidden behind a random `public_id`.
+correct to surface. Appraisals follow [ADR-0014](0014-persisted-appraisals.md): the
+internal integer PK stays hidden behind a random `public_id` (they need a synthetic
+handle because two appraisals aren't distinguishable by content and the id is shared
+as a link).
 
-An audit found one resource breaking that rule: **`PricingRule`** exposed its
+An audit found one resource breaking the rule: **`PricingRule`** exposed its
 auto-increment integer PK in `RuleOut` and in the `PATCH/DELETE
-/corporations/me/rules/{id}` URLs. Tenant isolation was still enforced (the use case
-returns `404` for a rule belonging to another corp, so there is **no IDOR**), but a
-single global sequence leaks low-value cross-tenant metadata: a corp seeing `id: 4821`
-can infer roughly how many rules exist system-wide and the relative creation order
-across tenants — exactly the enumeration ADR-0014 set out to avoid.
+/corporations/me/rules/{id}` URLs. Tenant isolation was enforced (a foreign rule
+returns `404`, so there is **no IDOR**), but a single global sequence leaks low-value
+cross-tenant metadata: a corp seeing `id: 4821` can infer roughly how many rules exist
+system-wide and the relative creation order across tenants — the enumeration ADR-0014
+set out to avoid.
 
 ## Decision
 
-**No externally-referenced resource exposes a sequential surrogate PK.** Resources
-keyed by an internal auto-increment id get a random, non-enumerable `public_id`
-(12-char base64url slug, 72 bits — `domain/ids.py`); the integer PK stays internal,
-used only for relationships and ordering.
+**No externally-referenced resource exposes a sequential surrogate PK.**
 
-Applied to `PricingRule`: added a unique `public_id` column; `RuleOut.public_id` and
-the rule URLs now use it; lookups for update/delete go through `public_id` with the
-existing corp-ownership check. The convention now matches appraisals.
+Unlike an appraisal, a pricing rule has a **natural unique key**: there is at most one
+rule per `(corporation_id, target_kind, target_id)` ([ADR-0007](0007-pricing-rule-taxonomy.md)).
+So it needs no synthetic handle at all — address it by its target:
+
+- `RuleOut` carries `target_kind` + `target_id` (no id of any kind).
+- `PATCH` / `DELETE /corporations/me/rules/{target_kind}/{target_id}`.
+- The corp-scoped lookup `(corp, target_kind, target_id)` doubles as the tenancy check
+  — a foreign or absent rule is simply "not found" (`404`).
+- `POST /corporations/me/rules` still creates (with the target in the body) and `409`s
+  on a duplicate target. The target is immutable; retarget by deleting and recreating.
+
+The integer PK is retained internally for relationships and ordering, never serialized.
 
 Natural EVE ids remain exposed as before — this ADR is about **synthetic** keys only.
 
 ## Consequences
 
-- No cross-tenant volume/timing inference via rule ids; consistent with ADR-0014.
-- A new externally-addressable table should either be keyed by a natural id or carry a
-  `public_id` (see `generate_*_id` in `domain/ids.py`). Reviewers should reject raw
-  integer-PK exposure.
-- Slightly more indirection (lookup by `public_id` rather than PK), negligible at this
-  scale. The integer PK is retained for FKs/joins.
+- No cross-tenant volume/timing inference; consistent with ADR-0014's intent.
+- No surrogate, public or private, leaves the data layer for rules — and no extra
+  column, migration, or id generator is needed. The URL is meaningful
+  (`/rules/type/34`, `/rules/market_group/1857`).
+- A new externally-addressable resource should be keyed by a **natural id** where one
+  exists (like rules); only invent a random `public_id` (see `domain/ids.py`) when
+  there is no natural key and/or the handle is shared as a link (like appraisals).
+  Reviewers should reject raw integer-PK exposure.
 
 ## Alternatives considered
 
-- **Address rules by their natural target** (`/rules/{target_kind}/{target_id}`, since
-  `(corp, target_kind, target_id)` is unique) — elegant and needs no new column, but
-  changes the URL shape to two segments and diverges from the established `public_id`
-  idiom; the appraisal pattern is the more consistent, lower-surprise choice.
-- **Leave it** — access-controlled, low severity, but inconsistent with ADR-0014 and a
-  needless metadata leak; rejected.
-- **Per-corp local sequence / UUID PK** — local sequence adds insert-time counting and
-  races; a UUID works but yields uglier handles than the short slug for no gain.
+- **Random `public_id` slug on the rule** (like appraisals) — consistent with the
+  existing idiom and keeps a one-segment URL, but invents a "public" handle for a
+  resource that is never shared and already has a natural key, and costs a column +
+  migration + generator. Target-addressing is lighter and more honest; chosen instead.
+- **Leave the integer PK exposed** — access-controlled and low severity, but
+  inconsistent with ADR-0014 and a needless metadata leak; rejected.
+- **Per-corp local sequence / UUID PK** — a local sequence adds insert-time counting
+  and races; a UUID works but is heavier than addressing by the target the rule
+  already names.

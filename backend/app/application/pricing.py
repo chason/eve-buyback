@@ -17,7 +17,6 @@ from app.data.records import BuybackConfigRecord, PricingRuleRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
-from app.domain.ids import generate_rule_id
 from app.domain.pricing import (
     DEFAULT_AGGREGATE_FIELD,
     DEFAULT_BASIS,
@@ -98,7 +97,6 @@ async def create_rule(
         raise PricingRuleAlreadyExists()
     rule = await rules_repo.create_rule(
         session,
-        public_id=generate_rule_id(),
         corporation_id=corporation_id,
         target_kind=target_kind,
         target_id=target_id,
@@ -114,28 +112,42 @@ async def update_rule(
     session: AsyncSession,
     *,
     corporation_id: int,
-    public_id: str,
+    target_kind: TargetKind,
+    target_id: int,
     fields: dict,
 ) -> PricingRuleRecord:
-    """Patch `basis`/`percentage`/`enabled` on a rule. Target is immutable — change
-    it by deleting and recreating."""
+    """Patch `basis`/`percentage`/`enabled` on the corp's rule for a target. The
+    corp-scoped query also enforces tenancy — a foreign rule simply isn't found."""
     await get_registered_corporation(session, corporation_id)
-    existing = await rules_repo.get_rule(session, public_id)
-    if existing is None or existing.corporation_id != corporation_id:
+    rule = await rules_repo.update_rule(
+        session,
+        corporation_id=corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
+        fields=fields,
+    )
+    if rule is None:
         raise PricingRuleNotFound()
-    rule = await rules_repo.update_rule(session, public_id, **fields)
     await session.commit()
-    return rule  # type: ignore[return-value]  # existence checked above
+    return rule
 
 
 async def delete_rule(
-    session: AsyncSession, *, corporation_id: int, public_id: str
+    session: AsyncSession,
+    *,
+    corporation_id: int,
+    target_kind: TargetKind,
+    target_id: int,
 ) -> None:
     await get_registered_corporation(session, corporation_id)
-    existing = await rules_repo.get_rule(session, public_id)
-    if existing is None or existing.corporation_id != corporation_id:
+    removed = await rules_repo.delete_rule(
+        session,
+        corporation_id=corporation_id,
+        target_kind=target_kind,
+        target_id=target_id,
+    )
+    if not removed:
         raise PricingRuleNotFound()
-    await rules_repo.delete_rule(session, public_id)
     await session.commit()
 
 

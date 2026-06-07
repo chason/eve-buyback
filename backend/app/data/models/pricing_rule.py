@@ -20,10 +20,9 @@ class PricingRule(Base):
         ),
     )
 
+    # Internal surrogate PK, never exposed by the API. A rule is addressed
+    # externally by its natural key (corp + target_kind + target_id) — ADR-0022.
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Random, non-enumerable handle used by the API (ADR-0022); the integer PK is
-    # never exposed.
-    public_id: Mapped[str] = mapped_column(unique=True, index=True)
     corporation_id: Mapped[int] = mapped_column(
         ForeignKey("corporations.corporation_id", ondelete="CASCADE")
     )
