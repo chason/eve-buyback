@@ -45,11 +45,10 @@ used `float`** — both money (market price aggregates) and quantities
 
 - Money math is exact and appraisals are reproducible — the property
   [ADR-0014](0014-persisted-appraisals.md) needs.
-- **SQLite caveat:** SQLite's `NUMERIC` has REAL (float) affinity, so in local dev a
-  value still round-trips through a float under the hood — no worse than the previous
-  all-`float` design, and the full guarantee holds on the PostgreSQL deployment
-  target. If exactness in SQLite ever matters, revisit with a TEXT-backed decimal
-  type or scaled-integer storage.
+- **SQLite caveat (now moot — [ADR-0024](0024-postgresql-database.md)):** under SQLite,
+  `NUMERIC` had REAL (float) affinity, so values round-tripped through a float in local
+  dev. Since the project moved to PostgreSQL as the sole database, `NUMERIC` is exact
+  everywhere and this caveat no longer applies.
 - Pydantic serializes `Decimal` to a JSON number by default; API DTOs that expose
   money (M5 appraisals) inherit this — confirm the SPA renders it acceptably then.
 - Cached timestamps from SQLite come back naive; freshness math normalizes them to

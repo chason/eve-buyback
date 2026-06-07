@@ -1,4 +1,4 @@
-from app.domain.paste import ParsedLine, parse_paste
+from app.domain.paste import MAX_QUANTITY, ParsedLine, parse_paste
 
 
 def test_multibuy_name_space_qty():
@@ -47,3 +47,9 @@ def test_blank_lines_skipped_and_multiline():
 def test_empty_input():
     assert parse_paste("") == []
     assert parse_paste("   \n  \n") == []
+
+
+def test_quantity_clamped_to_max():
+    # Absurd quantities are clamped so they stay well under BIGINT (ADR-0024).
+    [line] = parse_paste("Tritanium 99999999999999999999999")
+    assert line.quantity == MAX_QUANTITY

@@ -7,7 +7,7 @@ the application layer (which owns the clock and the `commit()`).
 from collections.abc import Sequence
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import MarketPrice
@@ -52,7 +52,7 @@ async def upsert_prices(
     if not rows:
         return
     values = [{**row, "hub_id": hub_id} for row in rows]
-    stmt = sqlite_insert(MarketPrice).values(values)
+    stmt = pg_insert(MarketPrice).values(values)
     stmt = stmt.on_conflict_do_update(
         index_elements=[MarketPrice.hub_id, MarketPrice.type_id],
         set_={col: getattr(stmt.excluded, col) for col in _AGGREGATE_COLUMNS},

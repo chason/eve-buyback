@@ -3,12 +3,13 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.domain.paste import MAX_QUANTITY
 from app.domain.pricing import Basis, LineStatus
 
 
 class AppraisalItemIn(BaseModel):
     type_id: int
-    quantity: int = Field(ge=1)
+    quantity: int = Field(ge=1, le=MAX_QUANTITY)
 
 
 class AppraisalCreateRequest(BaseModel):

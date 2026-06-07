@@ -29,6 +29,7 @@
       "AppraisalItemIn": {
         "properties": {
           "quantity": {
+            "maximum": 1000000000000.0,
             "minimum": 1.0,
             "title": "Quantity",
             "type": "integer"

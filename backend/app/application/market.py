@@ -7,7 +7,6 @@ simply omits items it has never priced, rather than failing the whole request.
 """
 
 import logging
-from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,12 +18,6 @@ from app.domain.market import is_fresh
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkClient
 
 log = logging.getLogger(__name__)
-
-
-def _as_utc(dt: datetime) -> datetime:
-    """Cached timestamps come back naive from SQLite (no tz support); we always
-    store UTC, so treat a naive value as UTC for freshness math."""
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 def _row_from_aggregate(type_id: int, agg: FuzzworkAggregate, fetched_at) -> dict:
@@ -69,7 +62,7 @@ async def get_market_prices(
     fresh = {
         tid: r
         for tid, r in cached.items()
-        if is_fresh(_as_utc(r.fetched_at), now=now, ttl_seconds=ttl)
+        if is_fresh(r.fetched_at, now=now, ttl_seconds=ttl)
     }
     to_fetch = [tid for tid in type_ids if tid not in fresh]
 

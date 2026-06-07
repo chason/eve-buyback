@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import SdeMarketGroup, SdeMetadata, SdeType
@@ -82,14 +82,10 @@ async def list_market_groups(session: AsyncSession) -> list[SdeMarketGroupRecord
 async def bulk_upsert_types(
     session: AsyncSession, rows: Sequence[dict]
 ) -> int:
-    """Insert-or-update SdeType rows keyed by `type_id`. Returns the row count.
-
-    Uses SQLite's ON CONFLICT DO UPDATE; swap to the Postgres dialect's
-    equivalent when moving off SQLite (ADR-0002).
-    """
+    """Insert-or-update SdeType rows keyed by `type_id`. Returns the row count."""
     for start in range(0, len(rows), _BATCH):
         batch = rows[start : start + _BATCH]
-        stmt = sqlite_insert(SdeType).values(list(batch))
+        stmt = pg_insert(SdeType).values(list(batch))
         stmt = stmt.on_conflict_do_update(
             index_elements=[SdeType.type_id],
             set_={
@@ -110,7 +106,7 @@ async def bulk_upsert_market_groups(
     """Insert-or-update SdeMarketGroup rows keyed by `market_group_id`."""
     for start in range(0, len(rows), _BATCH):
         batch = rows[start : start + _BATCH]
-        stmt = sqlite_insert(SdeMarketGroup).values(list(batch))
+        stmt = pg_insert(SdeMarketGroup).values(list(batch))
         stmt = stmt.on_conflict_do_update(
             index_elements=[SdeMarketGroup.market_group_id],
             set_={
@@ -135,7 +131,7 @@ async def set_metadata(
     market_group_count: int,
     imported_at: datetime,
 ) -> SdeMetadataRecord:
-    stmt = sqlite_insert(SdeMetadata).values(
+    stmt = pg_insert(SdeMetadata).values(
         id=1,
         source=source,
         type_count=type_count,

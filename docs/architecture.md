@@ -18,7 +18,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | # | Decision | ADR |
 |---|----------|-----|
 | 1 | REST backend on **FastAPI + Pydantic** | [0001](adr/0001-fastapi-backend.md) |
-| 2 | **SQLite via SQLAlchemy 2.0 + Alembic**, Postgres-ready | [0002](adr/0002-sqlite-sqlalchemy-postgres-ready.md) |
+| 2 | **PostgreSQL** via SQLAlchemy 2.0 + Alembic (asyncpg) | [0024](adr/0024-postgresql-database.md) (supersedes [0002](adr/0002-sqlite-sqlalchemy-postgres-ready.md)) |
 | 3 | **Multi-tenant** via `corp_id` row scoping | [0003](adr/0003-multi-tenant-corp-scoping.md) |
 | 4 | **EVE SSO** login, backend-issued session cookie, no persisted EVE tokens | [0004](adr/0004-eve-sso-session-auth.md) |
 | 5 | **Roles**: member / Buyback Manager / CEO (CEO auto-derived from ESI) | [0005](adr/0005-authorization-roles.md) |

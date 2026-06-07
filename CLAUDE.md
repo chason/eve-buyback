@@ -26,7 +26,7 @@ domain model, auth flow, and pricing-rule resolution.
 | Layer       | Choice                                   | Notes                                   |
 | ----------- | ---------------------------------------- | --------------------------------------- |
 | Backend     | Python + FastAPI + Pydantic v2 (async)   | REST/JSON API under `/api/v1` (ADR-0001)|
-| Persistence | SQLAlchemy 2.0 + Alembic on SQLite       | Postgres-ready (ADR-0002)               |
+| Persistence | SQLAlchemy 2.0 + Alembic on PostgreSQL (asyncpg) | Sole DB; UUID app-entity PKs (ADR-0024, 0025) |
 | Frontend    | TypeScript + React (Vite) + TanStack Query | SPA; types generated from OpenAPI (ADR-0011, 0013) |
 | Auth        | EVE SSO → backend session cookie         | No persisted EVE tokens (ADR-0004)      |
 | Market data | Fuzzwork aggregates, cached              | (ADR-0006)                              |
@@ -106,6 +106,10 @@ directory. Read them before changing files there.
 ## Commands
 
 ```bash
+# One-time: create the Postgres databases (ADR-0024), then set
+# BUYBACK_DATABASE_URL in backend/.env. The test suite derives `<name>_test`.
+createdb buyback ; createdb buyback_test
+
 # Backend (from backend/)
 uv sync --extra dev                      # create venv + install deps
 uv run uvicorn app.main:app --reload     # dev server :8000

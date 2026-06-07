@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     app_name: str = "buyback"
     environment: str = "development"
 
-    # Async SQLite by default; swap to PostgreSQL via this URL (ADR-0002).
-    database_url: str = "sqlite+aiosqlite:///./buyback.db"
+    # PostgreSQL via asyncpg (ADR-0024). Override per environment in .env.
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback"
+    )
 
     # Default market hub: Jita 4-4 station (ADR-0006).
     market_hub_id: int = 60003760

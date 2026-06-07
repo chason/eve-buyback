@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric
+from sqlalchemy import BigInteger, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -24,7 +24,8 @@ class AppraisalLine(Base):
     # as a rejected line with just its `type_name` (ADR-0021).
     type_id: Mapped[int | None]
     type_name: Mapped[str]
-    quantity: Mapped[int]
+    # User-supplied count: BIGINT so large EVE hauls (>2.1B) fit on Postgres.
+    quantity: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[LineStatus] = mapped_column(
         check_enum(LineStatus, name="line_status")
     )

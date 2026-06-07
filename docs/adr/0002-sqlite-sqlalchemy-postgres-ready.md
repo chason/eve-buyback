@@ -1,7 +1,11 @@
 # 0002. SQLite via SQLAlchemy 2.0 + Alembic, Postgres-ready
 
-- **Status:** Accepted
+- **Status:** Superseded by [0024](0024-postgresql-database.md)
 - **Date:** 2026-06-04
+
+> **Superseded:** the "SQLite-now, Postgres-ready" split caused repeated dev/prod
+> divergences; [ADR-0024](0024-postgresql-database.md) moves to PostgreSQL as the sole
+> database. The SQLAlchemy 2.0 + Alembic choices below still hold.
 
 ## Context
 

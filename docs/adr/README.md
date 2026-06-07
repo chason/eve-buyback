@@ -11,7 +11,7 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | # | Title | Status |
 |---|-------|--------|
 | [0001](0001-fastapi-backend.md) | REST backend on FastAPI + Pydantic | Accepted |
-| [0002](0002-sqlite-sqlalchemy-postgres-ready.md) | SQLite via SQLAlchemy 2.0 + Alembic, Postgres-ready | Accepted |
+| [0002](0002-sqlite-sqlalchemy-postgres-ready.md) | SQLite via SQLAlchemy 2.0 + Alembic, Postgres-ready | Superseded by 0024 |
 | [0003](0003-multi-tenant-corp-scoping.md) | Multi-tenancy via corp_id row scoping | Accepted |
 | [0004](0004-eve-sso-session-auth.md) | EVE SSO login with backend-issued session cookie | Accepted |
 | [0005](0005-authorization-roles.md) | Authorization roles: member / manager / CEO | Accepted |
@@ -33,5 +33,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0021](0021-appraisal-computation-and-storage.md) | Appraisal computation, storage, and closed-set typing | Accepted |
 | [0022](0022-no-sequential-pks-in-api.md) | Don't expose sequential surrogate PKs in the API | Accepted |
 | [0023](0023-frontend-styling-and-typegen.md) | Frontend styling (Pico.css) and OpenAPI type generation | Accepted |
+| [0024](0024-postgresql-database.md) | PostgreSQL as the sole database | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

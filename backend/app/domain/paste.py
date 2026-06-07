@@ -4,6 +4,10 @@ resolution happens in the application layer against the SDE (ADR-0021)."""
 import re
 from dataclasses import dataclass
 
+# Ceiling for a single line's quantity — rejects absurd input while staying well
+# under BIGINT. Mirrored by `AppraisalItemIn.quantity` (le=) for structured items.
+MAX_QUANTITY = 1_000_000_000_000
+
 # A trailing quantity: whitespace, an optional `x`, then a run of digits that may
 # carry thousands separators (`,` `.` space / non-breaking space — EVE's number
 # format is locale-dependent). Item names ending in letters (e.g. "Warp Disruptor
@@ -29,7 +33,9 @@ def parse_paste(text: str) -> list[ParsedLine]:
             continue
         name, quantity = _parse_line(line)
         if name:
-            result.append(ParsedLine(name=name, quantity=quantity))
+            result.append(
+                ParsedLine(name=name, quantity=min(quantity, MAX_QUANTITY))
+            )
     return result
 
 
