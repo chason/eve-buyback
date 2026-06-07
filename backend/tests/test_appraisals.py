@@ -4,11 +4,12 @@ import pytest
 
 from app.data.db import SessionLocal
 from app.data.repositories import appraisals as appraisals_repo
+from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import sde as sde_repo
 from app.main import app
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide, get_fuzzwork_client
-from tests.helpers import CeoEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, MemberEsi, login, make_client
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +110,27 @@ async def test_rule_overrides_default():
         assert Decimal(line["line_total"]) == Decimal("50.00")
 
 
+async def test_market_group_rule_applies_in_appraisal():
+    await _seed_sde()  # type 34 lives in market group 1
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("10.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # A market-group rule on group 1 covers Tritanium: 50% sell.
+        await http.post(
+            "/api/v1/corporations/me/rules",
+            json={"target_kind": "market_group", "target_id": 1,
+                  "basis": "sell", "percentage": "50"},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 2}]}
+        )
+        line = resp.json()["lines"][0]
+        assert line["basis"] == "sell"
+        assert Decimal(line["percentage"]) == 50
+        assert Decimal(line["line_total"]) == Decimal("10.00")  # 10*50% = 5, x2
+
+
 async def test_unknown_item_is_rejected():
     await _seed_sde()
     _use_fuzzwork({})
@@ -197,3 +219,41 @@ async def test_list_appraisals_returns_created():
         listed = await http.get("/api/v1/appraisals")
         assert listed.status_code == 200
         assert len(listed.json()) == 1
+
+
+async def test_list_scope_member_sees_own_manager_sees_all():
+    """A member lists only their own appraisals; a manager/CEO sees the corp's."""
+    await _seed_sde()
+    async with SessionLocal() as session:
+        await corporations_repo.create_corporation(
+            session, corporation_id=CORP_ID, name="Test Corp",
+            ceo_character_id=99999, registered_by_character_id=99999,
+        )
+        await config_repo.upsert_config(
+            session, corporation_id=CORP_ID, market_hub_id=60003760,
+            default_basis="buy", default_percentage=90, aggregate_field="percentile",
+        )
+        # An appraisal owned by a different character in the same corp.
+        await appraisals_repo.create_appraisal(
+            session, public_id="teammateAppr", corporation_id=CORP_ID,
+            created_by_character_id=777, market_hub_id=60003760,
+            accepted_total=Decimal("0"), rejected_count=0,
+            request_json={"items": []}, lines=[],
+        )
+        await session.commit()
+
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(MemberEsi()) as http:
+        me = await login(http)
+        assert me["role"] == "member"
+        await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1}]}
+        )
+        mine = await http.get("/api/v1/appraisals")
+        # Member sees only their own line, not the teammate's.
+        assert [a["created_by_character_id"] for a in mine.json()] == [CHAR_ID]
+
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        everyone = await http.get("/api/v1/appraisals")
+        assert len(everyone.json()) == 2  # manager sees the whole corp

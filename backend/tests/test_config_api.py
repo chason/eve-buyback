@@ -90,6 +90,26 @@ async def test_member_cannot_update_config_but_can_read():
         assert resp.status_code == 403
 
 
+async def test_get_config_lazily_creates_default_when_missing():
+    # A registered corp with no config row (e.g. registered before configs existed).
+    async with SessionLocal() as session:
+        await corporations_repo.create_corporation(
+            session, corporation_id=CORP_ID, name="Test Corp",
+            ceo_character_id=99999, registered_by_character_id=99999,
+        )
+        await session.commit()
+
+    async with make_client(MemberEsi()) as http:
+        await login(http)
+        resp = await http.get("/api/v1/corporations/me/config")
+        assert resp.status_code == 200
+        assert resp.json()["default_basis"] == "buy"  # default, lazily created
+
+    # The lazily-created config is now persisted.
+    async with SessionLocal() as session:
+        assert await config_repo.get_config(session, CORP_ID) is not None
+
+
 async def test_config_rejects_bad_basis():
     async with make_client(CeoEsi()) as http:
         await login(http)

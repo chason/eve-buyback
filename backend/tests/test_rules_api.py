@@ -83,7 +83,7 @@ async def test_duplicate_target_conflicts():
         assert (await http.post("/api/v1/corporations/me/rules", json=body)).status_code == 409
 
 
-async def test_unknown_target_rejected():
+async def test_unknown_type_target_rejected():
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
@@ -92,6 +92,30 @@ async def test_unknown_target_rejected():
             json={"target_kind": "type", "target_id": 999999, "percentage": "95"},
         )
         assert resp.status_code == 400
+
+
+async def test_market_group_rule_crud_and_validation():
+    await _seed_sde()  # seeds market group 1
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+
+        # A valid market-group rule.
+        created = await http.post(
+            "/api/v1/corporations/me/rules",
+            json={"target_kind": "market_group", "target_id": 1,
+                  "basis": "sell", "percentage": "80"},
+        )
+        assert created.status_code == 201
+        assert created.json()["target_kind"] == "market_group"
+
+        # An unknown market group is rejected.
+        bad = await http.post(
+            "/api/v1/corporations/me/rules",
+            json={"target_kind": "market_group", "target_id": 999999,
+                  "percentage": "80"},
+        )
+        assert bad.status_code == 400
 
 
 async def test_patch_missing_rule_404():
