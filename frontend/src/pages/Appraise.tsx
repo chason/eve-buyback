@@ -122,10 +122,14 @@ export default function Appraise() {
                   <input
                     type="number"
                     min={1}
+                    step={1}
                     value={i.quantity}
                     aria-label={`Quantity for ${i.name}`}
                     onChange={(e) =>
-                      setQuantity(i.type_id, Math.max(1, Number(e.target.value) || 1))
+                      setQuantity(
+                        i.type_id,
+                        Math.max(1, Math.trunc(Number(e.target.value)) || 1),
+                      )
                     }
                   />
                 </td>

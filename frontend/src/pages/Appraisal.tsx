@@ -12,7 +12,7 @@ export default function Appraisal() {
     queryFn: () => getAppraisal(publicId!),
     enabled: !!publicId,
   })
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
 
   if (appraisal.isLoading) return <p aria-busy="true">Loading…</p>
   if (appraisal.isError || !appraisal.data) {
@@ -21,8 +21,15 @@ export default function Appraisal() {
   const a = appraisal.data
 
   async function copyLink() {
-    await navigator.clipboard.writeText(window.location.href)
-    setCopied(true)
+    // navigator.clipboard is undefined in non-secure contexts (plain http,
+    // non-localhost); guard the whole thing so the click never rejects unhandled.
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopyState("copied")
+    } catch {
+      setCopyState("failed")
+    }
+    window.setTimeout(() => setCopyState("idle"), 2000)
   }
 
   return (
@@ -39,7 +46,11 @@ export default function Appraisal() {
         {a.rejected_count > 0 && ` · ${a.rejected_count} rejected`}
       </p>
       <button className="secondary" onClick={copyLink}>
-        {copied ? "Link copied" : "Copy link"}
+        {copyState === "copied"
+          ? "Link copied"
+          : copyState === "failed"
+            ? "Copy failed — copy from the address bar"
+            : "Copy link"}
       </button>
 
       <table>

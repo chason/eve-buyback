@@ -12,8 +12,8 @@ MAX_QUANTITY = 1_000_000_000_000
 # carry thousands separators (`,` `.` space / non-breaking space — EVE's number
 # format is locale-dependent). Item names ending in letters (e.g. "Warp Disruptor
 # II") simply don't match, so they fall through to quantity 1.
-_TRAILING_QTY = re.compile(r"^(.*?)\s+(?:x\s*)?(\d[\d.,\s ]*)$", re.IGNORECASE)
-_SEPARATORS = re.compile(r"[.,\s ]")
+_TRAILING_QTY = re.compile(r"^(.*?)\s+(?:x\s*)?(\d[\d.,\s]*)$", re.IGNORECASE)
+_SEPARATORS = re.compile(r"[.,\s]")
 
 
 @dataclass(frozen=True)
