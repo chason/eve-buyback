@@ -68,7 +68,7 @@ export default function Appraisal() {
         <tbody>
           {a.lines.map((line, idx) => (
             <tr
-              key={idx}
+              key={`${line.type_id}-${idx}`}
               className={line.status === "rejected" ? "rejected" : undefined}
             >
               <td>{line.type_name}</td>
