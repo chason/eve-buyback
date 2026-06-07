@@ -163,11 +163,29 @@ function AddRule({
     enabled: kind === "type" && query.length >= 2,
   })
 
-  // Market groups are already loaded; filter them locally by leaf name (capped).
+  // Market groups are already loaded; filter locally by matching the query anywhere
+  // in a group's path. A match on the group's own name ranks above an ancestor-only
+  // match, so searching "Raw Materials" lists that group first, then everything under
+  // it. Ties break by depth (shallower first) then path. Capped for rendering.
   const groupMatches = useMemo(() => {
     if (kind !== "market_group" || query.length < 2) return []
     const q = query.toLowerCase()
-    return groupOptions.filter((g) => g.leaf.toLowerCase().includes(q)).slice(0, 50)
+    const scored: { g: (typeof groupOptions)[number]; score: number; depth: number }[] =
+      []
+    for (const g of groupOptions) {
+      const leaf = g.leaf.toLowerCase()
+      let score: number | null = null
+      if (leaf === q) score = 0
+      else if (leaf.includes(q)) score = 1
+      else if (g.path.toLowerCase().includes(q)) score = 2
+      if (score === null) continue
+      scored.push({ g, score, depth: g.path.split(" / ").length })
+    }
+    scored.sort(
+      (a, b) =>
+        a.score - b.score || a.depth - b.depth || a.g.path.localeCompare(b.g.path),
+    )
+    return scored.slice(0, 50).map((s) => s.g)
   }, [kind, query, groupOptions])
 
   const save = useMutation({
@@ -276,8 +294,8 @@ function AddRule({
               </ul>
             )}
             <small>
-              Matches the group name; the full path disambiguates repeats. Ores live
-              under <em>… / Raw Materials / Standard Ores</em>.
+              Matches anywhere in the path — search a parent (e.g.{" "}
+              <em>Raw Materials</em>) to list everything under it.
             </small>
           </label>
         )}

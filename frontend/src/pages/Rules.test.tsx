@@ -121,6 +121,33 @@ describe("Rules", () => {
     ).toBeInTheDocument()
   })
 
+  it("matches a parent term and lists its descendants too", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.listRules).mockResolvedValue([])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
+      { market_group_id: 10, parent_id: null, name: "Manufacture & Research" },
+      { market_group_id: 11, parent_id: 10, name: "Materials" },
+      { market_group_id: 12, parent_id: 11, name: "Standard Ores" },
+    ])
+
+    renderRules()
+
+    await u.selectOptions(
+      await screen.findByLabelText("Target kind"),
+      "market_group",
+    )
+    // "Materials" is a parent; searching it surfaces the group itself AND its
+    // descendant "Standard Ores" (whose path contains "Materials").
+    await u.type(screen.getByLabelText("Search market group by name"), "materials")
+    expect(
+      await screen.findByText("Manufacture & Research / Materials"),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText("Manufacture & Research / Materials / Standard Ores"),
+    ).toBeInTheDocument()
+  })
+
   it("hides edit controls from a member", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("member"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([])
