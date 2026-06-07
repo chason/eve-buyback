@@ -255,7 +255,7 @@ Fuzzwork usage, image/link helpers, and caching.
    appraisals (`POST /appraisals`, `GET /appraisals/{public_id}`, list).
 6. **Frontend** (shipped core-first) — **6a**: OpenAPI type-gen, app shell, the
    appraisal tool + shareable result view (generated API types, Pico.css). **6b**:
-   manager rule editor, corp config view, appraisal history.
+   corp config view, manager rule editor, appraisal history (role-gated nav).
 7. **Data quality + polish** — rejection thresholds, packaging/Docker.
 
 ## 13. Out of scope (MVP) / future

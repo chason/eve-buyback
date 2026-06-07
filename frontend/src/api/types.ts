@@ -20,4 +20,11 @@ export type MarketGroupOut = Schemas["MarketGroupOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]
+export type ConfigUpdateRequest = Schemas["ConfigUpdateRequest"]
 export type RuleOut = Schemas["RuleOut"]
+export type RulePutRequest = Schemas["RulePutRequest"]
+
+// Closed-set enums shared by config + rules (derived from the contract).
+export type Basis = ConfigOut["default_basis"]
+export type AggregateField = ConfigOut["aggregate_field"]
+export type TargetKind = RuleOut["target_kind"]

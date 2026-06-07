@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, Outlet } from "react-router-dom"
 
 import { getMe, logout } from "../api/auth"
+import { isManager } from "../lib/roles"
 
 export default function Layout() {
   const queryClient = useQueryClient()
@@ -11,6 +12,7 @@ export default function Layout() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
   })
   const user = me.data
+  const showManagerLinks = user?.corporation_registered && isManager(user.role)
 
   return (
     <>
@@ -27,6 +29,19 @@ export default function Layout() {
             <li>
               <Link to="/appraise">Appraise</Link>
             </li>
+            <li>
+              <Link to="/appraisals">Appraisals</Link>
+            </li>
+            {showManagerLinks && (
+              <>
+                <li>
+                  <Link to="/config">Config</Link>
+                </li>
+                <li>
+                  <Link to="/rules">Rules</Link>
+                </li>
+              </>
+            )}
             <li>{user.character_name}</li>
             <li>
               <a

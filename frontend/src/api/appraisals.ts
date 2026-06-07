@@ -1,7 +1,16 @@
 import { apiGet, apiSend } from "./client"
-import type { AppraisalCreateRequest, AppraisalOut } from "./types"
+import type {
+  AppraisalCreateRequest,
+  AppraisalOut,
+  AppraisalSummaryOut,
+} from "./types"
 
-export type { AppraisalCreateRequest, AppraisalLineOut, AppraisalOut } from "./types"
+export type {
+  AppraisalCreateRequest,
+  AppraisalLineOut,
+  AppraisalOut,
+  AppraisalSummaryOut,
+} from "./types"
 
 export async function createAppraisal(
   body: AppraisalCreateRequest,
@@ -13,3 +22,7 @@ export async function createAppraisal(
 
 export const getAppraisal = (publicId: string) =>
   apiGet<AppraisalOut>(`/appraisals/${encodeURIComponent(publicId)}`)
+
+/** List appraisals: own for members, the whole corp's for managers/CEO. */
+export const listAppraisals = () =>
+  apiGet<AppraisalSummaryOut[]>("/appraisals")
