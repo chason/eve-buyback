@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
-    PricingRuleAlreadyExists,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
 )
@@ -76,7 +75,7 @@ async def list_rules(
     return await rules_repo.list_rules(session, corporation_id)
 
 
-async def create_rule(
+async def set_rule(
     session: AsyncSession,
     *,
     corporation_id: int,
@@ -85,17 +84,13 @@ async def create_rule(
     basis: Basis | None,
     percentage: Decimal,
     enabled: bool,
-) -> PricingRuleRecord:
+) -> tuple[PricingRuleRecord, bool]:
+    """Create or replace the corp's rule for a target (idempotent PUT). Returns
+    `(record, created)`. The target must exist (else 400); there is no 409/404 on
+    write — setting the rule for a target is the whole operation."""
     await get_registered_corporation(session, corporation_id)
     await _validate_target(session, target_kind, target_id)
-    if await rules_repo.get_rule_for_target(
-        session,
-        corporation_id=corporation_id,
-        target_kind=target_kind,
-        target_id=target_id,
-    ):
-        raise PricingRuleAlreadyExists()
-    rule = await rules_repo.create_rule(
+    record, created = await rules_repo.upsert_rule(
         session,
         corporation_id=corporation_id,
         target_kind=target_kind,
@@ -105,31 +100,7 @@ async def create_rule(
         enabled=enabled,
     )
     await session.commit()
-    return rule
-
-
-async def update_rule(
-    session: AsyncSession,
-    *,
-    corporation_id: int,
-    target_kind: TargetKind,
-    target_id: int,
-    fields: dict,
-) -> PricingRuleRecord:
-    """Patch `basis`/`percentage`/`enabled` on the corp's rule for a target. The
-    corp-scoped query also enforces tenancy — a foreign rule simply isn't found."""
-    await get_registered_corporation(session, corporation_id)
-    rule = await rules_repo.update_rule(
-        session,
-        corporation_id=corporation_id,
-        target_kind=target_kind,
-        target_id=target_id,
-        fields=fields,
-    )
-    if rule is None:
-        raise PricingRuleNotFound()
-    await session.commit()
-    return rule
+    return record, created
 
 
 async def delete_rule(

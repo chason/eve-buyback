@@ -33,18 +33,10 @@ class RuleOut(BaseModel):
     enabled: bool
 
 
-class RuleCreateRequest(BaseModel):
-    target_kind: TargetKind
-    target_id: int
+class RulePutRequest(BaseModel):
+    """The full rule state for a target (the target comes from the URL). `PUT` is an
+    idempotent create-or-replace, so this is the complete representation."""
+
     basis: Basis | None = None
     percentage: Decimal = Field(ge=0)
     enabled: bool = True
-
-
-class RuleUpdateRequest(BaseModel):
-    """PATCH: only the fields sent are changed (router uses `exclude_unset`).
-    `target_kind`/`target_id` are immutable — delete and recreate to retarget."""
-
-    basis: Basis | None = None
-    percentage: Decimal | None = Field(default=None, ge=0)
-    enabled: bool | None = None

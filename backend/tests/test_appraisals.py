@@ -96,10 +96,9 @@ async def test_rule_overrides_default():
         await login(http)
         await http.post("/api/v1/corporations")
         # A type rule: 50% sell → unit 10 * 50% = 5.00 → x10 = 50.00
-        await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "type", "target_id": 34,
-                  "basis": "sell", "percentage": "50"},
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"basis": "sell", "percentage": "50"},
         )
         resp = await http.post(
             "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 10}]}
@@ -117,10 +116,9 @@ async def test_market_group_rule_applies_in_appraisal():
         await login(http)
         await http.post("/api/v1/corporations")
         # A market-group rule on group 1 covers Tritanium: 50% sell.
-        await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "market_group", "target_id": 1,
-                  "basis": "sell", "percentage": "50"},
+        await http.put(
+            "/api/v1/corporations/me/rules/market_group/1",
+            json={"basis": "sell", "percentage": "50"},
         )
         resp = await http.post(
             "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 2}]}

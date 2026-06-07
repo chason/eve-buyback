@@ -42,15 +42,15 @@ async def _seed_registered_corp() -> None:
         await session.commit()
 
 
-async def test_rule_crud_lifecycle():
+async def test_put_rule_lifecycle():
     await _seed_sde()
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
 
-        created = await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "type", "target_id": 34, "percentage": "95"},
+        # PUT creates → 201.
+        created = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "95"}
         )
         assert created.status_code == 201
         body = created.json()
@@ -64,75 +64,86 @@ async def test_rule_crud_lifecycle():
             ("type", 34)
         ]
 
-        patched = await http.patch(
-            "/api/v1/corporations/me/rules/type/34",
-            json={"basis": "sell", "enabled": False},
-        )
-        assert patched.status_code == 200
-        assert patched.json()["basis"] == "sell"
-        assert patched.json()["enabled"] is False
-        assert Decimal(patched.json()["percentage"]) == 95  # unchanged
-
         removed = await http.delete("/api/v1/corporations/me/rules/type/34")
         assert removed.status_code == 204
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
 
 
-async def test_duplicate_target_conflicts():
+async def test_put_is_idempotent_upsert():
     await _seed_sde()
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
-        body = {"target_kind": "type", "target_id": 34, "percentage": "95"}
-        assert (await http.post("/api/v1/corporations/me/rules", json=body)).status_code == 201
-        assert (await http.post("/api/v1/corporations/me/rules", json=body)).status_code == 409
+
+        first = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "95"}
+        )
+        assert first.status_code == 201
+
+        # A second PUT replaces (no 409) → 200, and the new state wins.
+        second = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"basis": "sell", "percentage": "50", "enabled": False},
+        )
+        assert second.status_code == 200
+        assert second.json()["basis"] == "sell"
+        assert second.json()["enabled"] is False
+        assert Decimal(second.json()["percentage"]) == 50
+
+        # Still exactly one rule for the target.
+        listed = await http.get("/api/v1/corporations/me/rules")
+        assert len(listed.json()) == 1
 
 
 async def test_unknown_type_target_rejected():
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
-        resp = await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "type", "target_id": 999999, "percentage": "95"},
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/type/999999", json={"percentage": "95"}
         )
         assert resp.status_code == 400
 
 
-async def test_market_group_rule_crud_and_validation():
+async def test_market_group_rule_put_and_validation():
     await _seed_sde()  # seeds market group 1
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
 
-        # A valid market-group rule.
-        created = await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "market_group", "target_id": 1,
-                  "basis": "sell", "percentage": "80"},
+        created = await http.put(
+            "/api/v1/corporations/me/rules/market_group/1",
+            json={"basis": "sell", "percentage": "80"},
         )
         assert created.status_code == 201
         assert created.json()["target_kind"] == "market_group"
 
         # An unknown market group is rejected.
-        bad = await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "market_group", "target_id": 999999,
-                  "percentage": "80"},
+        bad = await http.put(
+            "/api/v1/corporations/me/rules/market_group/999999",
+            json={"percentage": "80"},
         )
         assert bad.status_code == 400
 
 
-async def test_patch_missing_rule_404():
+async def test_delete_missing_rule_404():
     await _seed_sde()
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
-        # No rule exists for this target yet.
-        resp = await http.patch(
-            "/api/v1/corporations/me/rules/type/34", json={"percentage": "50"}
-        )
+        # No rule exists for this target.
+        resp = await http.delete("/api/v1/corporations/me/rules/type/34")
         assert resp.status_code == 404
+
+
+async def test_bad_target_kind_in_path_422():
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/bananas/34", json={"percentage": "95"}
+        )
+        assert resp.status_code == 422  # Literal path param rejects the bad value
 
 
 async def test_member_cannot_mutate_rules_but_can_list():
@@ -140,8 +151,7 @@ async def test_member_cannot_mutate_rules_but_can_list():
     async with make_client(MemberEsi()) as http:
         await login(http)
         assert (await http.get("/api/v1/corporations/me/rules")).status_code == 200
-        resp = await http.post(
-            "/api/v1/corporations/me/rules",
-            json={"target_kind": "type", "target_id": 34, "percentage": "95"},
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "95"}
         )
         assert resp.status_code == 403

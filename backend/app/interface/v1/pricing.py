@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.application import pricing as pricing_app
 from app.application.auth import AuthenticatedUser
@@ -10,9 +10,8 @@ from app.interface.security import RequireUser, require_role
 from app.schemas.pricing import (
     ConfigOut,
     ConfigUpdateRequest,
-    RuleCreateRequest,
     RuleOut,
-    RuleUpdateRequest,
+    RulePutRequest,
 )
 
 router = APIRouter(prefix="/corporations/me", tags=["pricing"])
@@ -42,30 +41,28 @@ async def list_rules(user: RequireUser, session: SessionDep) -> list[RuleOut]:
     return [RuleOut(**r.model_dump()) for r in rules]
 
 
-@router.post("/rules", response_model=RuleOut, status_code=status.HTTP_201_CREATED)
-async def create_rule(
-    payload: RuleCreateRequest, user: ManagerUser, session: SessionDep
-) -> RuleOut:
-    rule = await pricing_app.create_rule(
-        session, corporation_id=user.corporation_id, **payload.model_dump()
-    )
-    return RuleOut(**rule.model_dump())
-
-
-@router.patch("/rules/{target_kind}/{target_id}", response_model=RuleOut)
-async def update_rule(
+@router.put("/rules/{target_kind}/{target_id}", response_model=RuleOut)
+async def set_rule(
     target_kind: TargetKind,
     target_id: int,
-    payload: RuleUpdateRequest,
+    payload: RulePutRequest,
     user: ManagerUser,
     session: SessionDep,
+    response: Response,
 ) -> RuleOut:
-    rule = await pricing_app.update_rule(
+    """Create or replace the rule for a target (idempotent). 201 on create, 200 on
+    replace."""
+    rule, created = await pricing_app.set_rule(
         session,
         corporation_id=user.corporation_id,
         target_kind=target_kind,
         target_id=target_id,
-        fields=payload.model_dump(exclude_unset=True),
+        basis=payload.basis,
+        percentage=payload.percentage,
+        enabled=payload.enabled,
+    )
+    response.status_code = (
+        status.HTTP_201_CREATED if created else status.HTTP_200_OK
     )
     return RuleOut(**rule.model_dump())
 

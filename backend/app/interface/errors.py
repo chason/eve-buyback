@@ -14,7 +14,6 @@ from app.application.errors import (
     ManagerAlreadyExists,
     ManagerNotFound,
     NotAuthorized,
-    PricingRuleAlreadyExists,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
     SsoNotConfigured,
@@ -30,7 +29,6 @@ _STATUS: dict[type[ApplicationError], int] = {
     ManagerNotFound: 404,
     PricingRuleNotFound: 404,
     PricingRuleTargetInvalid: 400,
-    PricingRuleAlreadyExists: 409,
     AppraisalNotFound: 404,
     EmptyAppraisal: 400,
 }

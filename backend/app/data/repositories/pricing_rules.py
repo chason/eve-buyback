@@ -25,23 +25,7 @@ async def list_rules(
     return [PricingRuleRecord.model_validate(r) for r in rows]
 
 
-async def get_rule_for_target(
-    session: AsyncSession,
-    *,
-    corporation_id: int,
-    target_kind: TargetKind,
-    target_id: int,
-) -> PricingRuleRecord | None:
-    row = await _get_row(
-        session,
-        corporation_id=corporation_id,
-        target_kind=target_kind,
-        target_id=target_id,
-    )
-    return PricingRuleRecord.model_validate(row) if row is not None else None
-
-
-async def create_rule(
+async def upsert_rule(
     session: AsyncSession,
     *,
     corporation_id: int,
@@ -50,43 +34,32 @@ async def create_rule(
     basis: Basis | None,
     percentage: Decimal,
     enabled: bool,
-) -> PricingRuleRecord:
-    rule = PricingRule(
-        corporation_id=corporation_id,
-        target_kind=target_kind,
-        target_id=target_id,
-        basis=basis,
-        percentage=percentage,
-        enabled=enabled,
-    )
-    session.add(rule)
-    await session.flush()
-    await session.refresh(rule)
-    return PricingRuleRecord.model_validate(rule)
+) -> tuple[PricingRuleRecord, bool]:
+    """Create or replace the corp's rule for a target. Returns `(record, created)`.
 
-
-async def update_rule(
-    session: AsyncSession,
-    *,
-    corporation_id: int,
-    target_kind: TargetKind,
-    target_id: int,
-    fields: dict,
-) -> PricingRuleRecord | None:
-    """Patch fields on the corp's rule for a target. Returns None if absent."""
+    A portable get-then-set (like `buyback_config.upsert_config`) — no
+    dialect-specific `ON CONFLICT`; safe on SQLite and Postgres alike. Fine for this
+    low-concurrency, manager-driven path."""
     row = await _get_row(
         session,
         corporation_id=corporation_id,
         target_kind=target_kind,
         target_id=target_id,
     )
+    created = row is None
     if row is None:
-        return None
-    for key, value in fields.items():
-        setattr(row, key, value)
+        row = PricingRule(
+            corporation_id=corporation_id,
+            target_kind=target_kind,
+            target_id=target_id,
+        )
+        session.add(row)
+    row.basis = basis
+    row.percentage = percentage
+    row.enabled = enabled
     await session.flush()
     await session.refresh(row)
-    return PricingRuleRecord.model_validate(row)
+    return PricingRuleRecord.model_validate(row), created
 
 
 async def delete_rule(

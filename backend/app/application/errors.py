@@ -46,10 +46,6 @@ class PricingRuleTargetInvalid(ApplicationError):
     default_detail = "Pricing rule target does not exist"
 
 
-class PricingRuleAlreadyExists(ApplicationError):
-    default_detail = "A pricing rule already exists for this target"
-
-
 class AppraisalNotFound(ApplicationError):
     default_detail = "Appraisal not found"
 

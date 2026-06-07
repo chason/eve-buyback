@@ -27,14 +27,19 @@ set out to avoid.
 
 Unlike an appraisal, a pricing rule has a **natural unique key**: there is at most one
 rule per `(corporation_id, target_kind, target_id)` ([ADR-0007](0007-pricing-rule-taxonomy.md)).
-So it needs no synthetic handle at all — address it by its target:
+So it needs no synthetic handle at all — it's a **singleton resource addressed by its
+target**, and we model writes accordingly:
 
 - `RuleOut` carries `target_kind` + `target_id` (no id of any kind).
-- `PATCH` / `DELETE /corporations/me/rules/{target_kind}/{target_id}`.
+- `PUT /corporations/me/rules/{target_kind}/{target_id}` is an **idempotent
+  create-or-replace** (the body is the full rule minus the target). `201` on create,
+  `200` on replace — no `409`, and no write-time `404`. This suits a singleton-per-
+  target far better than `POST`-create + `PATCH`-update, and is retry-safe.
+- `DELETE /corporations/me/rules/{target_kind}/{target_id}` removes it (`404` if absent).
 - The corp-scoped lookup `(corp, target_kind, target_id)` doubles as the tenancy check
-  — a foreign or absent rule is simply "not found" (`404`).
-- `POST /corporations/me/rules` still creates (with the target in the body) and `409`s
-  on a duplicate target. The target is immutable; retarget by deleting and recreating.
+  — a foreign rule is simply not found.
+- The upsert is a **portable get-then-set** (like `buyback_config.upsert_config`), not a
+  dialect-specific `ON CONFLICT`; it runs unchanged on SQLite and PostgreSQL.
 
 The integer PK is retained internally for relationships and ordering, never serialized.
 

@@ -185,8 +185,7 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | GET | `/corporations/me/config` | member | Buyback config (read); a default "90% Jita Buy" is created at registration |
 | PUT | `/corporations/me/config` | manager | Edit global defaults (data-quality thresholds: M7) |
 | GET | `/corporations/me/rules` | member | List pricing rules |
-| POST | `/corporations/me/rules` | manager | Create a pricing rule |
-| PATCH/DELETE | `/corporations/me/rules/{target_kind}/{target_id}` | manager | Edit/remove the rule for a target (no surrogate id, ADR-0022) |
+| PUT/DELETE | `/corporations/me/rules/{target_kind}/{target_id}` | manager | Set (idempotent upsert) / remove the rule for a target — no surrogate id (ADR-0022) |
 | GET | `/corporations/me/managers` | CEO | List managers |
 | POST/DELETE | `/corporations/me/managers[/{character_id}]` | CEO | Grant/revoke manager |
 | POST | `/appraisals` | member | Price a list of items → persist + return appraisal (the core endpoint) |
