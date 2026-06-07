@@ -79,7 +79,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | `SdeTypeMaterial` (ref) | `type_id`, `material_type_id`, `quantity` (EVE-keyed) | Perfect-refine (100% base) yield per batch; seeded for ore types only ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 | `SdeMarketGroup` (ref) | `market_group_id` (EVE id, PK), `parent_id`, `name` | Hierarchy for rule resolution; EVE-keyed. |
 | `Appraisal` | `id` (UUID, PK), **`public_id`** (random slug), `corporation_id`→corp (UUID FK), `created_by`, `created_at`, `market_hub_id`, `accepted_total` | Persisted, immutable snapshot ([ADR-0014](adr/0014-persisted-appraisals.md)). |
-| `AppraisalLine` | `id` (UUID, PK), `appraisal_id`→appraisal (UUID FK), `position`, `type_id`, `quantity`, `basis`, `percentage`, `unit_value`, `unit_price`, `line_total`, `status`, `reason?` | Per-line snapshot; write-once, ordered by `position`. |
+| `AppraisalLine` | `id` (UUID, PK), `appraisal_id`→appraisal (UUID FK), `position`, `type_id`, `quantity`, `basis`, `percentage`, `unit_value`, `unit_price`, `line_total`, `status`, `reason?`, `reprocess?` (JSON) | Per-line snapshot; write-once, ordered by `position`. `reprocess` holds the mineral breakdown for a reprocess-priced ore ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 
 `basis ∈ {buy, sell, split}`. `market_hub_id` defaults to **Jita 4-4** (station
 `60003760`); region fallback **The Forge** (`10000002`).

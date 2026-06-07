@@ -5,7 +5,7 @@ from app.domain.pricing import (
     ORE_REFINE_YIELD,
     RuleSpec,
     line_total,
-    reprocessed_line_value,
+    reprocess_line,
     resolve_rule,
     round_isk,
     select_aggregate,
@@ -111,28 +111,36 @@ _MATS = [(34, 400)]
 _PRICED = {34: Decimal("5.00")}
 
 
-def test_reprocessed_whole_batches():
-    # 200 ore = 2 batches, no leftover: 2 * 400 * 0.9063 * 5.00.
-    total = reprocessed_line_value(200, 100, _MATS, _PRICED, Decimal("3.00"))
-    assert total == Decimal("2") * Decimal("400") * ORE_REFINE_YIELD * Decimal("5.00")
+def test_reprocessed_whole_batches_with_breakdown():
+    # 200 ore = 2 batches, no leftover: 2 * 400 * 0.9063 minerals at 5.00.
+    r = reprocess_line(200, 100, _MATS, _PRICED, Decimal("3.00"))
+    qty = Decimal("2") * Decimal("400") * ORE_REFINE_YIELD
+    assert r.total == qty * Decimal("5.00")
+    assert r.leftover_units == 0
+    assert len(r.minerals) == 1
+    m = r.minerals[0]
+    assert (m.type_id, m.quantity, m.value) == (34, qty, qty * Decimal("5.00"))
 
 
 def test_reprocessed_blends_leftover_at_ore_price():
     # 150 ore = 1 batch (reprocessed) + 50 leftover at ore price 3.00.
-    total = reprocessed_line_value(150, 100, _MATS, _PRICED, Decimal("3.00"))
+    r = reprocess_line(150, 100, _MATS, _PRICED, Decimal("3.00"))
     batch = Decimal("400") * ORE_REFINE_YIELD * Decimal("5.00")
-    assert total == batch + Decimal("50") * Decimal("3.00")
+    assert r.total == batch + Decimal("50") * Decimal("3.00")
+    assert r.leftover_units == 50
+    assert r.leftover_value == Decimal("50") * Decimal("3.00")
 
 
 def test_reprocessed_sub_batch_is_all_ore_price():
-    # 50 ore < one batch → entirely the ore's own price; no minerals.
-    total = reprocessed_line_value(50, 100, _MATS, _PRICED, Decimal("3.00"))
-    assert total == Decimal("50") * Decimal("3.00")
+    # 50 ore < one batch → entirely the ore's own price; mineral qty 0.
+    r = reprocess_line(50, 100, _MATS, _PRICED, Decimal("3.00"))
+    assert r.total == Decimal("50") * Decimal("3.00")
+    assert r.minerals[0].quantity == Decimal("0")
 
 
 def test_reprocessed_unpriced_mineral_and_ore_is_none():
     # No mineral price and no ore price for a sub-batch → nothing priceable.
-    assert reprocessed_line_value(50, 100, _MATS, {34: None}, None) is None
+    assert reprocess_line(50, 100, _MATS, {34: None}, None) is None
 
 
 def test_generate_appraisal_id_shape_and_uniqueness():

@@ -103,6 +103,14 @@ async def test_appraisal_reprocess_rule_prices_by_minerals():
         assert line["status"] == "accepted"
         # 1 batch = 400 Trit × 0.9063 yield × 100.00 ISK = 36252.00.
         assert Decimal(line["line_total"]) == Decimal("36252.00")
+        # The per-line breakdown names the minerals and their market value.
+        bd = line["reprocess"]
+        assert bd["leftover_units"] == 0
+        assert len(bd["minerals"]) == 1
+        m = bd["minerals"][0]
+        assert m["type_name"] == "Tritanium"
+        assert Decimal(m["quantity"]) == Decimal("400") * Decimal("0.9063")  # 362.52
+        assert Decimal(m["value"]) == Decimal("36252.00")
 
 
 async def test_appraisal_reprocess_sub_batch_uses_ore_price():

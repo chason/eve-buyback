@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
@@ -144,20 +144,42 @@ export default function Appraisal() {
         </thead>
         <tbody>
           {a.lines.map((line, idx) => (
-            <tr
-              key={`${line.type_id}-${idx}`}
-              className={line.status === "rejected" ? "rejected" : undefined}
-            >
-              <td>{line.type_name}</td>
-              <td className="num">{line.quantity.toLocaleString()}</td>
-              <td>{line.basis ?? "—"}</td>
-              <td className="num">{line.percentage ?? "—"}</td>
-              <td className="num isk">
-                {line.unit_price ? formatIsk(line.unit_price) : "—"}
-              </td>
-              <td className="num isk">{formatIsk(line.line_total)}</td>
-              <td>{line.status === "accepted" ? "✓" : line.reason}</td>
-            </tr>
+            <Fragment key={`${line.type_id}-${idx}`}>
+              <tr className={line.status === "rejected" ? "rejected" : undefined}>
+                <td>{line.type_name}</td>
+                <td className="num">{line.quantity.toLocaleString()}</td>
+                <td>{line.basis ?? "—"}</td>
+                <td className="num">{line.percentage ?? "—"}</td>
+                <td className="num isk">
+                  {line.unit_price ? formatIsk(line.unit_price) : "—"}
+                </td>
+                <td className="num isk">{formatIsk(line.line_total)}</td>
+                <td>{line.status === "accepted" ? "✓" : line.reason}</td>
+              </tr>
+              {line.reprocess && (
+                <tr className="reprocess-detail">
+                  <td colSpan={7}>
+                    <small>
+                      ♻ Reprocessed into:{" "}
+                      {line.reprocess.minerals.map((m, i) => (
+                        <span key={m.type_id}>
+                          {i > 0 && ", "}
+                          {m.type_name} ×
+                          {Number(m.quantity).toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}{" "}
+                          = {formatIsk(m.value)}
+                        </span>
+                      ))}
+                      {line.reprocess.leftover_units > 0 &&
+                        ` · ${line.reprocess.leftover_units.toLocaleString()} units at ore price (${formatIsk(
+                          line.reprocess.leftover_value,
+                        )})`}
+                    </small>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

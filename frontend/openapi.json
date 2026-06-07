@@ -98,6 +98,16 @@
             ],
             "title": "Reason"
           },
+          "reprocess": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReprocessBreakdownOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "enum": [
               "accepted",
@@ -519,6 +529,77 @@
           "name"
         ],
         "title": "MarketGroupOut",
+        "type": "object"
+      },
+      "ReprocessBreakdownOut": {
+        "description": "How a reprocess-priced ore line breaks down (ADR-0026): the minerals it yields\nplus any sub-batch leftover priced at the ore's own market price.",
+        "properties": {
+          "leftover_units": {
+            "title": "Leftover Units",
+            "type": "integer"
+          },
+          "leftover_value": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Leftover Value",
+            "type": "string"
+          },
+          "minerals": {
+            "items": {
+              "$ref": "#/components/schemas/ReprocessMineralOut"
+            },
+            "title": "Minerals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "minerals",
+          "leftover_units",
+          "leftover_value"
+        ],
+        "title": "ReprocessBreakdownOut",
+        "type": "object"
+      },
+      "ReprocessMineralOut": {
+        "properties": {
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "title": "Type Name",
+            "type": "string"
+          },
+          "unit_value": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Value"
+          },
+          "value": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type_id",
+          "type_name",
+          "quantity",
+          "unit_value",
+          "value"
+        ],
+        "title": "ReprocessMineralOut",
         "type": "object"
       },
       "RuleOut": {

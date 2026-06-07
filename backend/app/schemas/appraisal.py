@@ -30,6 +30,23 @@ class AppraisalCreateRequest(BaseModel):
         return self
 
 
+class ReprocessMineralOut(BaseModel):
+    type_id: int
+    type_name: str
+    quantity: Decimal
+    unit_value: Decimal | None
+    value: Decimal
+
+
+class ReprocessBreakdownOut(BaseModel):
+    """How a reprocess-priced ore line breaks down (ADR-0026): the minerals it yields
+    plus any sub-batch leftover priced at the ore's own market price."""
+
+    minerals: list[ReprocessMineralOut]
+    leftover_units: int
+    leftover_value: Decimal
+
+
 class AppraisalLineOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -43,6 +60,7 @@ class AppraisalLineOut(BaseModel):
     unit_price: Decimal | None
     line_total: Decimal
     reason: str | None
+    reprocess: ReprocessBreakdownOut | None = None
 
 
 class AppraisalOut(BaseModel):

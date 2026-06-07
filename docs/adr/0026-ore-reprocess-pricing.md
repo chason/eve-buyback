@@ -57,8 +57,11 @@ unions the ore's mineral ids into its single price fetch.
 - A reprocess line whose minerals (and ore, for any leftover) are entirely unpriced is
   rejected "No market data", like any other unpriceable line. An unpriced *individual*
   mineral contributes 0 (minerals are liquid in the hubs, so this is rare).
-- The appraisal stores a single blended `unit_value`/`unit_price`; the per-mineral
-  breakdown isn't surfaced (future UI work).
+- The line stores a single blended `unit_value`/`unit_price` **plus a per-line breakdown**
+  (`AppraisalLine.reprocess`, JSON): the minerals yielded — name, yielded quantity, market
+  unit value, value — and any sub-batch leftover. It's a snapshot (immutable like the rest
+  of the line, ADR-0014), persisted at creation since recomputing later would use today's
+  prices; the result view shows it under the ore line.
 
 ## Alternatives considered
 

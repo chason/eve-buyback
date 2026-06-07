@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, ForeignKey, Numeric, Uuid
+from sqlalchemy import JSON, BigInteger, ForeignKey, Numeric, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -40,3 +40,6 @@ class AppraisalLine(Base):
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     line_total: Mapped[Decimal] = mapped_column(Numeric)
     reason: Mapped[str | None] = mapped_column(nullable=True)
+    # Snapshot of the reprocessed-mineral breakdown for an ore priced by reprocess
+    # (ADR-0026); null for direct/rejected lines. Money/quantities are Decimal strings.
+    reprocess: Mapped[dict | None] = mapped_column(JSON, nullable=True)

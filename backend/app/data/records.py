@@ -141,6 +141,8 @@ class AppraisalLineRecord(BaseModel):
     unit_price: Decimal | None
     line_total: Decimal
     reason: str | None
+    # Reprocessed-mineral breakdown snapshot (ADR-0026); None for direct/rejected lines.
+    reprocess: dict | None = None
 
 
 class AppraisalRecord(BaseModel):

@@ -111,7 +111,25 @@ def select_aggregate(
     return (buy + sell) / Decimal(2)
 
 
-def reprocessed_line_value(
+@dataclass(frozen=True)
+class ReprocessMineral:
+    """One mineral a reprocessed ore line yields (across all its refine batches)."""
+
+    type_id: int
+    quantity: Decimal  # yielded amount = batches × base_qty × yield
+    unit_value: Decimal | None  # the mineral's market unit value (None if unpriced)
+    value: Decimal  # quantity × unit_value (market; 0 if unpriced)
+
+
+@dataclass(frozen=True)
+class ReprocessResult:
+    total: Decimal  # total market value (pre-percentage) of the line
+    minerals: list[ReprocessMineral]
+    leftover_units: int  # sub-batch remainder, priced at the ore's own price
+    leftover_value: Decimal
+
+
+def reprocess_line(
     quantity: int,
     portion_size: int,
     materials: list[tuple[int, int]],
@@ -119,29 +137,41 @@ def reprocessed_line_value(
     ore_unit_value: Decimal | None,
     *,
     yield_: Decimal = ORE_REFINE_YIELD,
-) -> Decimal | None:
-    """Total *market* value (pre-percentage) of reprocess-pricing an ore line (ADR-0026):
+) -> ReprocessResult | None:
+    """Reprocess-price an ore line (ADR-0026) and report the breakdown:
 
-    - **Whole refine batches** (`quantity // portion_size`) are valued by their minerals
-      at the perfect-refine `yield_`: `Σ(base_qty × yield_ × mineral_unit_value)` per batch
-      (an unpriced mineral contributes 0).
+    - **Whole refine batches** (`quantity // portion_size`) yield, per material,
+      `base_qty × yield_` minerals each, valued at the mineral's market unit value (an
+      unpriced mineral contributes 0).
     - The **leftover** below a full batch is valued at the ore's own market unit value.
 
-    Returns `None` if the result is ≤ 0 (nothing priceable → reject upstream).
+    Returns the total market value (pre-percentage) plus the per-mineral breakdown, or
+    `None` if nothing is priceable (total ≤ 0 → reject upstream).
     """
     batches = quantity // portion_size if portion_size > 0 else 0
     leftover = quantity - batches * portion_size
 
-    batch_value = Decimal(0)
+    minerals: list[ReprocessMineral] = []
     for material_id, base_qty in materials:
+        qty = Decimal(batches) * Decimal(base_qty) * yield_
         mv = mineral_value.get(material_id)
-        if mv is not None:
-            batch_value += Decimal(base_qty) * yield_ * mv
+        value = qty * mv if mv is not None else Decimal(0)
+        minerals.append(ReprocessMineral(material_id, qty, mv, value))
 
-    total = Decimal(batches) * batch_value
-    if leftover and ore_unit_value is not None:
-        total += Decimal(leftover) * ore_unit_value
-    return total if total > 0 else None
+    leftover_value = (
+        Decimal(leftover) * ore_unit_value
+        if leftover and ore_unit_value is not None
+        else Decimal(0)
+    )
+    total = sum((m.value for m in minerals), Decimal(0)) + leftover_value
+    if total <= 0:
+        return None
+    return ReprocessResult(
+        total=total,
+        minerals=minerals,
+        leftover_units=leftover,
+        leftover_value=leftover_value,
+    )
 
 
 def round_isk(value: Decimal) -> Decimal:

@@ -117,6 +117,8 @@ async def create_appraisal(
     mineral_ids = {
         mid for mats in materials_by_type.values() for (mid, _) in mats
     }
+    if mineral_ids:  # mineral names for the per-line breakdown
+        types = {**types, **await sde_repo.get_types(session, list(mineral_ids))}
 
     prices = await market.get_market_prices(
         session,
@@ -256,6 +258,7 @@ def _compute_line(
     resolved = resolve(w.type_id)
     agg = config.aggregate_field
     materials = materials_by_type.get(w.type_id)
+    breakdown: dict | None = None
 
     if resolved.reprocess and materials:
         # Reprocess pricing (ADR-0026): value whole refine batches by their minerals
@@ -265,12 +268,13 @@ def _compute_line(
             for mid, _ in materials
         }
         ore_unit = _basis_value(price_by_id.get(w.type_id), agg, resolved.basis)
-        total = pricing_domain.reprocessed_line_value(
+        result = pricing_domain.reprocess_line(
             w.quantity, sde_type.portion_size, materials, mineral_value, ore_unit
         )
-        if total is None:
+        if result is None:
             return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
-        unit_value = total / Decimal(w.quantity)
+        unit_value = result.total / Decimal(w.quantity)
+        breakdown = _reprocess_breakdown(result, types)
     else:
         price = price_by_id.get(w.type_id)
         if price is None:
@@ -294,6 +298,30 @@ def _compute_line(
         "unit_price": up,
         "line_total": lt,
         "reason": None,
+        "reprocess": breakdown,
+    }
+
+
+def _reprocess_breakdown(
+    result: pricing_domain.ReprocessResult, types: dict[int, SdeTypeRecord]
+) -> dict:
+    """JSON-serializable snapshot of a reprocess result for the appraisal line. Money
+    and quantities are Decimal strings (ADR-0020)."""
+    return {
+        "minerals": [
+            {
+                "type_id": m.type_id,
+                "type_name": types[m.type_id].name
+                if m.type_id in types
+                else f"Type {m.type_id}",
+                "quantity": str(m.quantity),
+                "unit_value": str(m.unit_value) if m.unit_value is not None else None,
+                "value": str(m.value),
+            }
+            for m in result.minerals
+        ],
+        "leftover_units": result.leftover_units,
+        "leftover_value": str(result.leftover_value),
     }
 
 
@@ -311,4 +339,5 @@ def _rejected(
         "unit_price": None,
         "line_total": Decimal("0"),
         "reason": reason,
+        "reprocess": None,
     }

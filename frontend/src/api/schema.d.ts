@@ -317,6 +317,7 @@ export interface components {
             quantity: number;
             /** Reason */
             reason: string | null;
+            reprocess?: components["schemas"]["ReprocessBreakdownOut"] | null;
             /**
              * Status
              * @enum {string}
@@ -471,6 +472,32 @@ export interface components {
             name: string;
             /** Parent Id */
             parent_id: number | null;
+        };
+        /**
+         * ReprocessBreakdownOut
+         * @description How a reprocess-priced ore line breaks down (ADR-0026): the minerals it yields
+         *     plus any sub-batch leftover priced at the ore's own market price.
+         */
+        ReprocessBreakdownOut: {
+            /** Leftover Units */
+            leftover_units: number;
+            /** Leftover Value */
+            leftover_value: string;
+            /** Minerals */
+            minerals: components["schemas"]["ReprocessMineralOut"][];
+        };
+        /** ReprocessMineralOut */
+        ReprocessMineralOut: {
+            /** Quantity */
+            quantity: string;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name: string;
+            /** Unit Value */
+            unit_value: string | null;
+            /** Value */
+            value: string;
         };
         /** RuleOut */
         RuleOut: {
