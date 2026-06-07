@@ -72,7 +72,8 @@ describe("Rules", () => {
     renderRules()
 
     await u.selectOptions(await screen.findByLabelText("Target kind"), "market_group")
-    await u.selectOptions(screen.getByLabelText("Market group"), "1")
+    await u.type(screen.getByLabelText("Search market group by name"), "ore")
+    await u.click(await screen.findByText("Ore"))  // pick the matching result
     await u.selectOptions(screen.getByLabelText("Basis"), "sell")
     const pct = screen.getByLabelText("Rule percentage")
     await u.clear(pct)
@@ -92,7 +93,8 @@ describe("Rules", () => {
     })
   })
 
-  it("labels market-group options with their full tree path", async () => {
+  it("filters market groups by leaf name and shows the full path", async () => {
+    const u = userEvent.setup()
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([])
     vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
@@ -103,16 +105,19 @@ describe("Rules", () => {
 
     renderRules()
 
-    const u = userEvent.setup()
     await u.selectOptions(
       await screen.findByLabelText("Target kind"),
       "market_group",
     )
-    // The leaf "Standard Ores" is shown with its full disambiguating path.
+    await u.type(
+      screen.getByLabelText("Search market group by name"),
+      "standard ores",
+    )
+    // The match is shown with its full disambiguating path.
     expect(
-      screen.getByRole("option", {
-        name: "Manufacture & Research / Materials / Standard Ores",
-      }),
+      await screen.findByText(
+        "Manufacture & Research / Materials / Standard Ores",
+      ),
     ).toBeInTheDocument()
   })
 

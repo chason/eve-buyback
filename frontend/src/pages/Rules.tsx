@@ -38,12 +38,17 @@ export default function Rules() {
     }
   }, [groups.data])
 
-  // Picker options: every group by its full path, sorted so siblings group together.
+  // Picker options: each group's leaf name (what the search matches) + its full path
+  // (what's shown, to disambiguate the many repeated names). Sorted by path.
   const groupOptions = useMemo(
     () =>
       (groups.data ?? [])
-        .map((g) => ({ id: g.market_group_id, label: groupPath(g.market_group_id) }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
+        .map((g) => ({
+          id: g.market_group_id,
+          leaf: g.name,
+          path: groupPath(g.market_group_id),
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
     [groups.data, groupPath],
   )
 
@@ -141,7 +146,7 @@ function AddRule({
   groupOptions,
 }: {
   onSaved: () => void
-  groupOptions: { id: number; label: string }[]
+  groupOptions: { id: number; leaf: string; path: string }[]
 }) {
   const [kind, setKind] = useState<TargetKind>("type")
   const [target, setTarget] = useState<{ id: number; name: string } | null>(null)
@@ -157,6 +162,13 @@ function AddRule({
     queryFn: () => searchTypes(query),
     enabled: kind === "type" && query.length >= 2,
   })
+
+  // Market groups are already loaded; filter them locally by leaf name (capped).
+  const groupMatches = useMemo(() => {
+    if (kind !== "market_group" || query.length < 2) return []
+    const q = query.toLowerCase()
+    return groupOptions.filter((g) => g.leaf.toLowerCase().includes(q)).slice(0, 50)
+  }, [kind, query, groupOptions])
 
   const save = useMutation({
     mutationFn: () =>
@@ -235,25 +247,37 @@ function AddRule({
         ) : (
           <label>
             Market group
-            <select
-              aria-label="Market group"
-              value={target?.id ?? ""}
+            <input
+              type="search"
+              value={target ? target.name : search}
+              placeholder="Search by name (e.g. Standard Ores)…"
+              aria-label="Search market group by name"
               onChange={(e) => {
-                const id = Number(e.target.value)
-                const g = groupOptions.find((x) => x.id === id)
-                setTarget(g ? { id, name: g.label } : null)
+                setTarget(null)
+                setSearch(e.target.value)
               }}
-            >
-              <option value="">Select a market group…</option>
-              {groupOptions.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
+            />
+            {!target && query.length >= 2 && (
+              <ul className="search-results">
+                {groupMatches.map((g) => (
+                  <li key={g.id}>
+                    <a
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setTarget({ id: g.id, name: g.path })
+                      }}
+                    >
+                      {g.path}
+                    </a>
+                  </li>
+                ))}
+                {groupMatches.length === 0 && <li>No matches.</li>}
+              </ul>
+            )}
             <small>
-              Full market path shown to disambiguate repeated names. Ores live under{" "}
-              <em>… / Raw Materials / Standard Ores</em>.
+              Matches the group name; the full path disambiguates repeats. Ores live
+              under <em>… / Raw Materials / Standard Ores</em>.
             </small>
           </label>
         )}
