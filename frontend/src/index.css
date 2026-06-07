@@ -34,6 +34,19 @@ tr.reprocess-detail td {
   padding: 0.25rem 0;
 }
 
+/* Checkbox row in the rule editor: keep the boxes on one line, neatly aligned
+   (not stretched to the height of the taller select/number inputs above). */
+.rule-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: var(--pico-spacing);
+}
+
+.rule-flags label {
+  margin-bottom: 0;
+}
+
 /* "How it works" — boxes connected by arrows: [ ] -> [ ] -> [ ]. */
 .flow {
   display: flex;

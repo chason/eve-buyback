@@ -362,6 +362,9 @@ function AddRule({
               onChange={(e) => setPercentage(e.target.value)}
             />
           </label>
+        </div>
+
+        <div className="rule-flags">
           <label>
             <input
               type="checkbox"
