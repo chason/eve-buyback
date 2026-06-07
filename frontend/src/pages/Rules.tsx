@@ -19,17 +19,40 @@ export default function Rules() {
   })
   const canEdit = isManager(me.data?.role)
 
-  const groupName = useMemo(() => {
-    const byId = new Map((groups.data ?? []).map((g) => [g.market_group_id, g.name]))
-    return (id: number) => byId.get(id) ?? `Market group ${id}`
+  // Full market-tree path of a group, e.g. "Manufacture & Research / Materials /
+  // Raw Materials / Standard Ores / Veldspar". Market-group *names* repeat heavily
+  // (19 groups are literally "ORE" — the Outer Ring Excavations ship faction, not
+  // asteroid ore), so the path is what makes a group unambiguous.
+  const groupPath = useMemo(() => {
+    const byId = new Map((groups.data ?? []).map((g) => [g.market_group_id, g]))
+    return (id: number): string => {
+      const parts: string[] = []
+      const seen = new Set<number>()
+      let cur = byId.get(id)
+      while (cur && !seen.has(cur.market_group_id)) {
+        seen.add(cur.market_group_id)
+        parts.unshift(cur.name)
+        cur = cur.parent_id != null ? byId.get(cur.parent_id) : undefined
+      }
+      return parts.join(" / ") || `Market group ${id}`
+    }
   }, [groups.data])
 
+  // Picker options: every group by its full path, sorted so siblings group together.
+  const groupOptions = useMemo(
+    () =>
+      (groups.data ?? [])
+        .map((g) => ({ id: g.market_group_id, label: groupPath(g.market_group_id) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [groups.data, groupPath],
+  )
+
   function targetLabel(rule: RuleOut): string {
-    // The backend resolves the SDE name; fall back to a group lookup / the raw id
+    // The backend resolves the SDE name; fall back to a path lookup / the raw id
     // only if it's missing (e.g. the target was removed from the SDE).
     if (rule.target_name) return rule.target_name
     return rule.target_kind === "market_group"
-      ? groupName(rule.target_id)
+      ? groupPath(rule.target_id)
       : `Type ${rule.target_id}`
   }
 
@@ -70,7 +93,15 @@ export default function Rules() {
           <tbody>
             {rules.data.map((rule) => (
               <tr key={`${rule.target_kind}-${rule.target_id}`}>
-                <td>{targetLabel(rule)}</td>
+                <td
+                  title={
+                    rule.target_kind === "market_group"
+                      ? groupPath(rule.target_id)
+                      : undefined
+                  }
+                >
+                  {targetLabel(rule)}
+                </td>
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
                 <td>{rule.reprocess ? "yes" : "–"}</td>
@@ -95,7 +126,7 @@ export default function Rules() {
       )}
 
       {canEdit ? (
-        <AddRule onSaved={invalidate} groupOptions={groups.data ?? []} />
+        <AddRule onSaved={invalidate} groupOptions={groupOptions} />
       ) : (
         <p>
           <small>Only a Buyback Manager can change pricing rules.</small>
@@ -110,7 +141,7 @@ function AddRule({
   groupOptions,
 }: {
   onSaved: () => void
-  groupOptions: { market_group_id: number; name: string }[]
+  groupOptions: { id: number; label: string }[]
 }) {
   const [kind, setKind] = useState<TargetKind>("type")
   const [target, setTarget] = useState<{ id: number; name: string } | null>(null)
@@ -205,20 +236,25 @@ function AddRule({
           <label>
             Market group
             <select
+              aria-label="Market group"
               value={target?.id ?? ""}
               onChange={(e) => {
                 const id = Number(e.target.value)
-                const g = groupOptions.find((x) => x.market_group_id === id)
-                setTarget(g ? { id, name: g.name } : null)
+                const g = groupOptions.find((x) => x.id === id)
+                setTarget(g ? { id, name: g.label } : null)
               }}
             >
               <option value="">Select a market group…</option>
               {groupOptions.map((g) => (
-                <option key={g.market_group_id} value={g.market_group_id}>
-                  {g.name}
+                <option key={g.id} value={g.id}>
+                  {g.label}
                 </option>
               ))}
             </select>
+            <small>
+              Full market path shown to disambiguate repeated names. Ores live under{" "}
+              <em>… / Raw Materials / Standard Ores</em>.
+            </small>
           </label>
         )}
 

@@ -92,6 +92,30 @@ describe("Rules", () => {
     })
   })
 
+  it("labels market-group options with their full tree path", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.listRules).mockResolvedValue([])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
+      { market_group_id: 10, parent_id: null, name: "Manufacture & Research" },
+      { market_group_id: 11, parent_id: 10, name: "Materials" },
+      { market_group_id: 12, parent_id: 11, name: "Standard Ores" },
+    ])
+
+    renderRules()
+
+    const u = userEvent.setup()
+    await u.selectOptions(
+      await screen.findByLabelText("Target kind"),
+      "market_group",
+    )
+    // The leaf "Standard Ores" is shown with its full disambiguating path.
+    expect(
+      screen.getByRole("option", {
+        name: "Manufacture & Research / Materials / Standard Ores",
+      }),
+    ).toBeInTheDocument()
+  })
+
   it("hides edit controls from a member", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("member"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([])
