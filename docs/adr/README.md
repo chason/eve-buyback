@@ -30,5 +30,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0018](0018-layered-backend-architecture.md) | Layered backend: interface / application / domain / data / plugins | Accepted |
 | [0019](0019-progressive-layer-documentation.md) | Progressive docs via layer-local CLAUDE.md | Accepted |
 | [0020](0020-decimal-money-values.md) | Decimal (not float) for money and quantity values | Accepted |
+| [0021](0021-appraisal-computation-and-storage.md) | Appraisal computation, storage, and closed-set typing | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

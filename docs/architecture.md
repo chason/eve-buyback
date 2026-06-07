@@ -37,6 +37,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 18 | **Layered backend**: interface / application / domain / data / plugins | [0018](adr/0018-layered-backend-architecture.md) |
 | 19 | **Progressive docs** via layer-local `CLAUDE.md` | [0019](adr/0019-progressive-layer-documentation.md) |
 | 20 | **`Decimal` not `float`** for money + quantity values | [0020](adr/0020-decimal-money-values.md) |
+| 21 | **Appraisal computation/storage**: hybrid lines, half-even rounding, `Literal`+CHECK enums | [0021](adr/0021-appraisal-computation-and-storage.md) |
 
 ## 3. System context
 
@@ -179,8 +180,9 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | DELETE | `/auth/session` | member | Log out (clear session) |
 | GET | `/auth/me` | member | Current character, corp, role |
 | POST | `/corporations` | CEO | Register caller's corp |
-| GET | `/corporations/me` | member | Corp + buyback config (read) |
-| PUT | `/corporations/me/config` | manager | Edit global defaults / thresholds |
+| GET | `/corporations/me` | member | Registered corp (read) |
+| GET | `/corporations/me/config` | member | Buyback config (read); a default "90% Jita Buy" is created at registration |
+| PUT | `/corporations/me/config` | manager | Edit global defaults (data-quality thresholds: M7) |
 | GET | `/corporations/me/rules` | member | List pricing rules |
 | POST/PATCH/DELETE | `/corporations/me/rules[/{id}]` | manager | CRUD pricing rules |
 | GET | `/corporations/me/managers` | CEO | List managers |
@@ -190,9 +192,11 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | GET | `/appraisals` | member | List appraisals (own; managers/CEO see the corp's) |
 | GET | `/market-groups` / `/types/search` | member | Pickers for the rule editor |
 
-`POST /appraisals` accepts `{ items: [{type_id, quantity}] }` and (optionally) a raw
-EVE inventory paste string the backend parses to type ids. It stores an immutable
-snapshot and returns a `public_id` for later reference ([ADR-0014](adr/0014-persisted-appraisals.md)).
+`POST /appraisals` accepts `{ items: [{type_id, quantity}] }` (structured input; raw
+EVE inventory-paste parsing lands with the M6 UI — [ADR-0021](adr/0021-appraisal-computation-and-storage.md)).
+It stores an immutable snapshot and returns a `public_id` for later reference
+([ADR-0014](adr/0014-persisted-appraisals.md)). Lines with no usable market price are
+rejected with a reason; configurable data-quality thresholds are M7.
 
 ## 11. Repository layout
 
