@@ -9,6 +9,10 @@ import { isManager } from "../lib/roles"
 
 const BASES: Basis[] = ["buy", "sell", "split"]
 
+// Reprocess pricing only applies to ores (ADR-0026): the three ore branches under
+// "Raw Materials". A target is eligible if its market-group path passes through one.
+const ORE_BRANCHES = new Set(["Standard Ores", "Moon Ores", "Ice Ores"])
+
 export default function Rules() {
   const queryClient = useQueryClient()
   const me = useQuery({ queryKey: ["me"], queryFn: getMe })
@@ -51,6 +55,15 @@ export default function Rules() {
         .sort((a, b) => a.path.localeCompare(b.path)),
     [groups.data, groupPath],
   )
+
+  // Market-group ids that sit in (or under) an ore branch — reprocess-eligible.
+  const oreGroupIds = useMemo(() => {
+    const s = new Set<number>()
+    for (const g of groupOptions) {
+      if (g.path.split(" / ").some((seg) => ORE_BRANCHES.has(seg))) s.add(g.id)
+    }
+    return s
+  }, [groupOptions])
 
   function targetLabel(rule: RuleOut): string {
     // The backend resolves the SDE name; fall back to a path lookup / the raw id
@@ -131,7 +144,11 @@ export default function Rules() {
       )}
 
       {canEdit ? (
-        <AddRule onSaved={invalidate} groupOptions={groupOptions} />
+        <AddRule
+          onSaved={invalidate}
+          groupOptions={groupOptions}
+          oreGroupIds={oreGroupIds}
+        />
       ) : (
         <p>
           <small>Only a Buyback Manager can change pricing rules.</small>
@@ -144,17 +161,31 @@ export default function Rules() {
 function AddRule({
   onSaved,
   groupOptions,
+  oreGroupIds,
 }: {
   onSaved: () => void
   groupOptions: { id: number; leaf: string; path: string }[]
+  oreGroupIds: Set<number>
 }) {
   const [kind, setKind] = useState<TargetKind>("type")
-  const [target, setTarget] = useState<{ id: number; name: string } | null>(null)
+  const [target, setTarget] = useState<{
+    id: number
+    name: string
+    marketGroupId?: number | null
+  } | null>(null)
   const [search, setSearch] = useState("")
   const [basis, setBasis] = useState<Basis | "">("")
   const [percentage, setPercentage] = useState("90")
   const [enabled, setEnabled] = useState(true)
   const [reprocess, setReprocess] = useState(false)
+
+  // Reprocess only applies to ores: a market-group target in an ore branch, or a
+  // type whose market group is in one (ADR-0026). Hidden/ignored otherwise.
+  const reprocessEligible =
+    !!target &&
+    (kind === "market_group"
+      ? oreGroupIds.has(target.id)
+      : target.marketGroupId != null && oreGroupIds.has(target.marketGroupId))
 
   const query = search.trim()
   const results = useQuery({
@@ -194,7 +225,7 @@ function AddRule({
         basis: basis === "" ? null : basis,
         percentage,
         enabled,
-        reprocess,
+        reprocess: reprocessEligible && reprocess,
       }),
     onSuccess: () => {
       setTarget(null)
@@ -221,6 +252,7 @@ function AddRule({
                 setKind(e.target.value as TargetKind)
                 setTarget(null)
                 setSearch("")
+                setReprocess(false)
               }}
             >
               <option value="type">Type</option>
@@ -251,7 +283,11 @@ function AddRule({
                       href="#"
                       onClick={(e) => {
                         e.preventDefault()
-                        setTarget({ id: t.type_id, name: t.name })
+                        setTarget({
+                          id: t.type_id,
+                          name: t.name,
+                          marketGroupId: t.market_group_id,
+                        })
                       }}
                     >
                       {t.name}
@@ -334,14 +370,16 @@ function AddRule({
             />
             Enabled
           </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={reprocess}
-              onChange={(e) => setReprocess(e.target.checked)}
-            />
-            Reprocess (ore → minerals)
-          </label>
+          {reprocessEligible && (
+            <label>
+              <input
+                type="checkbox"
+                checked={reprocess}
+                onChange={(e) => setReprocess(e.target.checked)}
+              />
+              Reprocess (ore → minerals)
+            </label>
+          )}
         </div>
 
         <button type="submit" disabled={!target} aria-busy={save.isPending}>

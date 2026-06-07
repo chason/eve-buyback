@@ -51,7 +51,9 @@ unions the ore's mineral ids into its single price fetch.
 - A new, composable pricing mode that reuses the rule hierarchy — no separate config
   surface, and per-ore granularity falls out for free. The rules table and editor gain a
   **Reprocess** column/checkbox; `RuleOut`/`RulePutRequest` gain `reprocess` (the API
-  contract is otherwise unchanged).
+  contract is otherwise unchanged). The editor only offers the checkbox for **ore
+  targets** — a market group in (or under) one of the three ore branches (Standard / Moon
+  / Ice Ores) or a type within one — since the flag is a no-op anywhere else.
 - The seed now downloads two more Fuzzwork dumps (`invGroups`, `invTypeMaterials`) and
   writes `sde_type_materials`; re-run it after deploying this.
 - A reprocess line whose minerals (and ore, for any leftover) are entirely unpriced is

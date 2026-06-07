@@ -63,7 +63,7 @@ describe("Rules", () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([])
     vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
-      { market_group_id: 1, parent_id: null, name: "Ore" },
+      { market_group_id: 1, parent_id: null, name: "Standard Ores" },
     ])
     vi.mocked(pricingApi.putRule).mockResolvedValue({
       target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true,
@@ -72,8 +72,8 @@ describe("Rules", () => {
     renderRules()
 
     await u.selectOptions(await screen.findByLabelText("Target kind"), "market_group")
-    await u.type(screen.getByLabelText("Search market group by name"), "ore")
-    await u.click(await screen.findByText("Ore"))  // pick the matching result
+    await u.type(screen.getByLabelText("Search market group by name"), "standard ores")
+    await u.click(await screen.findByText("Standard Ores"))  // an ore branch → eligible
     await u.selectOptions(screen.getByLabelText("Basis"), "sell")
     const pct = screen.getByLabelText("Rule percentage")
     await u.clear(pct)
@@ -145,6 +145,39 @@ describe("Rules", () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText("Manufacture & Research / Materials / Standard Ores"),
+    ).toBeInTheDocument()
+  })
+
+  it("offers Reprocess only for ore targets", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.listRules).mockResolvedValue([])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
+      { market_group_id: 1, parent_id: null, name: "Standard Ores" },
+      { market_group_id: 2, parent_id: null, name: "Ship Equipment" },
+    ])
+
+    renderRules()
+
+    await u.selectOptions(
+      await screen.findByLabelText("Target kind"),
+      "market_group",
+    )
+    const box = screen.getByLabelText("Search market group by name")
+
+    // A non-ore group → no Reprocess checkbox.
+    await u.type(box, "ship equipment")
+    await u.click(await screen.findByText("Ship Equipment"))
+    expect(
+      screen.queryByLabelText("Reprocess (ore → minerals)"),
+    ).not.toBeInTheDocument()
+
+    // Switch to an ore branch → the checkbox appears.
+    await u.clear(box)
+    await u.type(box, "standard ores")
+    await u.click(await screen.findByText("Standard Ores"))
+    expect(
+      screen.getByLabelText("Reprocess (ore → minerals)"),
     ).toBeInTheDocument()
   })
 
