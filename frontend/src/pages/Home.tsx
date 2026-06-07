@@ -64,36 +64,35 @@ export default function Home() {
 
       <section>
         <h2>How it works</h2>
-        <ol>
-          <li>
-            <strong>Paste your items into an appraisal.</strong> Paste an in-game
-            inventory list (or search and add items) and submit to get a priced
-            quote.
-          </li>
-          <li>
-            <strong>Create a contract for the quoted price.</strong> In EVE, make an{" "}
-            <em>item exchange</em> contract to your corporation for the ISK the
-            appraisal shows. The recipient is your corporation today; making it
-            configurable is a planned feature. The appraisal page lists the exact
-            fields to fill in:
-            <ul>
-              <li>
-                <strong>Contract to</strong> — your corporation
-              </li>
-              <li>
-                <strong>I will receive</strong> — the appraisal amount
-              </li>
-              <li>
-                <strong>Description</strong> — the appraisal ID, so it can be looked
-                up
-              </li>
-            </ul>
-          </li>
-          <li>
-            <strong>Wait for it to be accepted.</strong> A Buyback Manager reviews
-            the contract and accepts it, and you get paid.
-          </li>
-        </ol>
+        <div className="flow">
+          <div className="flow-step">
+            <span className="flow-num">1</span>
+            <h3>Appraise</h3>
+            <p>
+              Paste your items (or search and add them) and submit to get a priced
+              quote.
+            </p>
+          </div>
+          <span className="flow-arrow" aria-hidden="true">
+            →
+          </span>
+          <div className="flow-step">
+            <span className="flow-num">2</span>
+            <h3>Contract</h3>
+            <p>
+              Make an <em>item exchange</em> contract to your corporation for the
+              quoted price. The appraisal page lists the exact fields to fill in.
+            </p>
+          </div>
+          <span className="flow-arrow" aria-hidden="true">
+            →
+          </span>
+          <div className="flow-step">
+            <span className="flow-num">3</span>
+            <h3>Get paid</h3>
+            <p>A Buyback Manager reviews and accepts the contract, and you get paid.</p>
+          </div>
+        </div>
       </section>
 
       {me.isLoading && <p aria-busy="true">Checking session…</p>}
