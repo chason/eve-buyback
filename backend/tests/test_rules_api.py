@@ -78,11 +78,13 @@ async def test_put_rule_reprocess_round_trips():
         await http.post("/api/v1/corporations")
         created = await http.put(
             "/api/v1/corporations/me/rules/type/34",
-            json={"percentage": "100", "reprocess": True},
+            json={"percentage": "100", "reprocess": True, "compressed_only": True},
         )
         assert created.json()["reprocess"] is True
+        assert created.json()["compressed_only"] is True
         listed = await http.get("/api/v1/corporations/me/rules")
         assert listed.json()[0]["reprocess"] is True
+        assert listed.json()[0]["compressed_only"] is True
 
 
 async def test_put_is_idempotent_upsert():

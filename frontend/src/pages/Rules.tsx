@@ -104,6 +104,7 @@ export default function Rules() {
               <th>Basis</th>
               <th>%</th>
               <th>Reprocess</th>
+              <th>Compressed</th>
               <th>Enabled</th>
               {canEdit && <th />}
             </tr>
@@ -123,6 +124,7 @@ export default function Rules() {
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
                 <td>{rule.reprocess ? "yes" : "–"}</td>
+                <td>{rule.compressed_only ? "yes" : "–"}</td>
                 <td>{rule.enabled ? "yes" : "no"}</td>
                 {canEdit && (
                   <td>
@@ -178,6 +180,7 @@ function AddRule({
   const [percentage, setPercentage] = useState("90")
   const [enabled, setEnabled] = useState(true)
   const [reprocess, setReprocess] = useState(false)
+  const [compressedOnly, setCompressedOnly] = useState(false)
 
   // Reprocess only applies to ores: a market-group target in an ore branch, or a
   // type whose market group is in one (ADR-0026). Hidden/ignored otherwise.
@@ -226,6 +229,7 @@ function AddRule({
         percentage,
         enabled,
         reprocess: reprocessEligible && reprocess,
+        compressed_only: reprocessEligible && compressedOnly,
       }),
     onSuccess: () => {
       setTarget(null)
@@ -253,6 +257,7 @@ function AddRule({
                 setTarget(null)
                 setSearch("")
                 setReprocess(false)
+                setCompressedOnly(false)
               }}
             >
               <option value="type">Type</option>
@@ -374,14 +379,24 @@ function AddRule({
             Enabled
           </label>
           {reprocessEligible && (
-            <label>
-              <input
-                type="checkbox"
-                checked={reprocess}
-                onChange={(e) => setReprocess(e.target.checked)}
-              />
-              Reprocess (ore → minerals)
-            </label>
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={reprocess}
+                  onChange={(e) => setReprocess(e.target.checked)}
+                />
+                Reprocess (ore → minerals)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={compressedOnly}
+                  onChange={(e) => setCompressedOnly(e.target.checked)}
+                />
+                Compressed only
+              </label>
+            </>
           )}
         </div>
 

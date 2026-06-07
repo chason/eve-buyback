@@ -45,8 +45,8 @@ describe("Rules", () => {
   it("shows each rule's backend-resolved target name", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([
-      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true, reprocess: true },
-      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false },
+      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true, reprocess: true, compressed_only: false },
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false },
     ])
     vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
 
@@ -66,7 +66,7 @@ describe("Rules", () => {
       { market_group_id: 1, parent_id: null, name: "Standard Ores" },
     ])
     vi.mocked(pricingApi.putRule).mockResolvedValue({
-      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true,
+      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true, compressed_only: true,
     })
 
     renderRules()
@@ -79,6 +79,7 @@ describe("Rules", () => {
     await u.clear(pct)
     await u.type(pct, "75")
     await u.click(screen.getByLabelText("Reprocess (ore → minerals)"))
+    await u.click(screen.getByLabelText("Compressed only"))
     await u.click(screen.getByRole("button", { name: "Save rule" }))
 
     await waitFor(() => expect(pricingApi.putRule).toHaveBeenCalled())
@@ -90,6 +91,7 @@ describe("Rules", () => {
       percentage: "75",
       enabled: true,
       reprocess: true,
+      compressed_only: true,
     })
   })
 

@@ -503,6 +503,11 @@ export interface components {
         RuleOut: {
             /** Basis */
             basis: ("buy" | "sell" | "split") | null;
+            /**
+             * Compressed Only
+             * @default false
+             */
+            compressed_only: boolean;
             /** Enabled */
             enabled: boolean;
             /** Percentage */
@@ -530,6 +535,11 @@ export interface components {
         RulePutRequest: {
             /** Basis */
             basis?: ("buy" | "sell" | "split") | null;
+            /**
+             * Compressed Only
+             * @default false
+             */
+            compressed_only: boolean;
             /**
              * Enabled
              * @default true

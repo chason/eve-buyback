@@ -126,6 +126,8 @@ class PricingRuleRecord(BaseModel):
     enabled: bool
     # Price a matched ore by its refined mineral value (ADR-0026); ignored for non-ores.
     reprocess: bool = False
+    # Accept only the compressed variants of matched ores (ADR-0026); ore-only.
+    compressed_only: bool = False
 
 
 class AppraisalLineRecord(BaseModel):

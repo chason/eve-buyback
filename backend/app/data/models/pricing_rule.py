@@ -39,3 +39,7 @@ class PricingRule(Base):
     reprocess: Mapped[bool] = mapped_column(
         default=False, server_default=text("false")
     )
+    # Accept only the compressed variants of matched ores (ADR-0026); ore-only.
+    compressed_only: Mapped[bool] = mapped_column(
+        default=False, server_default=text("false")
+    )

@@ -36,6 +36,8 @@ class RuleOut(BaseModel):
     enabled: bool
     # Price a matched ore by refined mineral value (ADR-0026); ignored for non-ores.
     reprocess: bool = False
+    # Accept only the compressed variants of matched ores (ADR-0026); ore-only.
+    compressed_only: bool = False
 
 
 class RulePutRequest(BaseModel):
@@ -46,3 +48,4 @@ class RulePutRequest(BaseModel):
     percentage: Decimal = Field(ge=0)
     enabled: bool = True
     reprocess: bool = False
+    compressed_only: bool = False

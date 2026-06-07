@@ -130,6 +130,44 @@ async def test_appraisal_reprocess_sub_batch_uses_ore_price():
         assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
 
 
+async def test_appraisal_compressed_only_rejects_uncompressed_ore():
+    # Raw + compressed Veldspar in one ore market group; a compressed-only rule on
+    # the group accepts the compressed one and rejects the raw one.
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_market_groups(
+            session, [{"market_group_id": 1, "parent_id": None, "name": "Ore"}]
+        )
+        await sde_repo.bulk_upsert_types(session, [
+            {"type_id": 1230, "name": "Veldspar", "group_id": 462, "category_id": 25,
+             "market_group_id": 1, "volume": 0.1, "portion_size": 100,
+             "published": True},
+            {"type_id": 28430, "name": "Compressed Veldspar", "group_id": 462,
+             "category_id": 25, "market_group_id": 1, "volume": 0.15,
+             "portion_size": 1, "published": True},
+        ])
+        await session.commit()
+    _use_fuzzwork({
+        1230: FuzzworkAggregate(buy=_side("2.00"), sell=_side("2.00")),
+        28430: FuzzworkAggregate(buy=_side("5.00"), sell=_side("5.00")),
+    })
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/market_group/1",
+            json={"percentage": "100", "compressed_only": True},
+        )
+        resp = await http.post("/api/v1/appraisals", json={"items": [
+            {"type_id": 1230, "quantity": 100},   # raw → rejected
+            {"type_id": 28430, "quantity": 100},  # compressed → accepted
+        ]})
+        lines = {ln["type_name"]: ln for ln in resp.json()["lines"]}
+        assert lines["Veldspar"]["status"] == "rejected"
+        assert lines["Veldspar"]["reason"] == "Compressed only"
+        assert lines["Compressed Veldspar"]["status"] == "accepted"
+        assert Decimal(lines["Compressed Veldspar"]["line_total"]) == Decimal("500.00")
+
+
 async def test_appraisal_ore_without_reprocess_rule_is_direct():
     await _seed_ore()
     _use_ore_fuzzwork()

@@ -4,6 +4,7 @@ from app.domain.ids import generate_appraisal_id
 from app.domain.pricing import (
     ORE_REFINE_YIELD,
     RuleSpec,
+    is_compressed_ore,
     line_total,
     reprocess_line,
     resolve_rule,
@@ -136,6 +137,22 @@ def test_reprocessed_sub_batch_is_all_ore_price():
     r = reprocess_line(50, 100, _MATS, _PRICED, Decimal("3.00"))
     assert r.total == Decimal("50") * Decimal("3.00")
     assert r.minerals[0].quantity == Decimal("0")
+
+
+def test_is_compressed_ore():
+    assert is_compressed_ore("Compressed Veldspar") is True
+    assert is_compressed_ore("Compressed Dense Veldspar") is True
+    assert is_compressed_ore("Veldspar") is False
+    assert is_compressed_ore("Compressedium") is False  # needs the trailing space
+
+
+def test_resolve_rule_carries_compressed_only():
+    r = resolve_rule(
+        34, 1,
+        type_rules={34: RuleSpec("buy", Decimal("90"), compressed_only=True)},
+        group_rules={}, parent_of={1: None}, **DEF,
+    )
+    assert r.compressed_only is True
 
 
 def test_reprocessed_unpriced_mineral_and_ore_is_none():

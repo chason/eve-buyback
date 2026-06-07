@@ -27,6 +27,11 @@ reprocess one ore type or one sub-group. No matching rule (or the corp default) 
 pricing, exactly as before. The flag is **ignored for non-ores** (they have no refine
 yield).
 
+A sibling ore-only rule flag, **`compressed_only`**, rejects the *uncompressed* variants
+of matched ores — a line is rejected ("Compressed only") when the resolved rule has the
+flag and the ore's name doesn't start with `"Compressed "`. Corps that only buy compressed
+ore set it on the relevant ore branch; like `reprocess`, it's ignored for non-ores.
+
 **Pricing model** for an ore quantity `Q` with refine batch size `P` (SDE `portionSize`):
 
 - **Whole refine batches** (`floor(Q / P)`) are valued by their minerals at a **perfect

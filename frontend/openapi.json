@@ -620,6 +620,11 @@
             ],
             "title": "Basis"
           },
+          "compressed_only": {
+            "default": false,
+            "title": "Compressed Only",
+            "type": "boolean"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -686,6 +691,11 @@
               }
             ],
             "title": "Basis"
+          },
+          "compressed_only": {
+            "default": false,
+            "title": "Compressed Only",
+            "type": "boolean"
           },
           "enabled": {
             "default": true,

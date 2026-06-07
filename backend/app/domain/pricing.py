@@ -27,6 +27,13 @@ DEFAULT_AGGREGATE_FIELD: AggregateField = "percentile"
 # 100%). Gas/scrap have other yields but we only price ores.
 ORE_CATEGORY_ID = 25
 ORE_REFINE_YIELD = Decimal("0.9063")
+# Compressed ore type names start with this prefix (e.g. "Compressed Veldspar").
+_COMPRESSED_PREFIX = "Compressed "
+
+
+def is_compressed_ore(name: str) -> bool:
+    """Whether an ore type name is the compressed variant (ADR-0026)."""
+    return name.startswith(_COMPRESSED_PREFIX)
 
 _CENT = Decimal("0.01")
 
@@ -39,6 +46,7 @@ class RuleSpec:
     basis: Basis | None
     percentage: Decimal
     reprocess: bool = False
+    compressed_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -47,6 +55,7 @@ class ResolvedRule:
     percentage: Decimal
     source: str  # which rule won: "type:34", "market_group:1857", or "default"
     reprocess: bool = False  # price a matched ore by its refined minerals (ADR-0026)
+    compressed_only: bool = False  # reject the uncompressed variants of matched ores
 
 
 def resolve_rule(
@@ -75,6 +84,7 @@ def resolve_rule(
             percentage=type_rule.percentage,
             source=f"type:{type_id}",
             reprocess=type_rule.reprocess,
+            compressed_only=type_rule.compressed_only,
         )
 
     group_id = market_group_id
@@ -88,6 +98,7 @@ def resolve_rule(
                 percentage=group_rule.percentage,
                 source=f"market_group:{group_id}",
                 reprocess=group_rule.reprocess,
+                compressed_only=group_rule.compressed_only,
             )
         group_id = parent_of.get(group_id)
 

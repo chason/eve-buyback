@@ -82,12 +82,16 @@ async def create_appraisal(
     }
     rules = await rules_repo.list_rules(session, corp.id)
     type_rules = {
-        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage, r.reprocess)
+        r.target_id: pricing_domain.RuleSpec(
+            r.basis, r.percentage, r.reprocess, r.compressed_only
+        )
         for r in rules
         if r.enabled and r.target_kind == "type"
     }
     group_rules = {
-        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage, r.reprocess)
+        r.target_id: pricing_domain.RuleSpec(
+            r.basis, r.percentage, r.reprocess, r.compressed_only
+        )
         for r in rules
         if r.enabled and r.target_kind == "market_group"
     }
@@ -256,6 +260,18 @@ def _compute_line(
         return _rejected(w.type_id, f"Type {w.type_id}", w.quantity, "Unknown item")
 
     resolved = resolve(w.type_id)
+    is_ore = sde_type.category_id == pricing_domain.ORE_CATEGORY_ID
+
+    # "Compressed only" rule: reject the uncompressed variants of matched ores (ADR-0026).
+    if (
+        resolved.compressed_only
+        and is_ore
+        and not pricing_domain.is_compressed_ore(sde_type.name)
+    ):
+        return _rejected(
+            w.type_id, sde_type.name, w.quantity, "Compressed only"
+        )
+
     agg = config.aggregate_field
     materials = materials_by_type.get(w.type_id)
     breakdown: dict | None = None
