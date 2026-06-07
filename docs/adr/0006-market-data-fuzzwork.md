@@ -31,6 +31,25 @@ Quotes read cache-first and fetch only misses/stale entries.
 - Send a descriptive `User-Agent` (per the `eve-esi` skill) and respect Fuzzwork's
   caching/rate expectations.
 
+## Scope & hub coverage (MVP — confirmed 2026-06-07)
+
+- **Default aggregate field is `percentile`** (manipulation resistance), confirmed;
+  it stays per-corp configurable.
+- **One hub, Jita 4-4, for MVP.** The `BuybackConfig.market_hub_id` column and the
+  `(hub_id, type_id)` cache key already make the system multi-hub-capable, but the
+  MVP surfaces only Jita; the config field is not yet exposed in the UI.
+- **Fuzzwork's per-station aggregates cover only the five NPC trade hubs** (Jita
+  `60003760`, Amarr `60008494`, Dodixie `60011866`, Rens `60004588`, Hek
+  `60005686`), plus whole-region aggregates. Opening the other four hubs later is
+  cheap (seed the station set + a picker) — see the "future" list in the
+  architecture overview §13.
+- **Private Upwell structure markets are out of scope.** Fuzzwork has no structure
+  data; pricing at a player structure would require the authenticated
+  `GET /markets/structures/{id}/` ESI endpoint (scope `esi-markets.structure_markets.v1`
+  + per-structure access), our own aggregation, and a **stored EVE refresh token** —
+  which [ADR-0004](0004-eve-sso-session-auth.md) deliberately avoids. A future
+  feature that would supersede ADR-0004.
+
 ## Alternatives considered
 
 - **Raw ESI market orders, aggregate in-house** — full control and no third party,

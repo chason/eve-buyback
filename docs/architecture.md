@@ -262,21 +262,31 @@ Fuzzwork usage, image/link helpers, and caching.
 
 - Acting on members' behalf via ESI (contracts/wallet) → would need stored,
   encrypted refresh tokens.
-- Multi-hub pricing per corp beyond a single configured hub.
+- Multi-hub pricing beyond Jita — opening the other four NPC hubs (Amarr / Dodixie /
+  Rens / Hek) is cheap later; the data layer is already hub-keyed ([ADR-0006](adr/0006-market-data-fuzzwork.md)).
+- **Per-structure (private Upwell) pricing** — needs authenticated structure-market
+  ESI + a stored refresh token, superseding [ADR-0004](adr/0004-eve-sso-session-auth.md);
+  Fuzzwork has no structure data ([ADR-0006](adr/0006-market-data-fuzzwork.md)).
 - Payout automation / contract verification.
 - Public hosted multi-corp SaaS hardening (billing, abuse controls) — the data
   model supports it, but ops are out of MVP.
 - Audit log / analytics dashboards.
 
-## 14. Open questions
+## 14. Resolved questions
 
-- Which Fuzzwork aggregate is the default "buy"/"sell" number — `percentile`,
-  `weightedAverage`, or `max`/`min`? (Defaulting to `percentile`; confirm.)
-- Should the corp's hub be limited to Jita for MVP, or selectable among the major
-  hubs (Amarr/Dodixie/Rens/Hek)?
-- ~~Should a non-CEO Director be able to register the corp?~~ Resolved: CEO **or**
-  Director ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
-- Should every submit persist an appraisal, or add an ephemeral "preview" mode to
-  avoid clutter while typing? (MVP persists on submit — [ADR-0014](adr/0014-persisted-appraisals.md).)
-- Appraisal retention: keep indefinitely (MVP) or add pruning/archival later?
+All MVP open questions are settled (decisions of 2026-06-07):
+
+- ~~Default Fuzzwork aggregate for "buy"/"sell"?~~ **`percentile`** (manipulation
+  resistance), per-corp configurable ([ADR-0006](adr/0006-market-data-fuzzwork.md)).
+- ~~Hub limited to Jita, or selectable among the major hubs?~~ **Jita only for MVP.**
+  Fuzzwork's per-station aggregates cover just the five NPC hubs anyway; the data
+  layer is already hub-keyed, so the other four are a cheap future add, and private
+  Upwell structures are a token-requiring future feature (§13;
+  [ADR-0006](adr/0006-market-data-fuzzwork.md)).
+- ~~Should a non-CEO Director be able to register the corp?~~ **CEO or Director**
+  ([ADR-0015](adr/0015-corp-registration-ceo-or-director.md)).
+- ~~Persist every submit, or add an ephemeral "preview" mode?~~ **Always persist on
+  submit** ([ADR-0014](adr/0014-persisted-appraisals.md)).
+- ~~Appraisal retention?~~ **Keep indefinitely** for MVP — rows are small; add
+  pruning/archival only if it ever grows.
 ```
