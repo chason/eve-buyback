@@ -6,6 +6,7 @@ so the database shape never leaks into the public API contract.
 """
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,3 +36,31 @@ class ManagerRecord(BaseModel):
     character_name: str
     granted_by_character_id: int
     granted_at: datetime
+
+
+class SdeTypeRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    type_id: int
+    name: str
+    group_id: int
+    market_group_id: int | None
+    volume: Decimal
+    published: bool
+
+
+class SdeMarketGroupRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    market_group_id: int
+    parent_id: int | None
+    name: str
+
+
+class SdeMetadataRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source: str
+    type_count: int
+    market_group_count: int
+    imported_at: datetime

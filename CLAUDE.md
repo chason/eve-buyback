@@ -44,11 +44,12 @@ buyback/
 │   │   ├── main.py       # app factory + lifespan; wires middleware, routers, error handlers
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
 │   │   ├── interface/    # INTERFACE: FastAPI routers (v1/) + deps, security, middleware, error mapping
-│   │   ├── application/  # APPLICATION: use cases (auth, corporations) + typed errors
-│   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers)
+│   │   ├── application/  # APPLICATION: use cases (auth, corporations, sde, market, reference) + typed errors
+│   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers, market TTL)
 │   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
-│   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO); return pydantic
-│   │   └── schemas/      # API request/response DTOs (interface contracts)
+│   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO, Fuzzwork, SDE source); return pydantic
+│   │   ├── schemas/      # API request/response DTOs (interface contracts)
+│   │   └── sde/          # deploy-time SDE seed CLI (python -m app.sde.seed)
 │   ├── alembic/          # migrations (async env.py)
 │   └── tests/            # pytest
 ├── frontend/             # TypeScript SPA (Vite + React + TanStack Query)
@@ -109,6 +110,7 @@ uv run uvicorn app.main:app --reload     # dev server :8000
 uv run pytest                            # tests
 uv run ruff check .                      # lint
 uv run alembic upgrade head              # apply migrations (once models exist)
+uv run python -m app.sde.seed            # seed SDE reference data from Fuzzwork (ADR-0009)
 
 # Frontend (from frontend/)
 npm install
