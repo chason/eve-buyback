@@ -256,7 +256,15 @@ Fuzzwork usage, image/link helpers, and caching.
 6. **Frontend** (shipped core-first) — **6a**: OpenAPI type-gen, app shell, the
    appraisal tool + shareable result view (generated API types, Pico.css). **6b**:
    corp config view, manager rule editor, appraisal history (role-gated nav).
-7. **Data quality + polish** — rejection thresholds, packaging/Docker.
+7. **Data quality + polish**
+   - Configurable **rejection thresholds** (min order count, max price age) fed into
+     the existing line-rejection path.
+   - **SDE-readiness signal.** When the SDE tables are empty, every appraisal silently
+     rejects every line as "Unknown item" with no hint the reference data is unseeded
+     (an operator running fresh — or after a DB reset — hits this). Surface it: a
+     readiness check (e.g. `/health` reports `sde: seeded|empty` from `sde_metadata`)
+     and an empty-state banner on the appraisal page prompting `python -m app.sde.seed`.
+   - **Packaging/Docker** for self-hosting (incl. running the seed as a deploy step).
 
 ## 13. Out of scope (MVP) / future
 
