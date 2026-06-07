@@ -109,6 +109,8 @@ class BuybackConfigRecord(BaseModel):
     default_basis: Basis
     default_percentage: Decimal
     aggregate_field: AggregateField
+    # Global-default accept flag (ADR-0007): False → whitelist-only buyback.
+    default_accepted: bool = True
 
 
 class PricingRuleRecord(BaseModel):

@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, Uuid
+from sqlalchemy import ForeignKey, Numeric, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -26,4 +26,8 @@ class BuybackConfig(Base):
     default_percentage: Mapped[Decimal] = mapped_column(Numeric)
     aggregate_field: Mapped[AggregateField] = mapped_column(
         check_enum(AggregateField, name="aggregate_field")
+    )
+    # The global default's accept flag: False → buy nothing unless a rule accepts it.
+    default_accepted: Mapped[bool] = mapped_column(
+        default=True, server_default=text("true")
     )

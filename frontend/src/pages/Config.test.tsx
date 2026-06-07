@@ -30,6 +30,7 @@ const config = {
   default_basis: "buy" as const,
   default_percentage: "90",
   aggregate_field: "percentile" as const,
+  default_accepted: true,
 }
 
 function renderConfig() {
@@ -59,6 +60,8 @@ describe("Config", () => {
     const pct = await screen.findByLabelText("Default percentage")
     await u.clear(pct)
     await u.type(pct, "85")
+    // Flip to whitelist mode (buy nothing unless a rule accepts).
+    await u.click(screen.getByLabelText(/Accept items by default/))
     await u.click(screen.getByRole("button", { name: "Save config" }))
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
@@ -67,6 +70,7 @@ describe("Config", () => {
       default_basis: "buy",
       default_percentage: "85",
       aggregate_field: "percentile",
+      default_accepted: false,
     })
   })
 

@@ -26,8 +26,11 @@ the corp's `BuybackConfig` providing the **global** default. A `PricingRule` has
 
 A rule may also **reject** matching items: `accepted=False` makes the buyback refuse
 the item (a blacklist). It composes with most-specific-wins — blacklist a market group
-and whitelist a type under it with `accepted=True`. (Later additions: ore-only
-`reprocess` and `compressed_only` flags — see [ADR-0026](0026-ore-reprocess-pricing.md).)
+and whitelist a type under it with `accepted=True`. The **global default** carries the
+same flag: `BuybackConfig.default_accepted=False` flips the whole corp to
+**whitelist-only** buyback — nothing is bought unless a rule explicitly accepts it.
+(Later additions: ore-only `reprocess` and `compressed_only` flags — see
+[ADR-0026](0026-ore-reprocess-pricing.md).)
 
 ## Consequences
 

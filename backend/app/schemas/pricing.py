@@ -13,6 +13,7 @@ class ConfigOut(BaseModel):
     default_basis: Basis
     default_percentage: Decimal
     aggregate_field: AggregateField
+    default_accepted: bool = True
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -20,6 +21,7 @@ class ConfigUpdateRequest(BaseModel):
     default_basis: Basis
     default_percentage: Decimal = Field(ge=0)
     aggregate_field: AggregateField
+    default_accepted: bool = True
 
 
 class RuleOut(BaseModel):

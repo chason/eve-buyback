@@ -21,6 +21,7 @@ LineStatus = Literal["accepted", "rejected"]
 DEFAULT_BASIS: Basis = "buy"
 DEFAULT_PERCENTAGE = Decimal("90")
 DEFAULT_AGGREGATE_FIELD: AggregateField = "percentile"
+DEFAULT_ACCEPTED = True  # corps buy by default; set False for whitelist-only buyback
 
 # Ore reprocess pricing (ADR-0026). Ores are SDE category 25 (Asteroid). A "perfect"
 # ore refine yields 0.9063 of the base material quantities (the max achievable; not
@@ -69,6 +70,7 @@ def resolve_rule(
     parent_of: dict[int, int | None],
     default_basis: Basis,
     default_percentage: Decimal,
+    default_accepted: bool = True,
 ) -> ResolvedRule:
     """Most-specific-wins resolution for one type (ADR-0007):
 
@@ -107,7 +109,10 @@ def resolve_rule(
         group_id = parent_of.get(group_id)
 
     return ResolvedRule(
-        basis=default_basis, percentage=default_percentage, source="default"
+        basis=default_basis,
+        percentage=default_percentage,
+        source="default",
+        accepted=default_accepted,
     )
 
 

@@ -27,6 +27,7 @@ async def upsert_config(
     default_basis: Basis,
     default_percentage: Decimal,
     aggregate_field: AggregateField,
+    default_accepted: bool = True,
 ) -> BuybackConfigRecord:
     row = await _row(session, corporation_id)
     if row is None:
@@ -36,6 +37,7 @@ async def upsert_config(
     row.default_basis = default_basis
     row.default_percentage = default_percentage
     row.aggregate_field = aggregate_field
+    row.default_accepted = default_accepted
     await session.flush()
     await session.refresh(row)
     return BuybackConfigRecord.model_validate(row)

@@ -168,6 +168,23 @@ def test_resolve_rule_accepted_default_and_blacklist():
     assert r.accepted is False
 
 
+def test_default_accepted_false_is_whitelist():
+    # Whitelist mode: the global default rejects when no rule matches…
+    d = resolve_rule(
+        34, None, type_rules={}, group_rules={}, parent_of={},
+        default_accepted=False, **DEF,
+    )
+    assert d.accepted is False and d.source == "default"
+    # …but an explicit (accepting) rule still buys.
+    r = resolve_rule(
+        34, 1,
+        type_rules={34: RuleSpec("buy", Decimal("90"))},
+        group_rules={}, parent_of={1: None},
+        default_accepted=False, **DEF,
+    )
+    assert r.accepted is True
+
+
 def test_reprocessed_unpriced_mineral_and_ore_is_none():
     # No mineral price and no ore price for a sub-batch → nothing priceable.
     assert reprocess_line(50, 100, _MATS, {34: None}, None) is None

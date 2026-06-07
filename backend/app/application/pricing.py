@@ -54,6 +54,7 @@ async def update_config(
     default_basis: Basis,
     default_percentage: Decimal,
     aggregate_field: AggregateField,
+    default_accepted: bool = True,
 ) -> BuybackConfigRecord:
     corp = await get_registered_corporation(session, corporation_id)
     config = await config_repo.upsert_config(
@@ -63,6 +64,7 @@ async def update_config(
         default_basis=default_basis,
         default_percentage=default_percentage,
         aggregate_field=aggregate_field,
+        default_accepted=default_accepted,
     )
     await session.commit()
     return config

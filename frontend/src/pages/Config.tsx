@@ -25,6 +25,7 @@ export default function Config() {
   const [basis, setBasis] = useState<Basis>("buy")
   const [percentage, setPercentage] = useState("90")
   const [aggregate, setAggregate] = useState<AggregateField>("percentile")
+  const [defaultAccepted, setDefaultAccepted] = useState(true)
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Config() {
       setBasis(config.data.default_basis)
       setPercentage(config.data.default_percentage)
       setAggregate(config.data.aggregate_field)
+      setDefaultAccepted(config.data.default_accepted)
     }
   }, [config.data])
 
@@ -42,6 +44,7 @@ export default function Config() {
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
+        default_accepted: defaultAccepted,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["config"] }),
   })
@@ -111,6 +114,19 @@ export default function Config() {
               </option>
             ))}
           </select>
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={defaultAccepted}
+            disabled={!canEdit}
+            onChange={(e) => setDefaultAccepted(e.target.checked)}
+          />
+          Accept items by default
+          <small>
+            Off → buy <em>nothing</em> unless a pricing rule accepts it (whitelist).
+          </small>
         </label>
 
         {canEdit ? (

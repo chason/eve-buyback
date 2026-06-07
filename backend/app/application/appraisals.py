@@ -106,6 +106,7 @@ async def create_appraisal(
             parent_of=parent_of,
             default_basis=config.default_basis,
             default_percentage=config.default_percentage,
+            default_accepted=config.default_accepted,
         )
 
     # Ore lines whose resolved rule says "reprocess" are priced by their refined

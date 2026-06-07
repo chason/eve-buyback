@@ -298,6 +298,11 @@
             "title": "Corporation Id",
             "type": "integer"
           },
+          "default_accepted": {
+            "default": true,
+            "title": "Default Accepted",
+            "type": "boolean"
+          },
           "default_basis": {
             "enum": [
               "buy",
@@ -339,6 +344,11 @@
             ],
             "title": "Aggregate Field",
             "type": "string"
+          },
+          "default_accepted": {
+            "default": true,
+            "title": "Default Accepted",
+            "type": "boolean"
           },
           "default_basis": {
             "enum": [

@@ -130,6 +130,35 @@ async def test_appraisal_reprocess_sub_batch_uses_ore_price():
         assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
 
 
+async def test_appraisal_whitelist_mode_rejects_unruled_items():
+    await _seed_sde()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # Flip the corp to whitelist-only buyback.
+        await http.put("/api/v1/corporations/me/config", json={
+            "market_hub_id": 60003760, "default_basis": "buy",
+            "default_percentage": "90", "aggregate_field": "percentile",
+            "default_accepted": False,
+        })
+        # No rule for Tritanium → rejected by the default.
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1000}]}
+        )
+        assert resp.json()["lines"][0]["status"] == "rejected"
+        assert resp.json()["lines"][0]["reason"] == "Not accepted"
+
+        # Add an accepting rule → now it's bought.
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "90"}
+        )
+        resp2 = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1000}]}
+        )
+        assert resp2.json()["lines"][0]["status"] == "accepted"
+
+
 async def test_appraisal_not_accepted_rule_rejects_item():
     await _seed_sde()
     _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})

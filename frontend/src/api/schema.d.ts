@@ -384,6 +384,11 @@ export interface components {
             /** Corporation Id */
             corporation_id: number;
             /**
+             * Default Accepted
+             * @default true
+             */
+            default_accepted: boolean;
+            /**
              * Default Basis
              * @enum {string}
              */
@@ -400,6 +405,11 @@ export interface components {
              * @enum {string}
              */
             aggregate_field: "weighted_average" | "max" | "min" | "median" | "percentile";
+            /**
+             * Default Accepted
+             * @default true
+             */
+            default_accepted: boolean;
             /**
              * Default Basis
              * @enum {string}

@@ -70,6 +70,27 @@ async def test_manager_can_update_config():
         assert Decimal(after.json()["default_percentage"]) == Decimal("85.5")
 
 
+async def test_default_accepted_round_trips():
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        assert (await http.get("/api/v1/corporations/me/config")).json()[
+            "default_accepted"
+        ] is True  # corps accept by default
+        await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": 60003760,
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+                "default_accepted": False,
+            },
+        )
+        after = await http.get("/api/v1/corporations/me/config")
+        assert after.json()["default_accepted"] is False
+
+
 async def test_member_cannot_update_config_but_can_read():
     await _seed_registered_corp()
     async with make_client(MemberEsi()) as http:
