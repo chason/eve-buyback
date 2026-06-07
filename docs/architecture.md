@@ -36,6 +36,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 17 | **CSRF**: `SameSite=Lax` + required custom header on mutations | [0017](adr/0017-csrf-custom-header.md) |
 | 18 | **Layered backend**: interface / application / domain / data / plugins | [0018](adr/0018-layered-backend-architecture.md) |
 | 19 | **Progressive docs** via layer-local `CLAUDE.md` | [0019](adr/0019-progressive-layer-documentation.md) |
+| 20 | **`Decimal` not `float`** for money + quantity values | [0020](adr/0020-decimal-money-values.md) |
 
 ## 3. System context
 

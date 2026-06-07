@@ -29,5 +29,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0017](0017-csrf-custom-header.md) | CSRF: SameSite=lax plus a required custom header | Accepted |
 | [0018](0018-layered-backend-architecture.md) | Layered backend: interface / application / domain / data / plugins | Accepted |
 | [0019](0019-progressive-layer-documentation.md) | Progressive docs via layer-local CLAUDE.md | Accepted |
+| [0020](0020-decimal-money-values.md) | Decimal (not float) for money and quantity values | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
