@@ -30,7 +30,12 @@ async def create_appraisal(
         AppraisalItem(type_id=i.type_id, quantity=i.quantity) for i in payload.items
     ]
     record = await appraisals_app.create_appraisal(
-        session, fuzzwork, user=user, items=items, now=datetime.now(UTC)
+        session,
+        fuzzwork,
+        user=user,
+        items=items,
+        paste=payload.paste,
+        now=datetime.now(UTC),
     )
     return AppraisalOut(**record.model_dump())
 

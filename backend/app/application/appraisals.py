@@ -25,6 +25,7 @@ from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
+from app.domain.paste import parse_paste
 from app.domain.roles import role_at_least
 from app.plugins.fuzzwork import FuzzworkClient
 
@@ -35,21 +36,35 @@ class AppraisalItem:
     quantity: int
 
 
+@dataclass(frozen=True)
+class _WorkItem:
+    """A line to price. `type_id is None` means an unresolved pasted name —
+    `fallback_name` carries it for the rejected line."""
+
+    type_id: int | None
+    fallback_name: str | None
+    quantity: int
+
+
 async def create_appraisal(
     session: AsyncSession,
     fuzzwork: FuzzworkClient,
     *,
     user: AuthenticatedUser,
     items: list[AppraisalItem],
+    paste: str | None,
     now: datetime,
 ) -> AppraisalRecord:
-    if not items:
-        raise EmptyAppraisal()
     config = await get_config(session, user.corporation_id)  # 404 if unregistered
     hub_id = config.market_hub_id
 
+    work = await _gather_items(session, items, paste)
+    if not work:
+        raise EmptyAppraisal()
+
     # Reference data + rules + prices, fetched once for the whole appraisal.
-    types = await sde_repo.get_types(session, list({it.type_id for it in items}))
+    type_ids = list({w.type_id for w in work if w.type_id is not None})
+    types = await sde_repo.get_types(session, type_ids)
     parent_of = {
         g.market_group_id: g.parent_id
         for g in await sde_repo.list_market_groups(session)
@@ -66,16 +81,16 @@ async def create_appraisal(
         if r.enabled and r.target_kind == "market_group"
     }
     prices = await market.get_market_prices(
-        session, fuzzwork, hub_id=hub_id, type_ids=list(types.keys()), now=now
+        session, fuzzwork, hub_id=hub_id, type_ids=type_ids, now=now
     )
     price_by_id = {p.type_id: p for p in prices}
 
     lines: list[dict] = []
     accepted_total = Decimal("0")
     rejected_count = 0
-    for item in items:
+    for w in work:
         line = _compute_line(
-            item, config, types, price_by_id, type_rules, group_rules, parent_of
+            w, config, types, price_by_id, type_rules, group_rules, parent_of
         )
         lines.append(line)
         if line["status"] == "accepted":
@@ -94,12 +109,38 @@ async def create_appraisal(
         request_json={
             "items": [
                 {"type_id": it.type_id, "quantity": it.quantity} for it in items
-            ]
+            ],
+            "paste": paste,
         },
         lines=lines,
     )
     await session.commit()
     return record
+
+
+async def _gather_items(
+    session: AsyncSession, items: list[AppraisalItem], paste: str | None
+) -> list[_WorkItem]:
+    """Combine structured items with parsed + name-resolved paste lines."""
+    work = [
+        _WorkItem(type_id=it.type_id, fallback_name=None, quantity=it.quantity)
+        for it in items
+    ]
+    if paste and paste.strip():
+        parsed = parse_paste(paste)
+        by_name = await sde_repo.get_types_by_names(
+            session, [p.name for p in parsed]
+        )
+        for p in parsed:
+            match = by_name.get(p.name.lower())
+            work.append(
+                _WorkItem(
+                    type_id=match.type_id if match else None,
+                    fallback_name=None if match else p.name,
+                    quantity=p.quantity,
+                )
+            )
+    return work
 
 
 async def get_appraisal(
@@ -123,7 +164,7 @@ async def list_appraisals(
 
 
 def _compute_line(
-    item: AppraisalItem,
+    w: _WorkItem,
     config: BuybackConfigRecord,
     types: dict[int, SdeTypeRecord],
     price_by_id: dict[int, MarketPriceRecord],
@@ -131,12 +172,15 @@ def _compute_line(
     group_rules: dict[int, pricing_domain.RuleSpec],
     parent_of: dict[int, int | None],
 ) -> dict:
-    sde_type = types.get(item.type_id)
+    if w.type_id is None:
+        return _rejected(None, w.fallback_name or "Unknown", w.quantity, "Unknown item")
+
+    sde_type = types.get(w.type_id)
     if sde_type is None:
-        return _rejected(item, f"Type {item.type_id}", "Unknown item")
+        return _rejected(w.type_id, f"Type {w.type_id}", w.quantity, "Unknown item")
 
     resolved = pricing_domain.resolve_rule(
-        item.type_id,
+        w.type_id,
         sde_type.market_group_id,
         type_rules=type_rules,
         group_rules=group_rules,
@@ -145,23 +189,23 @@ def _compute_line(
         default_percentage=config.default_percentage,
     )
 
-    price = price_by_id.get(item.type_id)
+    price = price_by_id.get(w.type_id)
     if price is None:
-        return _rejected(item, sde_type.name, "No market data")
+        return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
 
     agg = config.aggregate_field
     buy = getattr(price, f"buy_{agg}") if price.buy_order_count > 0 else None
     sell = getattr(price, f"sell_{agg}") if price.sell_order_count > 0 else None
     unit_value = pricing_domain.select_aggregate(buy, sell, resolved.basis)
     if unit_value is None or unit_value <= 0:
-        return _rejected(item, sde_type.name, f"No {resolved.basis} orders")
+        return _rejected(w.type_id, sde_type.name, w.quantity, f"No {resolved.basis} orders")
 
     up = pricing_domain.unit_price(unit_value, resolved.percentage)
-    lt = pricing_domain.line_total(up, item.quantity)
+    lt = pricing_domain.line_total(up, w.quantity)
     return {
-        "type_id": item.type_id,
+        "type_id": w.type_id,
         "type_name": sde_type.name,
-        "quantity": item.quantity,
+        "quantity": w.quantity,
         "status": "accepted",
         "basis": resolved.basis,
         "percentage": resolved.percentage,
@@ -172,11 +216,13 @@ def _compute_line(
     }
 
 
-def _rejected(item: AppraisalItem, type_name: str, reason: str) -> dict:
+def _rejected(
+    type_id: int | None, type_name: str, quantity: int, reason: str
+) -> dict:
     return {
-        "type_id": item.type_id,
+        "type_id": type_id,
         "type_name": type_name,
-        "quantity": item.quantity,
+        "quantity": quantity,
         "status": "rejected",
         "basis": None,
         "percentage": None,

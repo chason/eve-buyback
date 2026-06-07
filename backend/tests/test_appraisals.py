@@ -172,6 +172,36 @@ async def test_no_buy_orders_is_rejected():
         assert resp.json()["lines"][0]["reason"] == "No buy orders"
 
 
+async def test_appraisal_from_paste_resolves_names():
+    await _seed_sde()  # type 34 "Tritanium" in market group 1
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.post(
+            "/api/v1/appraisals",
+            # Name resolution is case-insensitive; the second line is unknown.
+            json={"paste": "tritanium 1000\nNonexistent Item 5"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        lines = {(line["type_name"], line["status"], line["type_id"])
+                 for line in body["lines"]}
+        assert ("Tritanium", "accepted", 34) in lines
+        assert ("Nonexistent Item", "rejected", None) in lines
+        assert Decimal(body["accepted_total"]) == Decimal("4500.00")  # 5*90%*1000
+        assert body["rejected_count"] == 1
+
+
+async def test_appraisal_requires_items_or_paste():
+    _use_fuzzwork({})  # so the fuzzwork dependency resolves; body validation fails first
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.post("/api/v1/appraisals", json={})
+        assert resp.status_code == 422  # neither items nor paste
+
+
 async def test_get_unknown_appraisal_404():
     async with make_client(CeoEsi()) as http:
         await login(http)

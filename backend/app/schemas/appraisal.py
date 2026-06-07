@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.pricing import Basis, LineStatus
 
@@ -12,13 +12,23 @@ class AppraisalItemIn(BaseModel):
 
 
 class AppraisalCreateRequest(BaseModel):
-    items: list[AppraisalItemIn] = Field(min_length=1)
+    """Items may be supplied structured, as a raw EVE paste, or both — but at least
+    one must be non-empty. The paste is parsed and name-resolved server-side."""
+
+    items: list[AppraisalItemIn] = Field(default_factory=list)
+    paste: str | None = None
+
+    @model_validator(mode="after")
+    def _require_some_input(self) -> "AppraisalCreateRequest":
+        if not self.items and not (self.paste and self.paste.strip()):
+            raise ValueError("Provide at least one item or a non-empty paste")
+        return self
 
 
 class AppraisalLineOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    type_id: int
+    type_id: int | None
     type_name: str
     quantity: int
     status: LineStatus

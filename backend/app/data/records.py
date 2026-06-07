@@ -117,7 +117,7 @@ class PricingRuleRecord(BaseModel):
 class AppraisalLineRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    type_id: int
+    type_id: int | None
     type_name: str
     quantity: int
     status: LineStatus

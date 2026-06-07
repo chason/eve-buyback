@@ -20,7 +20,9 @@ class AppraisalLine(Base):
     appraisal_id: Mapped[int] = mapped_column(
         ForeignKey("appraisals.id", ondelete="CASCADE")
     )
-    type_id: Mapped[int]
+    # Nullable: a pasted item name we couldn't resolve has no type_id — it's stored
+    # as a rejected line with just its `type_name` (ADR-0021).
+    type_id: Mapped[int | None]
     type_name: Mapped[str]
     quantity: Mapped[int]
     status: Mapped[LineStatus] = mapped_column(

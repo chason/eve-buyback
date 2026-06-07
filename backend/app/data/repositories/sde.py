@@ -38,6 +38,19 @@ async def get_types(
     return {r.type_id: SdeTypeRecord.model_validate(r) for r in rows}
 
 
+async def get_types_by_names(
+    session: AsyncSession, names: Sequence[str]
+) -> dict[str, SdeTypeRecord]:
+    """Exact, case-insensitive name lookup, keyed by lowercased name (for paste
+    resolution). Unmatched names are simply absent."""
+    if not names:
+        return {}
+    lowered = {n.lower() for n in names}
+    stmt = select(SdeType).where(func.lower(SdeType.name).in_(lowered))
+    rows = (await session.execute(stmt)).scalars().all()
+    return {r.name.lower(): SdeTypeRecord.model_validate(r) for r in rows}
+
+
 async def get_market_group(
     session: AsyncSession, market_group_id: int
 ) -> SdeMarketGroupRecord | None:
