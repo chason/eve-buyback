@@ -275,6 +275,11 @@ Fuzzwork usage, image/link helpers, and caching.
 - **Per-structure (private Upwell) pricing** — needs authenticated structure-market
   ESI + a stored refresh token, superseding [ADR-0004](adr/0004-eve-sso-session-auth.md);
   Fuzzwork has no structure data ([ADR-0006](adr/0006-market-data-fuzzwork.md)).
+- **Configurable contract recipient.** The appraisal page tells the member to make
+  the buyback contract out to **their corporation** (the implicit recipient today).
+  A future option would let a manager set the recipient per corp — a specific
+  character (a buyer alt), a holding/other corp, or an alliance — stored on
+  `BuybackConfig` and shown in the appraisal's contract instructions.
 - Payout automation / contract verification.
 - Public hosted multi-corp SaaS hardening (billing, abuse controls) — the data
   model supports it, but ops are out of MVP.
