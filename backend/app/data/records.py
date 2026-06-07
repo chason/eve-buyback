@@ -57,6 +57,31 @@ class SdeMarketGroupRecord(BaseModel):
     name: str
 
 
+class MarketPriceRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    hub_id: int
+    type_id: int
+
+    buy_weighted_average: Decimal
+    buy_max: Decimal
+    buy_min: Decimal
+    buy_median: Decimal
+    buy_percentile: Decimal
+    buy_volume: Decimal
+    buy_order_count: int
+
+    sell_weighted_average: Decimal
+    sell_max: Decimal
+    sell_min: Decimal
+    sell_median: Decimal
+    sell_percentile: Decimal
+    sell_volume: Decimal
+    sell_order_count: int
+
+    fetched_at: datetime
+
+
 class SdeMetadataRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

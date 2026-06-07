@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # Default market hub: Jita 4-4 station (ADR-0006).
     market_hub_id: int = 60003760
+    # How long a cached Fuzzwork price stays fresh before re-fetch (ADR-0006).
+    market_cache_ttl_seconds: int = 60 * 60  # 1 hour
 
     # Session cookie signing (ADR-0004). CHANGE in production.
     session_secret: str = INSECURE_SESSION_SECRET
