@@ -11,7 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.models import SdeMarketGroup, SdeMetadata, SdeType
+from app.data.models import (
+    SdeMarketGroup,
+    SdeMetadata,
+    SdeType,
+    SdeTypeMaterial,
+)
 from app.data.records import (
     SdeMarketGroupRecord,
     SdeMetadataRecord,
@@ -101,13 +106,48 @@ async def bulk_upsert_types(
             set_={
                 "name": stmt.excluded.name,
                 "group_id": stmt.excluded.group_id,
+                "category_id": stmt.excluded.category_id,
                 "market_group_id": stmt.excluded.market_group_id,
                 "volume": stmt.excluded.volume,
+                "portion_size": stmt.excluded.portion_size,
                 "published": stmt.excluded.published,
             },
         )
         await session.execute(stmt)
     return len(rows)
+
+
+async def bulk_upsert_type_materials(
+    session: AsyncSession, rows: Sequence[dict]
+) -> int:
+    """Insert-or-update reprocessing yields, keyed by `(type_id, material_type_id)`."""
+    for start in range(0, len(rows), _BATCH):
+        batch = rows[start : start + _BATCH]
+        stmt = pg_insert(SdeTypeMaterial).values(list(batch))
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[
+                SdeTypeMaterial.type_id,
+                SdeTypeMaterial.material_type_id,
+            ],
+            set_={"quantity": stmt.excluded.quantity},
+        )
+        await session.execute(stmt)
+    return len(rows)
+
+
+async def get_type_materials(
+    session: AsyncSession, type_ids: Sequence[int]
+) -> dict[int, list[tuple[int, int]]]:
+    """Reprocessing yields for the given types, keyed by type_id → list of
+    `(material_type_id, quantity)`. Types with no rows are simply absent."""
+    if not type_ids:
+        return {}
+    stmt = select(SdeTypeMaterial).where(SdeTypeMaterial.type_id.in_(type_ids))
+    rows = (await session.execute(stmt)).scalars().all()
+    result: dict[int, list[tuple[int, int]]] = {}
+    for r in rows:
+        result.setdefault(r.type_id, []).append((r.material_type_id, r.quantity))
+    return result
 
 
 async def bulk_upsert_market_groups(

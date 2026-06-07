@@ -16,6 +16,8 @@ from pydantic import BaseModel
 FUZZWORK_DUMP_BASE = "https://www.fuzzwork.co.uk/dump/latest"
 INV_TYPES_URL = f"{FUZZWORK_DUMP_BASE}/invTypes.csv.bz2"
 INV_MARKET_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invMarketGroups.csv.bz2"
+INV_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invGroups.csv.bz2"
+INV_TYPE_MATERIALS_URL = f"{FUZZWORK_DUMP_BASE}/invTypeMaterials.csv.bz2"
 
 
 class SdeTypeRow(BaseModel):
@@ -24,6 +26,7 @@ class SdeTypeRow(BaseModel):
     group_id: int
     market_group_id: int | None
     volume: Decimal
+    portion_size: int
     published: bool
 
 
@@ -31,6 +34,12 @@ class SdeMarketGroupRow(BaseModel):
     market_group_id: int
     parent_id: int | None
     name: str
+
+
+class SdeTypeMaterialRow(BaseModel):
+    type_id: int
+    material_type_id: int
+    quantity: int
 
 
 def _int_or_none(value: str | None) -> int | None:
@@ -59,6 +68,7 @@ class SdeSource:
                 group_id=int(row["groupID"]),
                 market_group_id=_int_or_none(row.get("marketGroupID")),
                 volume=Decimal(row["volume"]) if row.get("volume") else Decimal("0"),
+                portion_size=int(row["portionSize"]) if row.get("portionSize") else 1,
                 published=row.get("published", "0").strip() == "1",
             )
             for row in reader
@@ -71,6 +81,28 @@ class SdeSource:
                 market_group_id=int(row["marketGroupID"]),
                 parent_id=_int_or_none(row.get("parentGroupID")),
                 name=row["marketGroupName"],
+            )
+            for row in reader
+        ]
+
+    async def fetch_group_categories(self) -> dict[int, int]:
+        """Map `group_id -> category_id` (from invGroups), for tagging each type's
+        category (ores are category 25)."""
+        reader = await self._fetch_csv(INV_GROUPS_URL)
+        return {
+            int(row["groupID"]): int(row["categoryID"])
+            for row in reader
+            if row.get("categoryID")
+        }
+
+    async def fetch_type_materials(self) -> list[SdeTypeMaterialRow]:
+        """Reprocessing yields from invTypeMaterials (base/100% quantities)."""
+        reader = await self._fetch_csv(INV_TYPE_MATERIALS_URL)
+        return [
+            SdeTypeMaterialRow(
+                type_id=int(row["typeID"]),
+                material_type_id=int(row["materialTypeID"]),
+                quantity=int(row["quantity"]),
             )
             for row in reader
         ]

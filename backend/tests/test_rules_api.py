@@ -59,6 +59,7 @@ async def test_put_rule_lifecycle():
         assert (body["target_kind"], body["target_id"]) == ("type", 34)
         assert body["target_name"] == "Tritanium"  # resolved name, not just the id
         assert body["basis"] is None  # inherits config default
+        assert body["reprocess"] is False  # defaults off
 
         listed = await http.get("/api/v1/corporations/me/rules")
         assert [(r["target_kind"], r["target_id"], r["target_name"]) for r in listed.json()] == [
@@ -68,6 +69,20 @@ async def test_put_rule_lifecycle():
         removed = await http.delete("/api/v1/corporations/me/rules/type/34")
         assert removed.status_code == 204
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
+
+
+async def test_put_rule_reprocess_round_trips():
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        created = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "100", "reprocess": True},
+        )
+        assert created.json()["reprocess"] is True
+        listed = await http.get("/api/v1/corporations/me/rules")
+        assert listed.json()[0]["reprocess"] is True
 
 
 async def test_put_is_idempotent_upsert():

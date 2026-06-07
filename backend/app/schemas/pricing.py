@@ -34,6 +34,8 @@ class RuleOut(BaseModel):
     basis: Basis | None
     percentage: Decimal
     enabled: bool
+    # Price a matched ore by refined mineral value (ADR-0026); ignored for non-ores.
+    reprocess: bool = False
 
 
 class RulePutRequest(BaseModel):
@@ -43,3 +45,4 @@ class RulePutRequest(BaseModel):
     basis: Basis | None = None
     percentage: Decimal = Field(ge=0)
     enabled: bool = True
+    reprocess: bool = False

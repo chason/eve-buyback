@@ -22,6 +22,12 @@ DEFAULT_BASIS: Basis = "buy"
 DEFAULT_PERCENTAGE = Decimal("90")
 DEFAULT_AGGREGATE_FIELD: AggregateField = "percentile"
 
+# Ore reprocess pricing (ADR-0026). Ores are SDE category 25 (Asteroid). A "perfect"
+# ore refine yields 0.9063 of the base material quantities (the max achievable; not
+# 100%). Gas/scrap have other yields but we only price ores.
+ORE_CATEGORY_ID = 25
+ORE_REFINE_YIELD = Decimal("0.9063")
+
 _CENT = Decimal("0.01")
 
 
@@ -32,6 +38,7 @@ class RuleSpec:
 
     basis: Basis | None
     percentage: Decimal
+    reprocess: bool = False
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,7 @@ class ResolvedRule:
     basis: Basis
     percentage: Decimal
     source: str  # which rule won: "type:34", "market_group:1857", or "default"
+    reprocess: bool = False  # price a matched ore by its refined minerals (ADR-0026)
 
 
 def resolve_rule(
@@ -66,6 +74,7 @@ def resolve_rule(
             basis=type_rule.basis or default_basis,
             percentage=type_rule.percentage,
             source=f"type:{type_id}",
+            reprocess=type_rule.reprocess,
         )
 
     group_id = market_group_id
@@ -78,6 +87,7 @@ def resolve_rule(
                 basis=group_rule.basis or default_basis,
                 percentage=group_rule.percentage,
                 source=f"market_group:{group_id}",
+                reprocess=group_rule.reprocess,
             )
         group_id = parent_of.get(group_id)
 
@@ -99,6 +109,39 @@ def select_aggregate(
     if buy is None or sell is None:
         return None
     return (buy + sell) / Decimal(2)
+
+
+def reprocessed_line_value(
+    quantity: int,
+    portion_size: int,
+    materials: list[tuple[int, int]],
+    mineral_value: dict[int, Decimal | None],
+    ore_unit_value: Decimal | None,
+    *,
+    yield_: Decimal = ORE_REFINE_YIELD,
+) -> Decimal | None:
+    """Total *market* value (pre-percentage) of reprocess-pricing an ore line (ADR-0026):
+
+    - **Whole refine batches** (`quantity // portion_size`) are valued by their minerals
+      at the perfect-refine `yield_`: `Σ(base_qty × yield_ × mineral_unit_value)` per batch
+      (an unpriced mineral contributes 0).
+    - The **leftover** below a full batch is valued at the ore's own market unit value.
+
+    Returns `None` if the result is ≤ 0 (nothing priceable → reject upstream).
+    """
+    batches = quantity // portion_size if portion_size > 0 else 0
+    leftover = quantity - batches * portion_size
+
+    batch_value = Decimal(0)
+    for material_id, base_qty in materials:
+        mv = mineral_value.get(material_id)
+        if mv is not None:
+            batch_value += Decimal(base_qty) * yield_ * mv
+
+    total = Decimal(batches) * batch_value
+    if leftover and ore_unit_value is not None:
+        total += Decimal(leftover) * ore_unit_value
+    return total if total > 0 else None
 
 
 def round_isk(value: Decimal) -> Decimal:

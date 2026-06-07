@@ -2,8 +2,10 @@ from decimal import Decimal
 
 from app.domain.ids import generate_appraisal_id
 from app.domain.pricing import (
+    ORE_REFINE_YIELD,
     RuleSpec,
     line_total,
+    reprocessed_line_value,
     resolve_rule,
     round_isk,
     select_aggregate,
@@ -89,6 +91,48 @@ def test_unit_price_and_line_total():
     up = unit_price(Decimal("5.00"), Decimal("90"))  # 5 * 90% = 4.50
     assert up == Decimal("4.50")
     assert line_total(up, 1000) == Decimal("4500.00")
+
+
+def test_resolve_rule_carries_reprocess():
+    r = resolve_rule(
+        34, 1,
+        type_rules={},
+        group_rules={1: RuleSpec("buy", Decimal("100"), reprocess=True)},
+        parent_of={1: None}, **DEF,
+    )
+    assert r.reprocess is True
+    # No matching rule → default is direct (not reprocess).
+    d = resolve_rule(34, None, type_rules={}, group_rules={}, parent_of={}, **DEF)
+    assert d.reprocess is False
+
+
+# Veldspar-like: batch of 100 ore → 400 Tritanium (base), priced at 5.00/unit.
+_MATS = [(34, 400)]
+_PRICED = {34: Decimal("5.00")}
+
+
+def test_reprocessed_whole_batches():
+    # 200 ore = 2 batches, no leftover: 2 * 400 * 0.9063 * 5.00.
+    total = reprocessed_line_value(200, 100, _MATS, _PRICED, Decimal("3.00"))
+    assert total == Decimal("2") * Decimal("400") * ORE_REFINE_YIELD * Decimal("5.00")
+
+
+def test_reprocessed_blends_leftover_at_ore_price():
+    # 150 ore = 1 batch (reprocessed) + 50 leftover at ore price 3.00.
+    total = reprocessed_line_value(150, 100, _MATS, _PRICED, Decimal("3.00"))
+    batch = Decimal("400") * ORE_REFINE_YIELD * Decimal("5.00")
+    assert total == batch + Decimal("50") * Decimal("3.00")
+
+
+def test_reprocessed_sub_batch_is_all_ore_price():
+    # 50 ore < one batch → entirely the ore's own price; no minerals.
+    total = reprocessed_line_value(50, 100, _MATS, _PRICED, Decimal("3.00"))
+    assert total == Decimal("50") * Decimal("3.00")
+
+
+def test_reprocessed_unpriced_mineral_and_ore_is_none():
+    # No mineral price and no ore price for a sub-batch → nothing priceable.
+    assert reprocessed_line_value(50, 100, _MATS, {34: None}, None) is None
 
 
 def test_generate_appraisal_id_shape_and_uniqueness():

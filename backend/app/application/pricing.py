@@ -106,6 +106,7 @@ async def set_rule(
     basis: Basis | None,
     percentage: Decimal,
     enabled: bool,
+    reprocess: bool,
 ) -> tuple[PricingRuleRecord, bool]:
     """Create or replace the corp's rule for a target (idempotent PUT). Returns
     `(record, created)`. The target must exist (else 400); there is no 409/404 on
@@ -120,6 +121,7 @@ async def set_rule(
         basis=basis,
         percentage=percentage,
         enabled=enabled,
+        reprocess=reprocess,
     )
     await session.commit()
     return record.model_copy(update={"target_name": target_name}), created

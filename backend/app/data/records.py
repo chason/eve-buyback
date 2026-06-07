@@ -51,8 +51,10 @@ class SdeTypeRecord(BaseModel):
     type_id: int
     name: str
     group_id: int
+    category_id: int | None
     market_group_id: int | None
     volume: Decimal
+    portion_size: int
     published: bool
 
 
@@ -122,6 +124,8 @@ class PricingRuleRecord(BaseModel):
     basis: Basis | None
     percentage: Decimal
     enabled: bool
+    # Price a matched ore by its refined mineral value (ADR-0026); ignored for non-ores.
+    reprocess: bool = False
 
 
 class AppraisalLineRecord(BaseModel):

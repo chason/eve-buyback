@@ -62,6 +62,7 @@ export default function Rules() {
               <th>Target</th>
               <th>Basis</th>
               <th>%</th>
+              <th>Reprocess</th>
               <th>Enabled</th>
               {canEdit && <th />}
             </tr>
@@ -72,6 +73,7 @@ export default function Rules() {
                 <td>{targetLabel(rule)}</td>
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
+                <td>{rule.reprocess ? "yes" : "–"}</td>
                 <td>{rule.enabled ? "yes" : "no"}</td>
                 {canEdit && (
                   <td>
@@ -116,6 +118,7 @@ function AddRule({
   const [basis, setBasis] = useState<Basis | "">("")
   const [percentage, setPercentage] = useState("90")
   const [enabled, setEnabled] = useState(true)
+  const [reprocess, setReprocess] = useState(false)
 
   const query = search.trim()
   const results = useQuery({
@@ -130,6 +133,7 @@ function AddRule({
         basis: basis === "" ? null : basis,
         percentage,
         enabled,
+        reprocess,
       }),
     onSuccess: () => {
       setTarget(null)
@@ -251,6 +255,14 @@ function AddRule({
               onChange={(e) => setEnabled(e.target.checked)}
             />
             Enabled
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={reprocess}
+              onChange={(e) => setReprocess(e.target.checked)}
+            />
+            Reprocess (ore → minerals)
           </label>
         </div>
 

@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, UniqueConstraint, Uuid
+from sqlalchemy import ForeignKey, Numeric, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -13,7 +13,8 @@ class PricingRule(Base):
     """A pricing override for a market group or a single type (ADR-0007). At most
     one rule per (corp, target_kind, target_id) — the rule is addressed externally by
     that natural key, never by the UUID PK (ADR-0022/0025). `basis` null inherits the
-    corp config's default basis."""
+    corp config's default basis. `reprocess` prices a matched **ore** by its refined
+    mineral value rather than its own market price (ADR-0026); ignored for non-ores."""
 
     __tablename__ = "pricing_rules"
     __table_args__ = (
@@ -35,3 +36,6 @@ class PricingRule(Base):
     )
     percentage: Mapped[Decimal] = mapped_column(Numeric)
     enabled: Mapped[bool] = mapped_column(default=True)
+    reprocess: Mapped[bool] = mapped_column(
+        default=False, server_default=text("false")
+    )

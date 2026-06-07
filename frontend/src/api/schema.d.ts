@@ -480,6 +480,11 @@ export interface components {
             enabled: boolean;
             /** Percentage */
             percentage: string;
+            /**
+             * Reprocess
+             * @default false
+             */
+            reprocess: boolean;
             /** Target Id */
             target_id: number;
             /**
@@ -505,6 +510,11 @@ export interface components {
             enabled: boolean;
             /** Percentage */
             percentage: number | string;
+            /**
+             * Reprocess
+             * @default false
+             */
+            reprocess: boolean;
         };
         /**
          * SessionUser

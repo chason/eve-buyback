@@ -45,8 +45,8 @@ describe("Rules", () => {
   it("shows each rule's backend-resolved target name", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([
-      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true },
-      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true },
+      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true, reprocess: true },
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false },
     ])
     vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
 
@@ -66,7 +66,7 @@ describe("Rules", () => {
       { market_group_id: 1, parent_id: null, name: "Ore" },
     ])
     vi.mocked(pricingApi.putRule).mockResolvedValue({
-      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true,
+      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true,
     })
 
     renderRules()
@@ -77,13 +77,19 @@ describe("Rules", () => {
     const pct = screen.getByLabelText("Rule percentage")
     await u.clear(pct)
     await u.type(pct, "75")
+    await u.click(screen.getByLabelText("Reprocess (ore → minerals)"))
     await u.click(screen.getByRole("button", { name: "Save rule" }))
 
     await waitFor(() => expect(pricingApi.putRule).toHaveBeenCalled())
     const call = vi.mocked(pricingApi.putRule).mock.calls[0]
     expect(call[0]).toBe("market_group")
     expect(call[1]).toBe(1)
-    expect(call[2]).toEqual({ basis: "sell", percentage: "75", enabled: true })
+    expect(call[2]).toEqual({
+      basis: "sell",
+      percentage: "75",
+      enabled: true,
+      reprocess: true,
+    })
   })
 
   it("hides edit controls from a member", async () => {

@@ -57,6 +57,84 @@ async def _seed_sde() -> None:
         await session.commit()
 
 
+async def _seed_ore() -> None:
+    """Veldspar (ore, category 25, 100-unit refine batch → 400 Tritanium) + the
+    Tritanium it reprocesses to."""
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_market_groups(
+            session, [{"market_group_id": 1, "parent_id": None, "name": "Ore"}]
+        )
+        await sde_repo.bulk_upsert_types(session, [
+            {"type_id": 1230, "name": "Veldspar", "group_id": 462, "category_id": 25,
+             "market_group_id": 1, "volume": 0.1, "portion_size": 100,
+             "published": True},
+            {"type_id": 34, "name": "Tritanium", "group_id": 18, "category_id": 4,
+             "market_group_id": 1, "volume": 0.01, "portion_size": 1,
+             "published": True},
+        ])
+        await sde_repo.bulk_upsert_type_materials(
+            session, [{"type_id": 1230, "material_type_id": 34, "quantity": 400}]
+        )
+        await session.commit()
+
+
+def _use_ore_fuzzwork() -> None:
+    # Tritanium buys at 100.00; Veldspar's own price is 2.00 (leftover/direct only).
+    _use_fuzzwork({
+        34: FuzzworkAggregate(buy=_side("100.00"), sell=_side("100.00")),
+        1230: FuzzworkAggregate(buy=_side("2.00"), sell=_side("2.00")),
+    })
+
+
+async def test_appraisal_reprocess_rule_prices_by_minerals():
+    await _seed_ore()
+    _use_ore_fuzzwork()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/1230",
+            json={"percentage": "100", "reprocess": True},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 1230, "quantity": 100}]}
+        )
+        line = resp.json()["lines"][0]
+        assert line["status"] == "accepted"
+        # 1 batch = 400 Trit × 0.9063 yield × 100.00 ISK = 36252.00.
+        assert Decimal(line["line_total"]) == Decimal("36252.00")
+
+
+async def test_appraisal_reprocess_sub_batch_uses_ore_price():
+    await _seed_ore()
+    _use_ore_fuzzwork()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/1230",
+            json={"percentage": "100", "reprocess": True},
+        )
+        # 50 < one 100-unit batch → entirely the ore's own buy price (50 × 2.00).
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 1230, "quantity": 50}]}
+        )
+        assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
+
+
+async def test_appraisal_ore_without_reprocess_rule_is_direct():
+    await _seed_ore()
+    _use_ore_fuzzwork()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # No reprocess rule → direct ore price at the default 90% buy: 100 × 2.00 × 90%.
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 1230, "quantity": 100}]}
+        )
+        assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("180.00")
+
+
 async def test_appraisal_accepts_and_persists():
     await _seed_sde()
     # buy percentile 5.00 → default 90% buy → unit_price 4.50 → x1000 = 4500.00

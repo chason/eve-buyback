@@ -60,6 +60,7 @@ async def set_rule(
         basis=payload.basis,
         percentage=payload.percentage,
         enabled=payload.enabled,
+        reprocess=payload.reprocess,
     )
     response.status_code = (
         status.HTTP_201_CREATED if created else status.HTTP_200_OK

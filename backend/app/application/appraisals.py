@@ -3,6 +3,7 @@ resolution, ADR-0021 computation). Orchestration only — the money math is in
 `domain/pricing.py`, the prices come from the market use case, and persistence is in
 the appraisals repository. Owns the commit."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -81,17 +82,48 @@ async def create_appraisal(
     }
     rules = await rules_repo.list_rules(session, corp.id)
     type_rules = {
-        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage)
+        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage, r.reprocess)
         for r in rules
         if r.enabled and r.target_kind == "type"
     }
     group_rules = {
-        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage)
+        r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage, r.reprocess)
         for r in rules
         if r.enabled and r.target_kind == "market_group"
     }
+
+    def resolve(type_id: int) -> pricing_domain.ResolvedRule:
+        sde_type = types.get(type_id)
+        return pricing_domain.resolve_rule(
+            type_id,
+            sde_type.market_group_id if sde_type else None,
+            type_rules=type_rules,
+            group_rules=group_rules,
+            parent_of=parent_of,
+            default_basis=config.default_basis,
+            default_percentage=config.default_percentage,
+        )
+
+    # Ore lines whose resolved rule says "reprocess" are priced by their refined
+    # minerals (ADR-0026); gather those minerals so they're priced in the same fetch.
+    reprocess_ore_ids = [
+        tid
+        for tid in type_ids
+        if (t := types.get(tid)) is not None
+        and t.category_id == pricing_domain.ORE_CATEGORY_ID
+        and resolve(tid).reprocess
+    ]
+    materials_by_type = await sde_repo.get_type_materials(session, reprocess_ore_ids)
+    mineral_ids = {
+        mid for mats in materials_by_type.values() for (mid, _) in mats
+    }
+
     prices = await market.get_market_prices(
-        session, fuzzwork, hub_id=hub_id, type_ids=type_ids, now=now
+        session,
+        fuzzwork,
+        hub_id=hub_id,
+        type_ids=list(set(type_ids) | mineral_ids),
+        now=now,
     )
     price_by_id = {p.type_id: p for p in prices}
 
@@ -99,9 +131,7 @@ async def create_appraisal(
     accepted_total = Decimal("0")
     rejected_count = 0
     for w in work:
-        line = _compute_line(
-            w, config, types, price_by_id, type_rules, group_rules, parent_of
-        )
+        line = _compute_line(w, config, types, price_by_id, resolve, materials_by_type)
         lines.append(line)
         if line["status"] == "accepted":
             accepted_total += line["line_total"]
@@ -195,14 +225,24 @@ async def list_appraisals(
     )
 
 
+def _basis_value(
+    price: MarketPriceRecord | None, agg: str, basis: pricing_domain.Basis
+) -> Decimal | None:
+    """The market unit value for a basis from a price row (None if unavailable)."""
+    if price is None:
+        return None
+    buy = getattr(price, f"buy_{agg}") if price.buy_order_count > 0 else None
+    sell = getattr(price, f"sell_{agg}") if price.sell_order_count > 0 else None
+    return pricing_domain.select_aggregate(buy, sell, basis)
+
+
 def _compute_line(
     w: _WorkItem,
     config: BuybackConfigRecord,
     types: dict[int, SdeTypeRecord],
     price_by_id: dict[int, MarketPriceRecord],
-    type_rules: dict[int, pricing_domain.RuleSpec],
-    group_rules: dict[int, pricing_domain.RuleSpec],
-    parent_of: dict[int, int | None],
+    resolve: Callable[[int], pricing_domain.ResolvedRule],
+    materials_by_type: dict[int, list[tuple[int, int]]],
 ) -> dict:
     if w.type_id is None:
         return _rejected(
@@ -213,26 +253,33 @@ def _compute_line(
     if sde_type is None:
         return _rejected(w.type_id, f"Type {w.type_id}", w.quantity, "Unknown item")
 
-    resolved = pricing_domain.resolve_rule(
-        w.type_id,
-        sde_type.market_group_id,
-        type_rules=type_rules,
-        group_rules=group_rules,
-        parent_of=parent_of,
-        default_basis=config.default_basis,
-        default_percentage=config.default_percentage,
-    )
-
-    price = price_by_id.get(w.type_id)
-    if price is None:
-        return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
-
+    resolved = resolve(w.type_id)
     agg = config.aggregate_field
-    buy = getattr(price, f"buy_{agg}") if price.buy_order_count > 0 else None
-    sell = getattr(price, f"sell_{agg}") if price.sell_order_count > 0 else None
-    unit_value = pricing_domain.select_aggregate(buy, sell, resolved.basis)
-    if unit_value is None or unit_value <= 0:
-        return _rejected(w.type_id, sde_type.name, w.quantity, f"No {resolved.basis} orders")
+    materials = materials_by_type.get(w.type_id)
+
+    if resolved.reprocess and materials:
+        # Reprocess pricing (ADR-0026): value whole refine batches by their minerals
+        # and any sub-batch leftover at the ore's own price.
+        mineral_value = {
+            mid: _basis_value(price_by_id.get(mid), agg, resolved.basis)
+            for mid, _ in materials
+        }
+        ore_unit = _basis_value(price_by_id.get(w.type_id), agg, resolved.basis)
+        total = pricing_domain.reprocessed_line_value(
+            w.quantity, sde_type.portion_size, materials, mineral_value, ore_unit
+        )
+        if total is None:
+            return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
+        unit_value = total / Decimal(w.quantity)
+    else:
+        price = price_by_id.get(w.type_id)
+        if price is None:
+            return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
+        unit_value = _basis_value(price, agg, resolved.basis)
+        if unit_value is None or unit_value <= 0:
+            return _rejected(
+                w.type_id, sde_type.name, w.quantity, f"No {resolved.basis} orders"
+            )
 
     up = pricing_domain.unit_price(unit_value, resolved.percentage)
     lt = pricing_domain.line_total(up, w.quantity)

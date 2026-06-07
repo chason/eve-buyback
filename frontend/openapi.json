@@ -548,6 +548,11 @@
             "title": "Percentage",
             "type": "string"
           },
+          "reprocess": {
+            "default": false,
+            "title": "Reprocess",
+            "type": "boolean"
+          },
           "target_id": {
             "title": "Target Id",
             "type": "integer"
@@ -618,6 +623,11 @@
               }
             ],
             "title": "Percentage"
+          },
+          "reprocess": {
+            "default": false,
+            "title": "Reprocess",
+            "type": "boolean"
           }
         },
         "required": [

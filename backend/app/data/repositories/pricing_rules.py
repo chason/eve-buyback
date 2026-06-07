@@ -35,6 +35,7 @@ async def upsert_rule(
     basis: Basis | None,
     percentage: Decimal,
     enabled: bool,
+    reprocess: bool,
 ) -> tuple[PricingRuleRecord, bool]:
     """Create or replace the corp's rule for a target. Returns `(record, created)`.
 
@@ -58,6 +59,7 @@ async def upsert_rule(
     row.basis = basis
     row.percentage = percentage
     row.enabled = enabled
+    row.reprocess = reprocess
     await session.flush()
     await session.refresh(row)
     return PricingRuleRecord.model_validate(row), created
