@@ -62,6 +62,40 @@ export default function Home() {
         <p>EVE Online corporation buyback.</p>
       </hgroup>
 
+      <section>
+        <h2>How it works</h2>
+        <ol>
+          <li>
+            <strong>Paste your items into an appraisal.</strong> Paste an in-game
+            inventory list (or search and add items) and submit to get a priced
+            quote.
+          </li>
+          <li>
+            <strong>Create a contract for the quoted price.</strong> In EVE, make an{" "}
+            <em>item exchange</em> contract to your corporation for the ISK the
+            appraisal shows. The recipient is your corporation today; making it
+            configurable is a planned feature. The appraisal page lists the exact
+            fields to fill in:
+            <ul>
+              <li>
+                <strong>Contract to</strong> — your corporation
+              </li>
+              <li>
+                <strong>I will receive</strong> — the appraisal amount
+              </li>
+              <li>
+                <strong>Description</strong> — the appraisal ID, so it can be looked
+                up
+              </li>
+            </ul>
+          </li>
+          <li>
+            <strong>Wait for it to be accepted.</strong> A Buyback Manager reviews
+            the contract and accepts it, and you get paid.
+          </li>
+        </ol>
+      </section>
+
       {me.isLoading && <p aria-busy="true">Checking session…</p>}
       {me.isError && <p className="error">Could not load session.</p>}
       {!me.isLoading &&

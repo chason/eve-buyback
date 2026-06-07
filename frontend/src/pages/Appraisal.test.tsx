@@ -4,9 +4,22 @@ import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as api from "../api/appraisals"
+import * as authApi from "../api/auth"
+import type { SessionUser } from "../api/types"
 import Appraisal from "./Appraisal"
 
 vi.mock("../api/appraisals")
+vi.mock("../api/auth")
+
+const sessionUser: SessionUser = {
+  character_id: 1,
+  character_name: "Pilot",
+  corporation_id: 2,
+  corporation_name: "Test Corp",
+  role: "member",
+  is_director: false,
+  corporation_registered: true,
+}
 
 function renderAt(publicId: string) {
   const queryClient = new QueryClient({
@@ -27,6 +40,7 @@ describe("Appraisal", () => {
   beforeEach(() => vi.resetAllMocks())
 
   it("renders priced and rejected lines with the accepted total", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
     vi.mocked(api.getAppraisal).mockResolvedValue({
       public_id: "abc123",
       created_by_character_id: 1,
@@ -51,9 +65,38 @@ describe("Appraisal", () => {
     renderAt("abc123")
 
     expect(await screen.findByText("Tritanium")).toBeInTheDocument()
-    // The total appears both in the header and as the single line's total.
+    // The total appears in the header, the contract panel, and the line total.
     expect(screen.getAllByText(/4,500\.00 ISK/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("Nonexistent")).toBeInTheDocument()
     expect(screen.getByText("Unknown item")).toBeInTheDocument()
+
+    // The contract instructions hand over the entity + appraisal id.
+    expect(screen.getByText(/Get paid/)).toBeInTheDocument()
+    expect(screen.getByText("Test Corp")).toBeInTheDocument()
+    expect(screen.getByText("abc123")).toBeInTheDocument()
+  })
+
+  it("hides the contract panel when nothing was accepted", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
+    vi.mocked(api.getAppraisal).mockResolvedValue({
+      public_id: "z9",
+      created_by_character_id: 1,
+      created_at: "2026-06-07T00:00:00Z",
+      market_hub_id: 60003760,
+      accepted_total: "0",
+      rejected_count: 1,
+      lines: [
+        {
+          type_id: null, type_name: "Nope", quantity: 1, status: "rejected",
+          basis: null, percentage: null, unit_value: null, unit_price: null,
+          line_total: "0.00", reason: "Unknown item",
+        },
+      ],
+    })
+
+    renderAt("z9")
+
+    expect(await screen.findByText("Nope")).toBeInTheDocument()
+    expect(screen.queryByText(/Get paid/)).not.toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
+import { getMe } from "../api/auth"
 import { formatIsk } from "../lib/format"
 import { hubName } from "../lib/hubs"
 
@@ -13,25 +14,49 @@ export default function Appraisal() {
     queryFn: () => getAppraisal(publicId!),
     enabled: !!publicId,
   })
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
+  const me = useQuery({ queryKey: ["me"], queryFn: getMe })
+  // Tracks which field was just copied (or "<key>:failed"), cleared after 2s.
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  async function copy(key: string, text: string) {
+    // navigator.clipboard is undefined in non-secure contexts (plain http,
+    // non-localhost); guard so the click never rejects unhandled.
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+    } catch {
+      setCopiedKey(`${key}:failed`)
+    }
+    window.setTimeout(() => setCopiedKey(null), 2000)
+  }
+
+  function CopyButton({ fieldKey, text }: { fieldKey: string; text: string }) {
+    const label =
+      copiedKey === fieldKey
+        ? "Copied"
+        : copiedKey === `${fieldKey}:failed`
+          ? "Failed"
+          : "Copy"
+    return (
+      <button
+        type="button"
+        className="secondary outline"
+        onClick={() => copy(fieldKey, text)}
+      >
+        {label}
+      </button>
+    )
+  }
 
   if (appraisal.isLoading) return <p aria-busy="true">Loading…</p>
   if (appraisal.isError || !appraisal.data) {
     return <p className="error">Appraisal not found.</p>
   }
   const a = appraisal.data
-
-  async function copyLink() {
-    // navigator.clipboard is undefined in non-secure contexts (plain http,
-    // non-localhost); guard the whole thing so the click never rejects unhandled.
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      setCopyState("copied")
-    } catch {
-      setCopyState("failed")
-    }
-    window.setTimeout(() => setCopyState("idle"), 2000)
-  }
+  // A successfully loaded appraisal is always the viewer's own corp (cross-corp
+  // reads 404), so the session's corp name is the contract recipient.
+  const entity = me.data?.corporation_name ?? "your corporation"
+  const hasPayout = Number(a.accepted_total) > 0
 
   return (
     <>
@@ -47,13 +72,63 @@ export default function Appraisal() {
         <strong className="isk">{formatIsk(a.accepted_total)}</strong> accepted
         {a.rejected_count > 0 && ` · ${a.rejected_count} rejected`}
       </p>
-      <button className="secondary" onClick={copyLink}>
-        {copyState === "copied"
+      <button
+        className="secondary"
+        onClick={() => copy("link", window.location.href)}
+      >
+        {copiedKey === "link"
           ? "Link copied"
-          : copyState === "failed"
+          : copiedKey === "link:failed"
             ? "Copy failed — copy from the address bar"
             : "Copy link"}
       </button>
+
+      {hasPayout && (
+        <article>
+          <header>Get paid — create the contract</header>
+          <p>
+            In EVE, open <strong>Contracts → Create Contract → Item Exchange</strong>{" "}
+            and enter these:
+          </p>
+          <table>
+            <tbody>
+              <tr>
+                <td>Contract to</td>
+                <td>
+                  <strong>{entity}</strong>{" "}
+                  <small>— your corporation</small>
+                </td>
+                <td>
+                  <CopyButton fieldKey="entity" text={entity} />
+                </td>
+              </tr>
+              <tr>
+                <td>I will receive</td>
+                <td>
+                  <strong className="isk">{formatIsk(a.accepted_total)}</strong>
+                </td>
+                <td>
+                  {/* Copy the raw value (no separators/“ISK”) for EVE's field. */}
+                  <CopyButton fieldKey="amount" text={a.accepted_total} />
+                </td>
+              </tr>
+              <tr>
+                <td>Description</td>
+                <td>
+                  <code>{a.public_id}</code>{" "}
+                  <small>— so a manager can look it up</small>
+                </td>
+                <td>
+                  <CopyButton fieldKey="id" text={a.public_id} />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            <small>Then wait for a Buyback Manager to accept it.</small>
+          </p>
+        </article>
+      )}
 
       <table>
         <thead>
