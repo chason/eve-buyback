@@ -87,6 +87,14 @@ label:has(> .search-results) > input {
   margin-bottom: 0;
 }
 
+/* Helper text under a checkbox (checkbox labels lay out inline, so an inside
+   <small> would collide — render it as a muted block on its own line instead). */
+.field-hint {
+  display: block;
+  margin: -0.5rem 0 var(--pico-spacing);
+  color: var(--pico-muted-color);
+}
+
 /* "How it works" — boxes connected by arrows: [ ] -> [ ] -> [ ]. */
 .flow {
   display: flex;

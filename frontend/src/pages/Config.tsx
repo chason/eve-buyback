@@ -124,10 +124,10 @@ export default function Config() {
             onChange={(e) => setDefaultAccepted(e.target.checked)}
           />
           Accept items by default
-          <small>
-            Off → buy <em>nothing</em> unless a pricing rule accepts it (whitelist).
-          </small>
         </label>
+        <small className="field-hint">
+          Off → buy <em>nothing</em> unless a pricing rule accepts it (whitelist).
+        </small>
 
         {canEdit ? (
           <button type="submit" aria-busy={save.isPending}>
