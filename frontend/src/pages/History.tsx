@@ -45,7 +45,9 @@ export default function History() {
             {appraisals.data.map((a) => (
               <tr key={a.public_id}>
                 <td>{new Date(a.created_at).toLocaleString()}</td>
-                {corpWide && <td className="num">{a.created_by_character_id}</td>}
+                {corpWide && (
+                  <td>{a.created_by_character_name ?? a.created_by_character_id}</td>
+                )}
                 <td className="num isk">{formatIsk(a.accepted_total)}</td>
                 <td className="num">{a.rejected_count}</td>
                 <td>

@@ -28,6 +28,9 @@ class RuleOut(BaseModel):
     # A rule is identified by its target; no surrogate id is exposed (ADR-0022).
     target_kind: TargetKind
     target_id: int
+    # The target's SDE name (type or market-group), for display; None if the target
+    # is no longer in the SDE.
+    target_name: str | None = None
     basis: Basis | None
     percentage: Decimal
     enabled: bool

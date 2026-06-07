@@ -177,6 +177,17 @@
             "title": "Created By Character Id",
             "type": "integer"
           },
+          "created_by_character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Character Name"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/AppraisalLineOut"
@@ -224,6 +235,17 @@
           "created_by_character_id": {
             "title": "Created By Character Id",
             "type": "integer"
+          },
+          "created_by_character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Character Name"
           },
           "market_hub_id": {
             "title": "Market Hub Id",
@@ -537,6 +559,17 @@
             ],
             "title": "Target Kind",
             "type": "string"
+          },
+          "target_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Name"
           }
         },
         "required": [

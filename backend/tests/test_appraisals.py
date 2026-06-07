@@ -71,6 +71,7 @@ async def test_appraisal_accepts_and_persists():
         assert resp.status_code == 201
         body = resp.json()
         assert len(body["public_id"]) == 12
+        assert body["created_by_character_name"] == "Boss"  # name, resolved by join
         # Money round-trips through SQLite's REAL affinity (ADR-0020), so compare
         # numerically rather than by string scale.
         assert Decimal(body["accepted_total"]) == Decimal("4500.00")

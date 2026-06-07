@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
 import { formatIsk } from "../lib/format"
+import { hubName } from "../lib/hubs"
 
 export default function Appraisal() {
   const { publicId } = useParams<{ publicId: string }>()
@@ -37,7 +38,8 @@ export default function Appraisal() {
       <hgroup>
         <h1>Appraisal</h1>
         <p>
-          {new Date(a.created_at).toLocaleString()} · hub {a.market_hub_id}
+          {new Date(a.created_at).toLocaleString()} · {hubName(a.market_hub_id)}
+          {a.created_by_character_name && ` · by ${a.created_by_character_name}`}
         </p>
       </hgroup>
 

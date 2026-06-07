@@ -116,6 +116,9 @@ class PricingRuleRecord(BaseModel):
 
     target_kind: TargetKind
     target_id: int
+    # Human-readable name of the target (SDE type or market-group name), resolved by
+    # the application layer for display. None if the target no longer exists in the SDE.
+    target_name: str | None = None
     basis: Basis | None
     percentage: Decimal
     enabled: bool
@@ -142,6 +145,7 @@ class AppraisalRecord(BaseModel):
     public_id: str
     corporation_id: uuid.UUID  # internal corp UUID, for the corp-scope check only
     created_by_character_id: int
+    created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: int
     accepted_total: Decimal
@@ -156,6 +160,7 @@ class AppraisalSummaryRecord(BaseModel):
 
     public_id: str
     created_by_character_id: int
+    created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: int
     accepted_total: Decimal

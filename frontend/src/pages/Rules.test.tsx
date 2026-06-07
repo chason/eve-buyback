@@ -42,18 +42,20 @@ function renderRules() {
 describe("Rules", () => {
   beforeEach(() => vi.resetAllMocks())
 
-  it("resolves a market-group rule's target name", async () => {
+  it("shows each rule's backend-resolved target name", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([
-      { target_kind: "market_group", target_id: 1, basis: "buy", percentage: "80", enabled: true },
+      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true },
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true },
     ])
-    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
-      { market_group_id: 1, parent_id: null, name: "Ore" },
-    ])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
 
     renderRules()
 
     expect(await screen.findByText("Ore")).toBeInTheDocument()
+    // A type target shows its name, not "Type 34".
+    expect(screen.getByText("Tritanium")).toBeInTheDocument()
+    expect(screen.queryByText("Type 34")).not.toBeInTheDocument()
   })
 
   it("lets a manager add a market-group rule", async () => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
 import type { AggregateField, Basis } from "../api/types"
+import { hubName } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
 const BASES: Basis[] = ["buy", "sell", "split"]
@@ -14,11 +15,6 @@ const AGGREGATES: AggregateField[] = [
   "max",
   "min",
 ]
-
-/** Hubs are Jita-only for the MVP (ADR-0006); show the configured hub read-only. */
-function hubLabel(hubId: number): string {
-  return hubId === 60003760 ? "Jita 4-4" : `Station ${hubId}`
-}
 
 export default function Config() {
   const queryClient = useQueryClient()
@@ -70,7 +66,7 @@ export default function Config() {
       >
         <label>
           Market hub
-          <input type="text" value={hubLabel(config.data.market_hub_id)} readOnly />
+          <input type="text" value={hubName(config.data.market_hub_id)} readOnly />
           <small>Jita-only for now.</small>
         </label>
 

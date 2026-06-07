@@ -50,6 +50,7 @@ class AppraisalOut(BaseModel):
 
     public_id: str
     created_by_character_id: int
+    created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: int
     accepted_total: Decimal
@@ -62,6 +63,7 @@ class AppraisalSummaryOut(BaseModel):
 
     public_id: str
     created_by_character_id: int
+    created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: int
     accepted_total: Decimal

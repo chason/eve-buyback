@@ -72,7 +72,29 @@ async def list_rules(
     session: AsyncSession, corporation_id: int
 ) -> list[PricingRuleRecord]:
     corp = await get_registered_corporation(session, corporation_id)
-    return await rules_repo.list_rules(session, corp.id)
+    rules = await rules_repo.list_rules(session, corp.id)
+    return await _with_target_names(session, rules)
+
+
+async def _with_target_names(
+    session: AsyncSession, rules: list[PricingRuleRecord]
+) -> list[PricingRuleRecord]:
+    """Resolve each rule's target to its SDE name for display. Batched: one type
+    lookup and one market-group lookup for the whole list."""
+    type_ids = [r.target_id for r in rules if r.target_kind == "type"]
+    types = await sde_repo.get_types(session, type_ids) if type_ids else {}
+    group_names = {
+        g.market_group_id: g.name
+        for g in await sde_repo.list_market_groups(session)
+    }
+
+    def name_for(rule: PricingRuleRecord) -> str | None:
+        if rule.target_kind == "type":
+            t = types.get(rule.target_id)
+            return t.name if t else None
+        return group_names.get(rule.target_id)
+
+    return [r.model_copy(update={"target_name": name_for(r)}) for r in rules]
 
 
 async def set_rule(
@@ -89,7 +111,7 @@ async def set_rule(
     `(record, created)`. The target must exist (else 400); there is no 409/404 on
     write — setting the rule for a target is the whole operation."""
     corp = await get_registered_corporation(session, corporation_id)
-    await _validate_target(session, target_kind, target_id)
+    target_name = await _validate_target(session, target_kind, target_id)
     record, created = await rules_repo.upsert_rule(
         session,
         corporation_id=corp.id,
@@ -100,7 +122,7 @@ async def set_rule(
         enabled=enabled,
     )
     await session.commit()
-    return record, created
+    return record.model_copy(update={"target_name": target_name}), created
 
 
 async def delete_rule(
@@ -124,9 +146,14 @@ async def delete_rule(
 
 async def _validate_target(
     session: AsyncSession, target_kind: TargetKind, target_id: int
-) -> None:
+) -> str:
+    """Ensure the target exists (else 400) and return its SDE name."""
     if target_kind == "type":
-        if await sde_repo.get_type(session, target_id) is None:
+        sde_type = await sde_repo.get_type(session, target_id)
+        if sde_type is None:
             raise PricingRuleTargetInvalid(f"Unknown type {target_id}")
-    elif await sde_repo.get_market_group(session, target_id) is None:
+        return sde_type.name
+    group = await sde_repo.get_market_group(session, target_id)
+    if group is None:
         raise PricingRuleTargetInvalid(f"Unknown market group {target_id}")
+    return group.name

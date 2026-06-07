@@ -57,11 +57,12 @@ async def test_put_rule_lifecycle():
         # No surrogate id is exposed; the rule is identified by its target (ADR-0022).
         assert "id" not in body and "public_id" not in body
         assert (body["target_kind"], body["target_id"]) == ("type", 34)
+        assert body["target_name"] == "Tritanium"  # resolved name, not just the id
         assert body["basis"] is None  # inherits config default
 
         listed = await http.get("/api/v1/corporations/me/rules")
-        assert [(r["target_kind"], r["target_id"]) for r in listed.json()] == [
-            ("type", 34)
+        assert [(r["target_kind"], r["target_id"], r["target_name"]) for r in listed.json()] == [
+            ("type", 34, "Tritanium")
         ]
 
         removed = await http.delete("/api/v1/corporations/me/rules/type/34")

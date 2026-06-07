@@ -113,6 +113,7 @@ async def create_appraisal(
         public_id=generate_appraisal_id(),
         corporation_id=corp.id,
         created_by_character_id=user.character_id,
+        created_by_character_name=user.character_name,
         market_hub_id=hub_id,
         accepted_total=accepted_total,
         rejected_count=rejected_count,

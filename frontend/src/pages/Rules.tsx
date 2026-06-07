@@ -25,6 +25,9 @@ export default function Rules() {
   }, [groups.data])
 
   function targetLabel(rule: RuleOut): string {
+    // The backend resolves the SDE name; fall back to a group lookup / the raw id
+    // only if it's missing (e.g. the target was removed from the SDE).
+    if (rule.target_name) return rule.target_name
     return rule.target_kind === "market_group"
       ? groupName(rule.target_id)
       : `Type ${rule.target_id}`

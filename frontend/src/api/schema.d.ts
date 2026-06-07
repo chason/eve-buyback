@@ -342,6 +342,8 @@ export interface components {
             created_at: string;
             /** Created By Character Id */
             created_by_character_id: number;
+            /** Created By Character Name */
+            created_by_character_name?: string | null;
             /** Lines */
             lines: components["schemas"]["AppraisalLineOut"][];
             /** Market Hub Id */
@@ -362,6 +364,8 @@ export interface components {
             created_at: string;
             /** Created By Character Id */
             created_by_character_id: number;
+            /** Created By Character Name */
+            created_by_character_name?: string | null;
             /** Market Hub Id */
             market_hub_id: number;
             /** Public Id */
@@ -483,6 +487,8 @@ export interface components {
              * @enum {string}
              */
             target_kind: "market_group" | "type";
+            /** Target Name */
+            target_name?: string | null;
         };
         /**
          * RulePutRequest
