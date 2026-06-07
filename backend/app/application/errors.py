@@ -36,3 +36,23 @@ class ManagerAlreadyExists(ApplicationError):
 
 class ManagerNotFound(ApplicationError):
     default_detail = "Manager not found"
+
+
+class PricingRuleNotFound(ApplicationError):
+    default_detail = "Pricing rule not found"
+
+
+class PricingRuleTargetInvalid(ApplicationError):
+    default_detail = "Pricing rule target does not exist"
+
+
+class PricingRuleAlreadyExists(ApplicationError):
+    default_detail = "A pricing rule already exists for this target"
+
+
+class AppraisalNotFound(ApplicationError):
+    default_detail = "Appraisal not found"
+
+
+class EmptyAppraisal(ApplicationError):
+    default_detail = "An appraisal must contain at least one item"

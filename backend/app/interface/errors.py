@@ -6,12 +6,17 @@ from fastapi.responses import JSONResponse
 
 from app.application.errors import (
     ApplicationError,
+    AppraisalNotFound,
     CharacterNotInCorporation,
     CorporationAlreadyRegistered,
     CorporationNotRegistered,
+    EmptyAppraisal,
     ManagerAlreadyExists,
     ManagerNotFound,
     NotAuthorized,
+    PricingRuleAlreadyExists,
+    PricingRuleNotFound,
+    PricingRuleTargetInvalid,
     SsoNotConfigured,
 )
 
@@ -23,6 +28,11 @@ _STATUS: dict[type[ApplicationError], int] = {
     CharacterNotInCorporation: 400,
     ManagerAlreadyExists: 409,
     ManagerNotFound: 404,
+    PricingRuleNotFound: 404,
+    PricingRuleTargetInvalid: 400,
+    PricingRuleAlreadyExists: 409,
+    AppraisalNotFound: 404,
+    EmptyAppraisal: 400,
 }
 
 

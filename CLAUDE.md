@@ -44,8 +44,8 @@ buyback/
 │   │   ├── main.py       # app factory + lifespan; wires middleware, routers, error handlers
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
 │   │   ├── interface/    # INTERFACE: FastAPI routers (v1/) + deps, security, middleware, error mapping
-│   │   ├── application/  # APPLICATION: use cases (auth, corporations, sde, market, reference) + typed errors
-│   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers, market TTL)
+│   │   ├── application/  # APPLICATION: use cases (auth, corporations, sde, market, reference, pricing, appraisals) + typed errors
+│   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers, market TTL, pricing/resolution)
 │   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
 │   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO, Fuzzwork, SDE source); return pydantic
 │   │   ├── schemas/      # API request/response DTOs (interface contracts)

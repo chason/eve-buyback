@@ -10,6 +10,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
+
 
 class CharacterRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -89,3 +91,66 @@ class SdeMetadataRecord(BaseModel):
     type_count: int
     market_group_count: int
     imported_at: datetime
+
+
+class BuybackConfigRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    corporation_id: int
+    market_hub_id: int
+    default_basis: Basis
+    default_percentage: Decimal
+    aggregate_field: AggregateField
+
+
+class PricingRuleRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    corporation_id: int
+    target_kind: TargetKind
+    target_id: int
+    basis: Basis | None
+    percentage: Decimal
+    enabled: bool
+
+
+class AppraisalLineRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    type_id: int
+    type_name: str
+    quantity: int
+    status: LineStatus
+    basis: Basis | None
+    percentage: Decimal | None
+    unit_value: Decimal | None
+    unit_price: Decimal | None
+    line_total: Decimal
+    reason: str | None
+
+
+class AppraisalRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    public_id: str
+    corporation_id: int
+    created_by_character_id: int
+    created_at: datetime
+    market_hub_id: int
+    accepted_total: Decimal
+    rejected_count: int
+    lines: list[AppraisalLineRecord]
+
+
+class AppraisalSummaryRecord(BaseModel):
+    """An appraisal header without its lines, for list views."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    public_id: str
+    created_by_character_id: int
+    created_at: datetime
+    market_hub_id: int
+    accepted_total: Decimal
+    rejected_count: int

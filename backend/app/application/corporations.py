@@ -13,10 +13,17 @@ from app.application.errors import (
     ManagerNotFound,
     NotAuthorized,
 )
+from app.config import get_settings
 from app.data.records import CorporationRecord, ManagerRecord
+from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import characters as characters_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import managers as managers_repo
+from app.domain.pricing import (
+    DEFAULT_AGGREGATE_FIELD,
+    DEFAULT_BASIS,
+    DEFAULT_PERCENTAGE,
+)
 from app.plugins.esi import EsiClient
 
 
@@ -49,6 +56,16 @@ async def register_corporation(
             character_name=user.character_name,
             granted_by_character_id=user.character_id,
         )
+
+    # Every registered corp gets a default "90% Jita Buy" config (ADR-0007).
+    await config_repo.upsert_config(
+        session,
+        corporation_id=user.corporation_id,
+        market_hub_id=get_settings().market_hub_id,
+        default_basis=DEFAULT_BASIS,
+        default_percentage=DEFAULT_PERCENTAGE,
+        aggregate_field=DEFAULT_AGGREGATE_FIELD,
+    )
 
     await session.commit()
     return corp

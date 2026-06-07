@@ -27,6 +27,24 @@ async def get_type(session: AsyncSession, type_id: int) -> SdeTypeRecord | None:
     return SdeTypeRecord.model_validate(row) if row is not None else None
 
 
+async def get_types(
+    session: AsyncSession, type_ids: Sequence[int]
+) -> dict[int, SdeTypeRecord]:
+    """Batch lookup keyed by type_id (missing ids are simply absent)."""
+    if not type_ids:
+        return {}
+    stmt = select(SdeType).where(SdeType.type_id.in_(type_ids))
+    rows = (await session.execute(stmt)).scalars().all()
+    return {r.type_id: SdeTypeRecord.model_validate(r) for r in rows}
+
+
+async def get_market_group(
+    session: AsyncSession, market_group_id: int
+) -> SdeMarketGroupRecord | None:
+    row = await session.get(SdeMarketGroup, market_group_id)
+    return SdeMarketGroupRecord.model_validate(row) if row is not None else None
+
+
 async def search_types(
     session: AsyncSession, query: str, limit: int
 ) -> list[SdeTypeRecord]:
