@@ -155,6 +155,19 @@ def test_resolve_rule_carries_compressed_only():
     assert r.compressed_only is True
 
 
+def test_resolve_rule_accepted_default_and_blacklist():
+    # No rule → accepted (items are bought by default).
+    d = resolve_rule(34, None, type_rules={}, group_rules={}, parent_of={}, **DEF)
+    assert d.accepted is True
+    # A blacklist rule → not accepted.
+    r = resolve_rule(
+        34, 1,
+        type_rules={34: RuleSpec("buy", Decimal("90"), accepted=False)},
+        group_rules={}, parent_of={1: None}, **DEF,
+    )
+    assert r.accepted is False
+
+
 def test_reprocessed_unpriced_mineral_and_ore_is_none():
     # No mineral price and no ore price for a sub-batch → nothing priceable.
     assert reprocess_line(50, 100, _MATS, {34: None}, None) is None

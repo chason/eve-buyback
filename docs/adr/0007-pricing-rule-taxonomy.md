@@ -24,10 +24,18 @@ the corp's `BuybackConfig` providing the **global** default. A `PricingRule` has
    from the type's `market_group_id`) that has an enabled rule, else
 3. the global default in `BuybackConfig`.
 
+A rule may also **reject** matching items: `accepted=False` makes the buyback refuse
+the item (a blacklist). It composes with most-specific-wins — blacklist a market group
+and whitelist a type under it with `accepted=True`. (Later additions: ore-only
+`reprocess` and `compressed_only` flags — see [ADR-0026](0026-ore-reprocess-pricing.md).)
+
 ## Consequences
 
 - "Group" and "subtype" are just market-group nodes at different depths — no
   special-casing of ore vs moon ore.
+- `accepted=False` rejects matching lines ("Not accepted") before pricing; this is
+  distinct from `enabled=False`, which simply removes the rule from resolution (the item
+  falls through to a less-specific rule or the global default and is still bought).
 - Requires the market-group hierarchy and type→market_group mapping locally
   ([ADR-0009](0009-sde-reference-data.md)).
 - Resolution is a cheap upward walk; cache each type's resolved rule per config

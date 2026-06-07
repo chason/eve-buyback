@@ -38,6 +38,8 @@ class RuleOut(BaseModel):
     reprocess: bool = False
     # Accept only the compressed variants of matched ores (ADR-0026); ore-only.
     compressed_only: bool = False
+    # False → the buyback rejects matching items (a blacklist rule).
+    accepted: bool = True
 
 
 class RulePutRequest(BaseModel):
@@ -49,3 +51,4 @@ class RulePutRequest(BaseModel):
     enabled: bool = True
     reprocess: bool = False
     compressed_only: bool = False
+    accepted: bool = True

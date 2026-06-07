@@ -43,3 +43,7 @@ class PricingRule(Base):
     compressed_only: Mapped[bool] = mapped_column(
         default=False, server_default=text("false")
     )
+    # False → the buyback rejects matching items (a blacklist rule).
+    accepted: Mapped[bool] = mapped_column(
+        default=True, server_default=text("true")
+    )

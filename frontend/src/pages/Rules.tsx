@@ -101,6 +101,7 @@ export default function Rules() {
           <thead>
             <tr>
               <th>Target</th>
+              <th>Accept</th>
               <th>Basis</th>
               <th>%</th>
               <th>Reprocess</th>
@@ -121,6 +122,7 @@ export default function Rules() {
                 >
                   {targetLabel(rule)}
                 </td>
+                <td>{rule.accepted ? "yes" : "no"}</td>
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
                 <td>{rule.reprocess ? "yes" : "–"}</td>
@@ -179,6 +181,7 @@ function AddRule({
   const [basis, setBasis] = useState<Basis | "">("")
   const [percentage, setPercentage] = useState("90")
   const [enabled, setEnabled] = useState(true)
+  const [accepted, setAccepted] = useState(true)
   const [reprocess, setReprocess] = useState(false)
   const [compressedOnly, setCompressedOnly] = useState(false)
 
@@ -228,6 +231,7 @@ function AddRule({
         basis: basis === "" ? null : basis,
         percentage,
         enabled,
+        accepted,
         reprocess: reprocessEligible && reprocess,
         compressed_only: reprocessEligible && compressedOnly,
       }),
@@ -341,35 +345,15 @@ function AddRule({
           </label>
         )}
 
-        <div className="grid">
-          <label>
-            Basis
-            <select
-              value={basis}
-              onChange={(e) => setBasis(e.target.value as Basis | "")}
-            >
-              <option value="">(default)</option>
-              {BASES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Percentage
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={percentage}
-              aria-label="Rule percentage"
-              onChange={(e) => setPercentage(e.target.value)}
-            />
-          </label>
-        </div>
-
         <div className="rule-flags">
+          <label>
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+            />
+            Accept (buy this item)
+          </label>
           <label>
             <input
               type="checkbox"
@@ -378,27 +362,63 @@ function AddRule({
             />
             Enabled
           </label>
-          {reprocessEligible && (
-            <>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={reprocess}
-                  onChange={(e) => setReprocess(e.target.checked)}
-                />
-                Reprocess (ore → minerals)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={compressedOnly}
-                  onChange={(e) => setCompressedOnly(e.target.checked)}
-                />
-                Compressed only
-              </label>
-            </>
-          )}
         </div>
+
+        {accepted ? (
+          <>
+            <div className="grid">
+              <label>
+                Basis
+                <select
+                  value={basis}
+                  onChange={(e) => setBasis(e.target.value as Basis | "")}
+                >
+                  <option value="">(default)</option>
+                  {BASES.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Percentage
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={percentage}
+                  aria-label="Rule percentage"
+                  onChange={(e) => setPercentage(e.target.value)}
+                />
+              </label>
+            </div>
+            {reprocessEligible && (
+              <div className="rule-flags">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={reprocess}
+                    onChange={(e) => setReprocess(e.target.checked)}
+                  />
+                  Reprocess (ore → minerals)
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={compressedOnly}
+                    onChange={(e) => setCompressedOnly(e.target.checked)}
+                  />
+                  Compressed only
+                </label>
+              </div>
+            )}
+          </>
+        ) : (
+          <p>
+            <small>This rule rejects the item — it won't be bought.</small>
+          </p>
+        )}
 
         <button type="submit" disabled={!target} aria-busy={save.isPending}>
           Save rule

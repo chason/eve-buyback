@@ -45,8 +45,8 @@ describe("Rules", () => {
   it("shows each rule's backend-resolved target name", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.listRules).mockResolvedValue([
-      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true, reprocess: true, compressed_only: false },
-      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false },
+      { target_kind: "market_group", target_id: 1, target_name: "Ore", basis: "buy", percentage: "80", enabled: true, reprocess: true, compressed_only: false, accepted: true },
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true },
     ])
     vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
 
@@ -66,7 +66,7 @@ describe("Rules", () => {
       { market_group_id: 1, parent_id: null, name: "Standard Ores" },
     ])
     vi.mocked(pricingApi.putRule).mockResolvedValue({
-      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true, compressed_only: true,
+      target_kind: "market_group", target_id: 1, basis: "sell", percentage: "75", enabled: true, reprocess: true, compressed_only: true, accepted: true,
     })
 
     renderRules()
@@ -90,9 +90,38 @@ describe("Rules", () => {
       basis: "sell",
       percentage: "75",
       enabled: true,
+      accepted: true,
       reprocess: true,
       compressed_only: true,
     })
+  })
+
+  it("can mark a rule as not accepted (blacklist)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.listRules).mockResolvedValue([])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
+    vi.mocked(sdeApi.searchTypes).mockResolvedValue([
+      { type_id: 587, name: "Rifter", market_group_id: 5 },
+    ])
+    vi.mocked(pricingApi.putRule).mockResolvedValue({
+      target_kind: "type", target_id: 587, basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: false,
+    })
+
+    renderRules()
+
+    await u.type(await screen.findByLabelText("Search type by name"), "rifter")
+    await u.click(await screen.findByText("Rifter"))
+    // Uncheck Accept → pricing fields disappear and the rule rejects the item.
+    await u.click(screen.getByLabelText("Accept (buy this item)"))
+    expect(screen.queryByLabelText("Rule percentage")).not.toBeInTheDocument()
+    await u.click(screen.getByRole("button", { name: "Save rule" }))
+
+    await waitFor(() => expect(pricingApi.putRule).toHaveBeenCalled())
+    const call = vi.mocked(pricingApi.putRule).mock.calls[0]
+    expect(call[0]).toBe("type")
+    expect(call[1]).toBe(587)
+    expect(call[2].accepted).toBe(false)
   })
 
   it("filters market groups by leaf name and shows the full path", async () => {

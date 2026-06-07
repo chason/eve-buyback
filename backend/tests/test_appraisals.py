@@ -130,6 +130,26 @@ async def test_appraisal_reprocess_sub_batch_uses_ore_price():
         assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
 
 
+async def test_appraisal_not_accepted_rule_rejects_item():
+    await _seed_sde()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # Blacklist Tritanium even though it has a market price.
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "0", "accepted": False},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1000}]}
+        )
+        line = resp.json()["lines"][0]
+        assert line["status"] == "rejected"
+        assert line["reason"] == "Not accepted"
+        assert Decimal(resp.json()["accepted_total"]) == 0
+
+
 async def test_appraisal_compressed_only_rejects_uncompressed_ore():
     # Raw + compressed Veldspar in one ore market group; a compressed-only rule on
     # the group accepts the compressed one and rejects the raw one.

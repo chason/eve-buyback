@@ -128,6 +128,8 @@ class PricingRuleRecord(BaseModel):
     reprocess: bool = False
     # Accept only the compressed variants of matched ores (ADR-0026); ore-only.
     compressed_only: bool = False
+    # False → the buyback rejects matching items (a blacklist rule).
+    accepted: bool = True
 
 
 class AppraisalLineRecord(BaseModel):

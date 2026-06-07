@@ -47,6 +47,7 @@ class RuleSpec:
     percentage: Decimal
     reprocess: bool = False
     compressed_only: bool = False
+    accepted: bool = True
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ class ResolvedRule:
     source: str  # which rule won: "type:34", "market_group:1857", or "default"
     reprocess: bool = False  # price a matched ore by its refined minerals (ADR-0026)
     compressed_only: bool = False  # reject the uncompressed variants of matched ores
+    accepted: bool = True  # False → the buyback rejects matching items (blacklist)
 
 
 def resolve_rule(
@@ -85,6 +87,7 @@ def resolve_rule(
             source=f"type:{type_id}",
             reprocess=type_rule.reprocess,
             compressed_only=type_rule.compressed_only,
+            accepted=type_rule.accepted,
         )
 
     group_id = market_group_id
@@ -99,6 +102,7 @@ def resolve_rule(
                 source=f"market_group:{group_id}",
                 reprocess=group_rule.reprocess,
                 compressed_only=group_rule.compressed_only,
+                accepted=group_rule.accepted,
             )
         group_id = parent_of.get(group_id)
 

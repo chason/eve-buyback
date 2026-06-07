@@ -501,6 +501,11 @@ export interface components {
         };
         /** RuleOut */
         RuleOut: {
+            /**
+             * Accepted
+             * @default true
+             */
+            accepted: boolean;
             /** Basis */
             basis: ("buy" | "sell" | "split") | null;
             /**
@@ -533,6 +538,11 @@ export interface components {
          *     idempotent create-or-replace, so this is the complete representation.
          */
         RulePutRequest: {
+            /**
+             * Accepted
+             * @default true
+             */
+            accepted: boolean;
             /** Basis */
             basis?: ("buy" | "sell" | "split") | null;
             /**
