@@ -52,3 +52,7 @@ class AppraisalNotFound(ApplicationError):
 
 class EmptyAppraisal(ApplicationError):
     default_detail = "An appraisal must contain at least one item"
+
+
+class AppraisalTooLarge(ApplicationError):
+    default_detail = "An appraisal may contain at most 1000 items (EVE's contract limit)"

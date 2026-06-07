@@ -288,7 +288,9 @@ export interface components {
         /**
          * AppraisalCreateRequest
          * @description Items may be supplied structured, as a raw EVE paste, or both — but at least
-         *     one must be non-empty. The paste is parsed and name-resolved server-side.
+         *     one must be non-empty. The paste is parsed and name-resolved server-side. The
+         *     combined item count (structured + paste) is capped in the use case; the bounds
+         *     here are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).
          */
         AppraisalCreateRequest: {
             /** Items */

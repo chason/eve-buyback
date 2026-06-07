@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.domain.paste import MAX_QUANTITY
+from app.domain.paste import MAX_APPRAISAL_ITEMS, MAX_PASTE_CHARS, MAX_QUANTITY
 from app.domain.pricing import Basis, LineStatus
 
 
@@ -14,10 +14,14 @@ class AppraisalItemIn(BaseModel):
 
 class AppraisalCreateRequest(BaseModel):
     """Items may be supplied structured, as a raw EVE paste, or both — but at least
-    one must be non-empty. The paste is parsed and name-resolved server-side."""
+    one must be non-empty. The paste is parsed and name-resolved server-side. The
+    combined item count (structured + paste) is capped in the use case; the bounds
+    here are the cheap first line of defense (ADR-0014, EVE's 1000-item contract)."""
 
-    items: list[AppraisalItemIn] = Field(default_factory=list)
-    paste: str | None = None
+    items: list[AppraisalItemIn] = Field(
+        default_factory=list, max_length=MAX_APPRAISAL_ITEMS
+    )
+    paste: str | None = Field(default=None, max_length=MAX_PASTE_CHARS)
 
     @model_validator(mode="after")
     def _require_some_input(self) -> "AppraisalCreateRequest":

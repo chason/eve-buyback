@@ -236,6 +236,44 @@ async def test_appraisal_requires_items_or_paste():
         assert resp.status_code == 422  # neither items nor paste
 
 
+async def test_appraisal_accepts_exactly_1000_items():
+    # 1000 = EVE's per-contract item limit — the boundary is allowed.
+    _use_fuzzwork({})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        paste = "\n".join(f"Unknown Item {i} 1" for i in range(1000))
+        resp = await http.post("/api/v1/appraisals", json={"paste": paste})
+        assert resp.status_code == 201
+        assert resp.json()["rejected_count"] == 1000  # all unknown, but persisted
+
+
+async def test_appraisal_rejects_more_than_1000_combined_items():
+    # Structured + paste are counted together; 1001 total is over the contract limit.
+    _use_fuzzwork({})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        items = [{"type_id": 34, "quantity": 1} for _ in range(500)]
+        paste = "\n".join(f"Unknown Item {i} 1" for i in range(501))
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": items, "paste": paste}
+        )
+        assert resp.status_code == 422
+        assert "1000" in resp.json()["detail"]
+
+
+async def test_appraisal_rejects_over_1000_structured_items_at_validation():
+    # The structured list alone is bounded at the DTO (cheap first line of defense).
+    _use_fuzzwork({})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        items = [{"type_id": 34, "quantity": 1} for _ in range(1001)]
+        resp = await http.post("/api/v1/appraisals", json={"items": items})
+        assert resp.status_code == 422
+
+
 async def test_get_unknown_appraisal_404():
     async with make_client(CeoEsi()) as http:
         await login(http)

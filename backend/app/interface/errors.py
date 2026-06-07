@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.application.errors import (
     ApplicationError,
     AppraisalNotFound,
+    AppraisalTooLarge,
     CharacterNotInCorporation,
     CorporationAlreadyRegistered,
     CorporationNotRegistered,
@@ -31,6 +32,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     PricingRuleTargetInvalid: 400,
     AppraisalNotFound: 404,
     EmptyAppraisal: 400,
+    AppraisalTooLarge: 422,
 }
 
 

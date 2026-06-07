@@ -2,18 +2,20 @@
   "components": {
     "schemas": {
       "AppraisalCreateRequest": {
-        "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side.",
+        "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side. The\ncombined item count (structured + paste) is capped in the use case; the bounds\nhere are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).",
         "properties": {
           "items": {
             "items": {
               "$ref": "#/components/schemas/AppraisalItemIn"
             },
+            "maxItems": 1000,
             "title": "Items",
             "type": "array"
           },
           "paste": {
             "anyOf": [
               {
+                "maxLength": 256000,
                 "type": "string"
               },
               {

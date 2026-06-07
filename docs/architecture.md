@@ -201,7 +201,8 @@ the SDE ([ADR-0021](adr/0021-appraisal-computation-and-storage.md)). It stores a
 immutable snapshot and returns a `public_id` for later reference
 ([ADR-0014](adr/0014-persisted-appraisals.md)). Lines with no usable market price (or
 an unresolved pasted name) are rejected with a reason; configurable data-quality
-thresholds are M7.
+thresholds are M7. The combined item count (structured + parsed paste) is capped at
+**1000** — one EVE contract's worth (`422` over the limit).
 
 ## 11. Repository layout
 

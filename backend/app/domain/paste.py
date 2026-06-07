@@ -8,6 +8,16 @@ from dataclasses import dataclass
 # under BIGINT. Mirrored by `AppraisalItemIn.quantity` (le=) for structured items.
 MAX_QUANTITY = 1_000_000_000_000
 
+# Max line items in one appraisal (structured + parsed paste, combined). An EVE
+# contract holds at most 1000 distinct item stacks, so a larger appraisal can't be
+# fulfilled as a single contract anyway. Enforced in the appraisal use case.
+MAX_APPRAISAL_ITEMS = 1000
+
+# Hard cap on the raw paste length, to bound parsing work regardless of item count.
+# Generous: ~256 chars per line over the 1000-item limit comfortably fits a full
+# in-game inventory copy (name + tab-separated columns) for the largest appraisal.
+MAX_PASTE_CHARS = 256_000
+
 # A trailing quantity: whitespace, an optional `x`, then a run of digits that may
 # carry thousands separators (`,` `.` space / non-breaking space — EVE's number
 # format is locale-dependent). Item names ending in letters (e.g. "Warp Disruptor

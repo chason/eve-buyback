@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application import market
 from app.application.auth import AuthenticatedUser
 from app.application.corporations import get_registered_corporation
-from app.application.errors import AppraisalNotFound, EmptyAppraisal
+from app.application.errors import (
+    AppraisalNotFound,
+    AppraisalTooLarge,
+    EmptyAppraisal,
+)
 from app.application.pricing import get_config
 from app.data.records import (
     AppraisalRecord,
@@ -27,7 +31,7 @@ from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
-from app.domain.paste import parse_paste
+from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
 from app.plugins.fuzzwork import FuzzworkClient
 
@@ -65,6 +69,8 @@ async def create_appraisal(
     work = await _gather_items(session, items, paste)
     if not work:
         raise EmptyAppraisal()
+    if len(work) > MAX_APPRAISAL_ITEMS:
+        raise AppraisalTooLarge()
 
     # Reference data + rules + prices, fetched once for the whole appraisal.
     type_ids = list({w.type_id for w in work if w.type_id is not None})
