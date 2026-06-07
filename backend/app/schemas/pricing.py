@@ -25,7 +25,7 @@ class ConfigUpdateRequest(BaseModel):
 class RuleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    public_id: str
     target_kind: TargetKind
     target_id: int
     basis: Basis | None

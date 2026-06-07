@@ -38,6 +38,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 19 | **Progressive docs** via layer-local `CLAUDE.md` | [0019](adr/0019-progressive-layer-documentation.md) |
 | 20 | **`Decimal` not `float`** for money + quantity values | [0020](adr/0020-decimal-money-values.md) |
 | 21 | **Appraisal computation/storage**: hybrid lines, half-even rounding, `Literal`+CHECK enums | [0021](adr/0021-appraisal-computation-and-storage.md) |
+| 22 | **No sequential surrogate PKs in the API** (random `public_id` handles) | [0022](adr/0022-no-sequential-pks-in-api.md) |
 
 ## 3. System context
 
@@ -184,7 +185,7 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | GET | `/corporations/me/config` | member | Buyback config (read); a default "90% Jita Buy" is created at registration |
 | PUT | `/corporations/me/config` | manager | Edit global defaults (data-quality thresholds: M7) |
 | GET | `/corporations/me/rules` | member | List pricing rules |
-| POST/PATCH/DELETE | `/corporations/me/rules[/{id}]` | manager | CRUD pricing rules |
+| POST/PATCH/DELETE | `/corporations/me/rules[/{public_id}]` | manager | CRUD pricing rules (random `public_id`, ADR-0022) |
 | GET | `/corporations/me/managers` | CEO | List managers |
 | POST/DELETE | `/corporations/me/managers[/{character_id}]` | CEO | Grant/revoke manager |
 | POST | `/appraisals` | member | Price a list of items → persist + return appraisal (the core endpoint) |

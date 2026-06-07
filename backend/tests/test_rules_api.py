@@ -53,14 +53,16 @@ async def test_rule_crud_lifecycle():
             json={"target_kind": "type", "target_id": 34, "percentage": "95"},
         )
         assert created.status_code == 201
-        rule_id = created.json()["id"]
+        public_id = created.json()["public_id"]
+        assert len(public_id) == 12  # opaque, non-sequential handle (ADR-0022)
+        assert "id" not in created.json()  # the integer PK is never exposed
         assert created.json()["basis"] is None  # inherits config default
 
         listed = await http.get("/api/v1/corporations/me/rules")
-        assert [r["id"] for r in listed.json()] == [rule_id]
+        assert [r["public_id"] for r in listed.json()] == [public_id]
 
         patched = await http.patch(
-            f"/api/v1/corporations/me/rules/{rule_id}",
+            f"/api/v1/corporations/me/rules/{public_id}",
             json={"basis": "sell", "enabled": False},
         )
         assert patched.status_code == 200
@@ -68,7 +70,7 @@ async def test_rule_crud_lifecycle():
         assert patched.json()["enabled"] is False
         assert Decimal(patched.json()["percentage"]) == 95  # unchanged
 
-        removed = await http.delete(f"/api/v1/corporations/me/rules/{rule_id}")
+        removed = await http.delete(f"/api/v1/corporations/me/rules/{public_id}")
         assert removed.status_code == 204
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
 

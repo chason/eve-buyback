@@ -21,6 +21,9 @@ class PricingRule(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Random, non-enumerable handle used by the API (ADR-0022); the integer PK is
+    # never exposed.
+    public_id: Mapped[str] = mapped_column(unique=True, index=True)
     corporation_id: Mapped[int] = mapped_column(
         ForeignKey("corporations.corporation_id", ondelete="CASCADE")
     )

@@ -23,9 +23,9 @@ async def list_rules(
 
 
 async def get_rule(
-    session: AsyncSession, rule_id: int
+    session: AsyncSession, public_id: str
 ) -> PricingRuleRecord | None:
-    row = await session.get(PricingRule, rule_id)
+    row = await _get_by_public_id(session, public_id)
     return PricingRuleRecord.model_validate(row) if row is not None else None
 
 
@@ -48,6 +48,7 @@ async def get_rule_for_target(
 async def create_rule(
     session: AsyncSession,
     *,
+    public_id: str,
     corporation_id: int,
     target_kind: TargetKind,
     target_id: int,
@@ -56,6 +57,7 @@ async def create_rule(
     enabled: bool,
 ) -> PricingRuleRecord:
     rule = PricingRule(
+        public_id=public_id,
         corporation_id=corporation_id,
         target_kind=target_kind,
         target_id=target_id,
@@ -70,10 +72,10 @@ async def create_rule(
 
 
 async def update_rule(
-    session: AsyncSession, rule_id: int, **fields
+    session: AsyncSession, public_id: str, **fields
 ) -> PricingRuleRecord | None:
     """Patch the given fields on a rule. Returns None if it doesn't exist."""
-    row = await session.get(PricingRule, rule_id)
+    row = await _get_by_public_id(session, public_id)
     if row is None:
         return None
     for key, value in fields.items():
@@ -83,10 +85,17 @@ async def update_rule(
     return PricingRuleRecord.model_validate(row)
 
 
-async def delete_rule(session: AsyncSession, rule_id: int) -> bool:
+async def delete_rule(session: AsyncSession, public_id: str) -> bool:
     """Delete a rule; return False if it didn't exist."""
-    row = await session.get(PricingRule, rule_id)
+    row = await _get_by_public_id(session, public_id)
     if row is None:
         return False
     await session.delete(row)
     return True
+
+
+async def _get_by_public_id(
+    session: AsyncSession, public_id: str
+) -> PricingRule | None:
+    stmt = select(PricingRule).where(PricingRule.public_id == public_id)
+    return (await session.execute(stmt)).scalar_one_or_none()

@@ -51,9 +51,9 @@ async def create_rule(
     return RuleOut(**rule.model_dump())
 
 
-@router.patch("/rules/{rule_id}", response_model=RuleOut)
+@router.patch("/rules/{public_id}", response_model=RuleOut)
 async def update_rule(
-    rule_id: int,
+    public_id: str,
     payload: RuleUpdateRequest,
     user: ManagerUser,
     session: SessionDep,
@@ -61,16 +61,16 @@ async def update_rule(
     rule = await pricing_app.update_rule(
         session,
         corporation_id=user.corporation_id,
-        rule_id=rule_id,
+        public_id=public_id,
         fields=payload.model_dump(exclude_unset=True),
     )
     return RuleOut(**rule.model_dump())
 
 
-@router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/rules/{public_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_rule(
-    rule_id: int, user: ManagerUser, session: SessionDep
+    public_id: str, user: ManagerUser, session: SessionDep
 ) -> None:
     await pricing_app.delete_rule(
-        session, corporation_id=user.corporation_id, rule_id=rule_id
+        session, corporation_id=user.corporation_id, public_id=public_id
     )
