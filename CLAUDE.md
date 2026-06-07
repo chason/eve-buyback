@@ -108,6 +108,7 @@ directory. Read them before changing files there.
 uv sync --extra dev                      # create venv + install deps
 uv run uvicorn app.main:app --reload     # dev server :8000
 uv run pytest                            # tests
+uv run pytest --cov                      # tests + coverage (greenlet-aware, see pyproject)
 uv run ruff check .                      # lint
 uv run alembic upgrade head              # apply migrations (once models exist)
 uv run python -m app.sde.seed            # seed SDE reference data from Fuzzwork (ADR-0009)

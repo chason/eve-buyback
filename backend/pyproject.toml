@@ -19,6 +19,7 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=5",
     "ruff>=0.7",
 ]
 
@@ -37,3 +38,13 @@ select = ["E", "F", "I", "UP", "B"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+# SQLAlchemy runs async DB work in greenlets; without this, coverage can't trace
+# the application-layer use cases that await the repositories and badly under-counts
+# them. Required for an accurate number — measure with `uv run pytest --cov`.
+concurrency = ["greenlet"]
+
+[tool.coverage.report]
+show_missing = true
