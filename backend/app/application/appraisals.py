@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import market
 from app.application.auth import AuthenticatedUser
+from app.application.corporations import get_registered_corporation
 from app.application.errors import AppraisalNotFound, EmptyAppraisal
 from app.application.pricing import get_config
 from app.data.records import (
@@ -21,6 +22,7 @@ from app.data.records import (
     SdeTypeRecord,
 )
 from app.data.repositories import appraisals as appraisals_repo
+from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
@@ -55,7 +57,8 @@ async def create_appraisal(
     paste: str | None,
     now: datetime,
 ) -> AppraisalRecord:
-    config = await get_config(session, user.corporation_id)  # 404 if unregistered
+    corp = await get_registered_corporation(session, user.corporation_id)  # 404 if not
+    config = await get_config(session, user.corporation_id)
     hub_id = config.market_hub_id
 
     work = await _gather_items(session, items, paste)
@@ -69,7 +72,7 @@ async def create_appraisal(
         g.market_group_id: g.parent_id
         for g in await sde_repo.list_market_groups(session)
     }
-    rules = await rules_repo.list_rules(session, user.corporation_id)
+    rules = await rules_repo.list_rules(session, corp.id)
     type_rules = {
         r.target_id: pricing_domain.RuleSpec(r.basis, r.percentage)
         for r in rules
@@ -101,7 +104,7 @@ async def create_appraisal(
     record = await appraisals_repo.create_appraisal(
         session,
         public_id=generate_appraisal_id(),
-        corporation_id=user.corporation_id,
+        corporation_id=corp.id,
         created_by_character_id=user.character_id,
         market_hub_id=hub_id,
         accepted_total=accepted_total,
@@ -146,9 +149,10 @@ async def _gather_items(
 async def get_appraisal(
     session: AsyncSession, *, corporation_id: int, public_id: str
 ) -> AppraisalRecord:
+    corp = await corporations_repo.get_by_eve_id(session, corporation_id)
     record = await appraisals_repo.get_by_public_id(session, public_id)
     # 404 for missing OR cross-corp — don't leak existence (ADR-0014).
-    if record is None or record.corporation_id != corporation_id:
+    if record is None or corp is None or record.corporation_id != corp.id:
         raise AppraisalNotFound()
     return record
 
@@ -156,10 +160,13 @@ async def get_appraisal(
 async def list_appraisals(
     session: AsyncSession, *, user: AuthenticatedUser
 ) -> list[AppraisalSummaryRecord]:
+    corp = await corporations_repo.get_by_eve_id(session, user.corporation_id)
+    if corp is None:
+        return []
     if role_at_least(user.role, "manager"):
-        return await appraisals_repo.list_for_corp(session, user.corporation_id)
+        return await appraisals_repo.list_for_corp(session, corp.id)
     return await appraisals_repo.list_for_character(
-        session, user.corporation_id, user.character_id
+        session, corp.id, user.character_id
     )
 
 

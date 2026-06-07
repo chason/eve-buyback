@@ -34,5 +34,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0022](0022-no-sequential-pks-in-api.md) | Don't expose sequential surrogate PKs in the API | Accepted |
 | [0023](0023-frontend-styling-and-typegen.md) | Frontend styling (Pico.css) and OpenAPI type generation | Accepted |
 | [0024](0024-postgresql-database.md) | PostgreSQL as the sole database | Accepted |
+| [0025](0025-uuid-primary-keys.md) | UUID primary keys for app entities; EVE ids as unique columns | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

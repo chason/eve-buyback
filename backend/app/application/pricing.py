@@ -31,12 +31,12 @@ async def get_config(
 ) -> BuybackConfigRecord:
     """Return the corp's config (404 if the corp isn't registered). Lazily creates
     the default config if missing — registration normally creates it."""
-    await get_registered_corporation(session, corporation_id)
-    config = await config_repo.get_config(session, corporation_id)
+    corp = await get_registered_corporation(session, corporation_id)
+    config = await config_repo.get_config(session, corp.id)
     if config is None:
         config = await config_repo.upsert_config(
             session,
-            corporation_id=corporation_id,
+            corporation_id=corp.id,
             market_hub_id=get_settings().market_hub_id,
             default_basis=DEFAULT_BASIS,
             default_percentage=DEFAULT_PERCENTAGE,
@@ -55,10 +55,10 @@ async def update_config(
     default_percentage: Decimal,
     aggregate_field: AggregateField,
 ) -> BuybackConfigRecord:
-    await get_registered_corporation(session, corporation_id)
+    corp = await get_registered_corporation(session, corporation_id)
     config = await config_repo.upsert_config(
         session,
-        corporation_id=corporation_id,
+        corporation_id=corp.id,
         market_hub_id=market_hub_id,
         default_basis=default_basis,
         default_percentage=default_percentage,
@@ -71,8 +71,8 @@ async def update_config(
 async def list_rules(
     session: AsyncSession, corporation_id: int
 ) -> list[PricingRuleRecord]:
-    await get_registered_corporation(session, corporation_id)
-    return await rules_repo.list_rules(session, corporation_id)
+    corp = await get_registered_corporation(session, corporation_id)
+    return await rules_repo.list_rules(session, corp.id)
 
 
 async def set_rule(
@@ -88,11 +88,11 @@ async def set_rule(
     """Create or replace the corp's rule for a target (idempotent PUT). Returns
     `(record, created)`. The target must exist (else 400); there is no 409/404 on
     write — setting the rule for a target is the whole operation."""
-    await get_registered_corporation(session, corporation_id)
+    corp = await get_registered_corporation(session, corporation_id)
     await _validate_target(session, target_kind, target_id)
     record, created = await rules_repo.upsert_rule(
         session,
-        corporation_id=corporation_id,
+        corporation_id=corp.id,
         target_kind=target_kind,
         target_id=target_id,
         basis=basis,
@@ -110,10 +110,10 @@ async def delete_rule(
     target_kind: TargetKind,
     target_id: int,
 ) -> None:
-    await get_registered_corporation(session, corporation_id)
+    corp = await get_registered_corporation(session, corporation_id)
     removed = await rules_repo.delete_rule(
         session,
-        corporation_id=corporation_id,
+        corporation_id=corp.id,
         target_kind=target_kind,
         target_id=target_id,
     )

@@ -215,14 +215,14 @@ async def test_cross_corp_appraisal_is_404():
         await http.post("/api/v1/corporations")
         # An appraisal owned by a different corp.
         async with SessionLocal() as session:
-            await corporations_repo.create_corporation(
-                session, corporation_id=99999999, name="Other Corp",
+            other_corp = await corporations_repo.create_corporation(
+                session, eve_corporation_id=99999999, name="Other Corp",
                 ceo_character_id=1, registered_by_character_id=1,
             )
             other = await appraisals_repo.create_appraisal(
                 session,
                 public_id="otherCorpXyz",
-                corporation_id=99999999,
+                corporation_id=other_corp.id,
                 created_by_character_id=1,
                 market_hub_id=60003760,
                 accepted_total=Decimal("0"),
@@ -253,17 +253,17 @@ async def test_list_scope_member_sees_own_manager_sees_all():
     """A member lists only their own appraisals; a manager/CEO sees the corp's."""
     await _seed_sde()
     async with SessionLocal() as session:
-        await corporations_repo.create_corporation(
-            session, corporation_id=CORP_ID, name="Test Corp",
+        corp = await corporations_repo.create_corporation(
+            session, eve_corporation_id=CORP_ID, name="Test Corp",
             ceo_character_id=99999, registered_by_character_id=99999,
         )
         await config_repo.upsert_config(
-            session, corporation_id=CORP_ID, market_hub_id=60003760,
+            session, corporation_id=corp.id, market_hub_id=60003760,
             default_basis="buy", default_percentage=90, aggregate_field="percentile",
         )
         # An appraisal owned by a different character in the same corp.
         await appraisals_repo.create_appraisal(
-            session, public_id="teammateAppr", corporation_id=CORP_ID,
+            session, public_id="teammateAppr", corporation_id=corp.id,
             created_by_character_id=777, market_hub_id=60003760,
             accepted_total=Decimal("0"), rejected_count=0,
             request_json={"items": []}, lines=[],

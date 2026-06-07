@@ -7,6 +7,7 @@ from sqlalchemy import delete
 
 from app.data.db import SessionLocal
 from app.data.models import ManagerAssignment
+from app.data.repositories import characters as characters_repo
 from app.main import app
 from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
 from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
@@ -65,9 +66,10 @@ async def test_manager_revocation_takes_effect_without_relogin():
 
             # Revoke the assignment directly in the DB (same cookie, no re-login).
             async with SessionLocal() as db:
+                char = await characters_repo.get_by_eve_id(db, CHAR_ID)
                 await db.execute(
                     delete(ManagerAssignment).where(
-                        ManagerAssignment.character_id == CHAR_ID
+                        ManagerAssignment.character_id == char.id
                     )
                 )
                 await db.commit()

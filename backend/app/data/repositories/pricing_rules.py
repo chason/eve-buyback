@@ -3,6 +3,7 @@
 Rules are addressed by their natural key — `(corporation_id, target_kind,
 target_id)` — which is unique; no surrogate id is exposed (ADR-0022)."""
 
+import uuid
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -14,7 +15,7 @@ from app.domain.pricing import Basis, TargetKind
 
 
 async def list_rules(
-    session: AsyncSession, corporation_id: int
+    session: AsyncSession, corporation_id: uuid.UUID
 ) -> list[PricingRuleRecord]:
     stmt = (
         select(PricingRule)
@@ -28,7 +29,7 @@ async def list_rules(
 async def upsert_rule(
     session: AsyncSession,
     *,
-    corporation_id: int,
+    corporation_id: uuid.UUID,
     target_kind: TargetKind,
     target_id: int,
     basis: Basis | None,
@@ -65,7 +66,7 @@ async def upsert_rule(
 async def delete_rule(
     session: AsyncSession,
     *,
-    corporation_id: int,
+    corporation_id: uuid.UUID,
     target_kind: TargetKind,
     target_id: int,
 ) -> bool:
@@ -85,7 +86,7 @@ async def delete_rule(
 async def _get_row(
     session: AsyncSession,
     *,
-    corporation_id: int,
+    corporation_id: uuid.UUID,
     target_kind: TargetKind,
     target_id: int,
 ) -> PricingRule | None:

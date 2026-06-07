@@ -17,16 +17,16 @@ def _clear_overrides():
 
 async def _seed_registered_corp() -> None:
     async with SessionLocal() as session:
-        await corporations_repo.create_corporation(
+        corp = await corporations_repo.create_corporation(
             session,
-            corporation_id=CORP_ID,
+            eve_corporation_id=CORP_ID,
             name="Test Corp",
             ceo_character_id=99999,
             registered_by_character_id=99999,
         )
         await config_repo.upsert_config(
             session,
-            corporation_id=CORP_ID,
+            corporation_id=corp.id,
             market_hub_id=60003760,
             default_basis="buy",
             default_percentage=90,
@@ -94,7 +94,7 @@ async def test_get_config_lazily_creates_default_when_missing():
     # A registered corp with no config row (e.g. registered before configs existed).
     async with SessionLocal() as session:
         await corporations_repo.create_corporation(
-            session, corporation_id=CORP_ID, name="Test Corp",
+            session, eve_corporation_id=CORP_ID, name="Test Corp",
             ceo_character_id=99999, registered_by_character_id=99999,
         )
         await session.commit()
@@ -107,7 +107,9 @@ async def test_get_config_lazily_creates_default_when_missing():
 
     # The lazily-created config is now persisted.
     async with SessionLocal() as session:
-        assert await config_repo.get_config(session, CORP_ID) is not None
+        corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+        assert corp is not None
+        assert await config_repo.get_config(session, corp.id) is not None
 
 
 async def test_config_rejects_bad_basis():

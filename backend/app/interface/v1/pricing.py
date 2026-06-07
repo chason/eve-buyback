@@ -22,7 +22,7 @@ ManagerUser = Annotated[AuthenticatedUser, Depends(require_role("manager"))]
 @router.get("/config", response_model=ConfigOut)
 async def get_config(user: RequireUser, session: SessionDep) -> ConfigOut:
     config = await pricing_app.get_config(session, user.corporation_id)
-    return ConfigOut(**config.model_dump())
+    return ConfigOut(corporation_id=user.corporation_id, **config.model_dump())
 
 
 @router.put("/config", response_model=ConfigOut)
@@ -32,7 +32,7 @@ async def update_config(
     config = await pricing_app.update_config(
         session, user.corporation_id, **payload.model_dump()
     )
-    return ConfigOut(**config.model_dump())
+    return ConfigOut(corporation_id=user.corporation_id, **config.model_dump())
 
 
 @router.get("/rules", response_model=list[RuleOut])

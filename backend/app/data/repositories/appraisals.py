@@ -1,6 +1,7 @@
 """Appraisal persistence (ADR-0014). Write-once snapshots; reads return records.
 The application owns commit."""
 
+import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 
@@ -19,7 +20,7 @@ async def create_appraisal(
     session: AsyncSession,
     *,
     public_id: str,
-    corporation_id: int,
+    corporation_id: uuid.UUID,
     created_by_character_id: int,
     market_hub_id: int,
     accepted_total: Decimal,
@@ -39,7 +40,10 @@ async def create_appraisal(
     session.add(appraisal)
     await session.flush()  # assign appraisal.id
 
-    line_objs = [AppraisalLine(appraisal_id=appraisal.id, **line) for line in lines]
+    line_objs = [
+        AppraisalLine(appraisal_id=appraisal.id, position=i, **line)
+        for i, line in enumerate(lines)
+    ]
     session.add_all(line_objs)
     await session.flush()
     await session.refresh(appraisal)  # load server-default created_at
@@ -61,14 +65,14 @@ async def get_by_public_id(
         await session.execute(
             select(AppraisalLine)
             .where(AppraisalLine.appraisal_id == appraisal.id)
-            .order_by(AppraisalLine.id)
+            .order_by(AppraisalLine.position)
         )
     ).scalars().all()
     return _to_record(appraisal, lines)
 
 
 async def list_for_corp(
-    session: AsyncSession, corporation_id: int
+    session: AsyncSession, corporation_id: uuid.UUID
 ) -> list[AppraisalSummaryRecord]:
     stmt = (
         select(Appraisal)
@@ -80,8 +84,9 @@ async def list_for_corp(
 
 
 async def list_for_character(
-    session: AsyncSession, corporation_id: int, character_id: int
+    session: AsyncSession, corporation_id: uuid.UUID, character_id: int
 ) -> list[AppraisalSummaryRecord]:
+    """`character_id` is the EVE id of the creator (an audit field, not a FK)."""
     stmt = (
         select(Appraisal)
         .where(

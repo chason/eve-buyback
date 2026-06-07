@@ -40,6 +40,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 21 | **Appraisal computation/storage**: hybrid lines, half-even rounding, `Literal`+CHECK enums | [0021](adr/0021-appraisal-computation-and-storage.md) |
 | 22 | **No sequential surrogate PKs in the API** (natural keys / random `public_id`) | [0022](adr/0022-no-sequential-pks-in-api.md) |
 | 23 | **Frontend: Pico.css** + OpenAPI-generated TS types | [0023](adr/0023-frontend-styling-and-typegen.md) |
+| 25 | **UUID PKs for app entities**; EVE ids demoted to unique `eve_id` columns, internal FKs via UUID | [0025](adr/0025-uuid-primary-keys.md) |
 
 ## 3. System context
 
@@ -67,16 +68,16 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 
 | Entity | Key fields | Notes |
 |--------|-----------|-------|
-| `Corporation` | `corp_id` (EVE id, PK), `name`, `ceo_character_id`, `registered_at`, `registered_by` | The tenant. One row per registered corp. |
-| `Character` | `character_id` (PK), `name`, `last_login_at` | Persisted only because managers must be referenceable. |
-| `ManagerAssignment` | `corp_id`, `character_id`, `granted_by`, `granted_at` | Grants the Buyback Manager role. CEO is implicit (not stored here). |
-| `BuybackConfig` | `corp_id` (PK), `market_hub_id`, `default_basis`, `default_percentage`, `aggregate_field`, data-quality thresholds | Per-corp defaults = the "global" rule. |
-| `PricingRule` | `id`, `corp_id`, `target_kind` (`market_group`\|`type`), `target_id`, `basis?`, `percentage`, `enabled` | Overrides for a market group or a single type. |
-| `MarketPrice` (cache) | `hub_id`, `type_id`, buy/sell aggregates, `volume`, `order_count`, `fetched_at` | Fuzzwork snapshot; TTL-expired. See [ADR-0006](adr/0006-market-data-fuzzwork.md). |
-| `SdeType` (ref) | `type_id`, `name`, `group_id`, `market_group_id`, `volume`, `published` | Seeded from SDE. |
-| `SdeMarketGroup` (ref) | `market_group_id`, `parent_id`, `name` | Hierarchy for rule resolution. |
-| `Appraisal` | `id`, **`public_id`** (random slug), `corp_id`, `created_by`, `created_at`, `market_hub_id`, `accepted_total` | Persisted, immutable snapshot ([ADR-0014](adr/0014-persisted-appraisals.md)). |
-| `AppraisalLine` | `appraisal_id`, `type_id`, `quantity`, `basis`, `percentage`, `unit_value`, `unit_price`, `line_total`, `status`, `reason?` | Per-line snapshot; write-once. May be JSON on the parent for MVP. |
+| `Corporation` | `id` (UUID, PK), `eve_id` (EVE corp id, unique), `name`, `ceo_character_id`, `registered_at`, `registered_by` | The tenant. One row per registered corp. |
+| `Character` | `id` (UUID, PK), `eve_id` (EVE char id, unique), `name`, `last_login_at` | Persisted only because managers must be referenceable. |
+| `ManagerAssignment` | `id` (UUID, PK), `corporation_id`→corp, `character_id`→char (UUID FKs), `granted_by`, `granted_at` | Grants the Buyback Manager role. CEO is implicit (not stored here). |
+| `BuybackConfig` | `id` (UUID, PK), `corporation_id`→corp (UUID FK, unique), `market_hub_id`, `default_basis`, `default_percentage`, `aggregate_field`, data-quality thresholds | Per-corp defaults = the "global" rule. |
+| `PricingRule` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `target_kind` (`market_group`\|`type`), `target_id` (EVE id), `basis?`, `percentage`, `enabled` | Overrides for a market group or a single type. |
+| `MarketPrice` (cache) | `hub_id`, `type_id`, buy/sell aggregates, `volume`, `order_count`, `fetched_at` | Fuzzwork snapshot; EVE-keyed cache, TTL-expired. See [ADR-0006](adr/0006-market-data-fuzzwork.md). |
+| `SdeType` (ref) | `type_id` (EVE id, PK), `name`, `group_id`, `market_group_id`, `volume`, `published` | Seeded from SDE; EVE-keyed reference data. |
+| `SdeMarketGroup` (ref) | `market_group_id` (EVE id, PK), `parent_id`, `name` | Hierarchy for rule resolution; EVE-keyed. |
+| `Appraisal` | `id` (UUID, PK), **`public_id`** (random slug), `corporation_id`→corp (UUID FK), `created_by`, `created_at`, `market_hub_id`, `accepted_total` | Persisted, immutable snapshot ([ADR-0014](adr/0014-persisted-appraisals.md)). |
+| `AppraisalLine` | `id` (UUID, PK), `appraisal_id`→appraisal (UUID FK), `position`, `type_id`, `quantity`, `basis`, `percentage`, `unit_value`, `unit_price`, `line_total`, `status`, `reason?` | Per-line snapshot; write-once, ordered by `position`. |
 
 `basis ∈ {buy, sell, split}`. `market_hub_id` defaults to **Jita 4-4** (station
 `60003760`); region fallback **The Forge** (`10000002`).

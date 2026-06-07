@@ -80,7 +80,7 @@ async def complete_login(
     )
 
     await characters_repo.upsert_character(
-        session, character_id=character.character_id, name=character.name
+        session, eve_character_id=character.character_id, name=character.name
     )
     await session.commit()
 
@@ -99,13 +99,17 @@ async def complete_login(
 async def resolve_authenticated_user(
     session: AsyncSession, identity: SessionIdentity
 ) -> AuthenticatedUser:
-    """Resolve role + registration freshly from the database (ADR-0016)."""
-    corp = await corporations_repo.get_corporation(session, identity.corporation_id)
+    """Resolve role + registration freshly from the database (ADR-0016). Identity is
+    in EVE ids; manager-ness is checked against the internal UUIDs (ADR-0025)."""
+    corp = await corporations_repo.get_by_eve_id(session, identity.corporation_id)
+    char = await characters_repo.get_by_eve_id(session, identity.character_id)
     registered = corp is not None
-    is_manager = registered and await managers_repo.manager_exists(
-        session,
-        corporation_id=identity.corporation_id,
-        character_id=identity.character_id,
+    is_manager = (
+        registered
+        and char is not None
+        and await managers_repo.manager_exists(
+            session, corporation_id=corp.id, character_id=char.id
+        )
     )
     role = derive_role(is_ceo=identity.is_ceo, is_manager=is_manager)
     return AuthenticatedUser(

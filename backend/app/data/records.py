@@ -5,26 +5,31 @@ these immutable records. The interface layer maps them to API DTOs (schemas/),
 so the database shape never leaks into the public API contract.
 """
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 
 
 class CharacterRecord(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # `character_id` keeps its API name but sources from the `eve_id` column (ADR-0025);
+    # `id` is the internal UUID used for FK relationships.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    character_id: int
+    id: uuid.UUID
+    character_id: int = Field(validation_alias="eve_id")
     name: str
     last_login_at: datetime
 
 
 class CorporationRecord(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    corporation_id: int
+    id: uuid.UUID
+    corporation_id: int = Field(validation_alias="eve_id")
     name: str
     ceo_character_id: int
     registered_by_character_id: int
@@ -94,9 +99,10 @@ class SdeMetadataRecord(BaseModel):
 
 
 class BuybackConfigRecord(BaseModel):
+    # No corporation_id: a config belongs to the caller's corp implicitly; the
+    # interface sets the API's EVE corp id from the session.
     model_config = ConfigDict(from_attributes=True)
 
-    corporation_id: int
     market_hub_id: int
     default_basis: Basis
     default_percentage: Decimal
@@ -104,9 +110,10 @@ class BuybackConfigRecord(BaseModel):
 
 
 class PricingRuleRecord(BaseModel):
+    # A rule is identified by its target (ADR-0022); neither the corp FK nor the UUID
+    # PK is surfaced.
     model_config = ConfigDict(from_attributes=True)
 
-    corporation_id: int
     target_kind: TargetKind
     target_id: int
     basis: Basis | None
@@ -133,7 +140,7 @@ class AppraisalRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     public_id: str
-    corporation_id: int
+    corporation_id: uuid.UUID  # internal corp UUID, for the corp-scope check only
     created_by_character_id: int
     created_at: datetime
     market_hub_id: int

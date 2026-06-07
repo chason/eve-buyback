@@ -1,6 +1,7 @@
+import uuid
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, ForeignKey, Numeric
+from sqlalchemy import BigInteger, ForeignKey, Numeric, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -16,10 +17,12 @@ class AppraisalLine(Base):
 
     __tablename__ = "appraisal_lines"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    appraisal_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    appraisal_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("appraisals.id", ondelete="CASCADE")
     )
+    # Stable display order: UUID PKs aren't sequential, so lines carry their index.
+    position: Mapped[int]
     # Nullable: a pasted item name we couldn't resolve has no type_id — it's stored
     # as a rejected line with just its `type_name` (ADR-0021).
     type_id: Mapped[int | None]

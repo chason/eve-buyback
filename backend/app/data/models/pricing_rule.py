@@ -1,6 +1,7 @@
+import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import ForeignKey, Numeric, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -10,8 +11,9 @@ from app.domain.pricing import Basis, TargetKind
 
 class PricingRule(Base):
     """A pricing override for a market group or a single type (ADR-0007). At most
-    one rule per (corp, target_kind, target_id). `basis` is nullable — null inherits
-    the corp config's default basis."""
+    one rule per (corp, target_kind, target_id) — the rule is addressed externally by
+    that natural key, never by the UUID PK (ADR-0022/0025). `basis` null inherits the
+    corp config's default basis."""
 
     __tablename__ = "pricing_rules"
     __table_args__ = (
@@ -20,11 +22,9 @@ class PricingRule(Base):
         ),
     )
 
-    # Internal surrogate PK, never exposed by the API. A rule is addressed
-    # externally by its natural key (corp + target_kind + target_id) — ADR-0022.
-    id: Mapped[int] = mapped_column(primary_key=True)
-    corporation_id: Mapped[int] = mapped_column(
-        ForeignKey("corporations.corporation_id", ondelete="CASCADE")
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    corporation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("corporations.id", ondelete="CASCADE")
     )
     target_kind: Mapped[TargetKind] = mapped_column(
         check_enum(TargetKind, name="target_kind")
