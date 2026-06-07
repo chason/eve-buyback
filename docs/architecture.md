@@ -39,6 +39,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 20 | **`Decimal` not `float`** for money + quantity values | [0020](adr/0020-decimal-money-values.md) |
 | 21 | **Appraisal computation/storage**: hybrid lines, half-even rounding, `Literal`+CHECK enums | [0021](adr/0021-appraisal-computation-and-storage.md) |
 | 22 | **No sequential surrogate PKs in the API** (natural keys / random `public_id`) | [0022](adr/0022-no-sequential-pks-in-api.md) |
+| 23 | **Frontend: Pico.css** + OpenAPI-generated TS types | [0023](adr/0023-frontend-styling-and-typegen.md) |
 
 ## 3. System context
 
@@ -193,11 +194,13 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | GET | `/appraisals` | member | List appraisals (own; managers/CEO see the corp's) |
 | GET | `/market-groups` / `/types/search` | member | Pickers for the rule editor |
 
-`POST /appraisals` accepts `{ items: [{type_id, quantity}] }` (structured input; raw
-EVE inventory-paste parsing lands with the M6 UI — [ADR-0021](adr/0021-appraisal-computation-and-storage.md)).
-It stores an immutable snapshot and returns a `public_id` for later reference
-([ADR-0014](adr/0014-persisted-appraisals.md)). Lines with no usable market price are
-rejected with a reason; configurable data-quality thresholds are M7.
+`POST /appraisals` accepts `{ items: [{type_id, quantity}], paste? }` — structured
+items and/or a raw EVE inventory paste that the backend parses and name-resolves via
+the SDE ([ADR-0021](adr/0021-appraisal-computation-and-storage.md)). It stores an
+immutable snapshot and returns a `public_id` for later reference
+([ADR-0014](adr/0014-persisted-appraisals.md)). Lines with no usable market price (or
+an unresolved pasted name) are rejected with a reason; configurable data-quality
+thresholds are M7.
 
 ## 11. Repository layout
 
@@ -222,8 +225,10 @@ buyback/
 │   └── tests/
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.ts      # dev proxy → backend
-│   └── src/{api,pages}/     # (auth/, components/ as they land)
+│   ├── vite.config.ts      # dev proxy → backend; Vitest config
+│   ├── eslint.config.js
+│   ├── openapi.json        # exported backend schema → src/api/schema.d.ts (gen:api)
+│   └── src/                # api/ (incl. generated schema.d.ts), components/, pages/, lib/, test/
 └── docs/{architecture.md, adr/}
 ```
 
@@ -246,8 +251,9 @@ Fuzzwork usage, image/link helpers, and caching.
 4. **SDE seed + market client** — seed types/market groups; Fuzzwork client + cache.
 5. **Pricing & appraisals** — config + rule CRUD + resolution engine; persist
    appraisals (`POST /appraisals`, `GET /appraisals/{public_id}`, list).
-6. **Frontend** — login, corp buyback view, appraisal tool (with shareable result
-   links), appraisal history, manager rule editor (generated API types).
+6. **Frontend** (shipped core-first) — **6a**: OpenAPI type-gen, app shell, the
+   appraisal tool + shareable result view (generated API types, Pico.css). **6b**:
+   manager rule editor, corp config view, appraisal history.
 7. **Data quality + polish** — rejection thresholds, packaging/Docker.
 
 ## 13. Out of scope (MVP) / future

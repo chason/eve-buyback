@@ -1,29 +1,8 @@
 import { apiSend } from "./client"
+import type { CorporationOut, LoginUrlResponse, SessionUser } from "./types"
 
-export type Role = "member" | "manager" | "ceo"
-
-export interface SessionUser {
-  character_id: number
-  character_name: string
-  corporation_id: number
-  corporation_name: string
-  role: Role
-  is_director: boolean
-  corporation_registered: boolean
-}
-
-export interface Corporation {
-  corporation_id: number
-  name: string
-  ceo_character_id: number
-  registered_by_character_id: number
-  registered_at: string
-}
-
-export interface LoginUrlResponse {
-  authorization_url: string
-  state: string
-}
+// Re-export the generated types so call sites can import them from here.
+export type { CorporationOut, LoginUrlResponse, Role, SessionUser } from "./types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1"
 
@@ -52,8 +31,8 @@ export async function logout(): Promise<void> {
   await apiSend("DELETE", "/auth/session")
 }
 
-export async function registerCorporation(): Promise<Corporation> {
+export async function registerCorporation(): Promise<CorporationOut> {
   const res = await apiSend("POST", "/corporations")
   if (!res.ok) throw new Error(`Register failed: ${res.status}`)
-  return (await res.json()) as Corporation
+  return (await res.json()) as CorporationOut
 }

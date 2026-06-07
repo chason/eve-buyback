@@ -1,0 +1,50 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link, Outlet } from "react-router-dom"
+
+import { getMe, logout } from "../api/auth"
+
+export default function Layout() {
+  const queryClient = useQueryClient()
+  const me = useQuery({ queryKey: ["me"], queryFn: getMe })
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  })
+  const user = me.data
+
+  return (
+    <>
+      <nav className="container">
+        <ul>
+          <li>
+            <Link to="/" className="contrast">
+              <strong>Buyback</strong>
+            </Link>
+          </li>
+        </ul>
+        {user && (
+          <ul>
+            <li>
+              <Link to="/appraise">Appraise</Link>
+            </li>
+            <li>{user.character_name}</li>
+            <li>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  logoutMutation.mutate()
+                }}
+              >
+                Log out
+              </a>
+            </li>
+          </ul>
+        )}
+      </nav>
+      <main className="container">
+        <Outlet />
+      </main>
+    </>
+  )
+}

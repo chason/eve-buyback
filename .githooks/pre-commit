@@ -2,7 +2,7 @@
 #
 # Pre-commit hook: run checks only for the parts of the tree being committed.
 #   - staged backend/  changes -> ruff check + pytest
-#   - staged frontend/ changes -> typecheck (tsc)
+#   - staged frontend/ changes -> typecheck (tsc) + lint (eslint) + test (vitest)
 #
 # Enable once per clone:
 #   git config core.hooksPath .githooks
@@ -55,6 +55,10 @@ if [ "$run_frontend" = 1 ]; then
   fi
   echo "pre-commit: frontend typecheck ..."
   npm run --silent typecheck
+  echo "pre-commit: frontend lint ..."
+  npm run --silent lint
+  echo "pre-commit: frontend test ..."
+  npm run --silent test
 else
   echo "pre-commit: no frontend/ changes staged; skipping frontend checks."
 fi

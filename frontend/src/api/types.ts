@@ -1,0 +1,23 @@
+// Friendly aliases over the generated OpenAPI schema (ADR-0011). Types are derived
+// from the backend contract, never hand-authored. Regenerate with `npm run gen:api`.
+import type { components } from "./schema"
+
+type Schemas = components["schemas"]
+
+export type SessionUser = Schemas["SessionUser"]
+export type Role = SessionUser["role"]
+export type CorporationOut = Schemas["CorporationOut"]
+export type LoginUrlResponse = Schemas["LoginUrlResponse"]
+
+export type AppraisalOut = Schemas["AppraisalOut"]
+export type AppraisalLineOut = Schemas["AppraisalLineOut"]
+export type AppraisalSummaryOut = Schemas["AppraisalSummaryOut"]
+export type AppraisalCreateRequest = Schemas["AppraisalCreateRequest"]
+export type AppraisalItemIn = Schemas["AppraisalItemIn"]
+
+export type TypeSearchResult = Schemas["TypeSearchResult"]
+export type MarketGroupOut = Schemas["MarketGroupOut"]
+
+// Used by the M6b rule editor / config view.
+export type ConfigOut = Schemas["ConfigOut"]
+export type RuleOut = Schemas["RuleOut"]

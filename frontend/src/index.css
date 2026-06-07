@@ -1,0 +1,29 @@
+/* App-specific tweaks on top of Pico (ADR-0023). */
+
+.isk {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tr.rejected {
+  color: var(--pico-del-color, crimson);
+}
+
+.error {
+  color: var(--pico-del-color, crimson);
+}
+
+.search-results {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.search-results li {
+  padding: 0.25rem 0;
+}

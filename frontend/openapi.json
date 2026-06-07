@@ -1,0 +1,1373 @@
+{
+  "components": {
+    "schemas": {
+      "AppraisalCreateRequest": {
+        "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppraisalItemIn"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "paste": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paste"
+          }
+        },
+        "title": "AppraisalCreateRequest",
+        "type": "object"
+      },
+      "AppraisalItemIn": {
+        "properties": {
+          "quantity": {
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type_id",
+          "quantity"
+        ],
+        "title": "AppraisalItemIn",
+        "type": "object"
+      },
+      "AppraisalLineOut": {
+        "properties": {
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "buy",
+                  "sell",
+                  "split"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "line_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Line Total",
+            "type": "string"
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Id"
+          },
+          "type_name": {
+            "title": "Type Name",
+            "type": "string"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          },
+          "unit_value": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Value"
+          }
+        },
+        "required": [
+          "type_id",
+          "type_name",
+          "quantity",
+          "status",
+          "basis",
+          "percentage",
+          "unit_value",
+          "unit_price",
+          "line_total",
+          "reason"
+        ],
+        "title": "AppraisalLineOut",
+        "type": "object"
+      },
+      "AppraisalOut": {
+        "properties": {
+          "accepted_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Accepted Total",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_character_id": {
+            "title": "Created By Character Id",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AppraisalLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "market_hub_id": {
+            "title": "Market Hub Id",
+            "type": "integer"
+          },
+          "public_id": {
+            "title": "Public Id",
+            "type": "string"
+          },
+          "rejected_count": {
+            "title": "Rejected Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "public_id",
+          "created_by_character_id",
+          "created_at",
+          "market_hub_id",
+          "accepted_total",
+          "rejected_count",
+          "lines"
+        ],
+        "title": "AppraisalOut",
+        "type": "object"
+      },
+      "AppraisalSummaryOut": {
+        "properties": {
+          "accepted_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Accepted Total",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_character_id": {
+            "title": "Created By Character Id",
+            "type": "integer"
+          },
+          "market_hub_id": {
+            "title": "Market Hub Id",
+            "type": "integer"
+          },
+          "public_id": {
+            "title": "Public Id",
+            "type": "string"
+          },
+          "rejected_count": {
+            "title": "Rejected Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "public_id",
+          "created_by_character_id",
+          "created_at",
+          "market_hub_id",
+          "accepted_total",
+          "rejected_count"
+        ],
+        "title": "AppraisalSummaryOut",
+        "type": "object"
+      },
+      "ConfigOut": {
+        "properties": {
+          "aggregate_field": {
+            "enum": [
+              "weighted_average",
+              "max",
+              "min",
+              "median",
+              "percentile"
+            ],
+            "title": "Aggregate Field",
+            "type": "string"
+          },
+          "corporation_id": {
+            "title": "Corporation Id",
+            "type": "integer"
+          },
+          "default_basis": {
+            "enum": [
+              "buy",
+              "sell",
+              "split"
+            ],
+            "title": "Default Basis",
+            "type": "string"
+          },
+          "default_percentage": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Default Percentage",
+            "type": "string"
+          },
+          "market_hub_id": {
+            "title": "Market Hub Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "corporation_id",
+          "market_hub_id",
+          "default_basis",
+          "default_percentage",
+          "aggregate_field"
+        ],
+        "title": "ConfigOut",
+        "type": "object"
+      },
+      "ConfigUpdateRequest": {
+        "properties": {
+          "aggregate_field": {
+            "enum": [
+              "weighted_average",
+              "max",
+              "min",
+              "median",
+              "percentile"
+            ],
+            "title": "Aggregate Field",
+            "type": "string"
+          },
+          "default_basis": {
+            "enum": [
+              "buy",
+              "sell",
+              "split"
+            ],
+            "title": "Default Basis",
+            "type": "string"
+          },
+          "default_percentage": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Default Percentage"
+          },
+          "market_hub_id": {
+            "title": "Market Hub Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "market_hub_id",
+          "default_basis",
+          "default_percentage",
+          "aggregate_field"
+        ],
+        "title": "ConfigUpdateRequest",
+        "type": "object"
+      },
+      "CorporationOut": {
+        "properties": {
+          "ceo_character_id": {
+            "title": "Ceo Character Id",
+            "type": "integer"
+          },
+          "corporation_id": {
+            "title": "Corporation Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "registered_at": {
+            "format": "date-time",
+            "title": "Registered At",
+            "type": "string"
+          },
+          "registered_by_character_id": {
+            "title": "Registered By Character Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "corporation_id",
+          "name",
+          "ceo_character_id",
+          "registered_by_character_id",
+          "registered_at"
+        ],
+        "title": "CorporationOut",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginUrlResponse": {
+        "properties": {
+          "authorization_url": {
+            "title": "Authorization Url",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_url",
+          "state"
+        ],
+        "title": "LoginUrlResponse",
+        "type": "object"
+      },
+      "ManagerCreateRequest": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "character_id"
+        ],
+        "title": "ManagerCreateRequest",
+        "type": "object"
+      },
+      "ManagerOut": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "character_name": {
+            "title": "Character Name",
+            "type": "string"
+          },
+          "granted_at": {
+            "format": "date-time",
+            "title": "Granted At",
+            "type": "string"
+          },
+          "granted_by_character_id": {
+            "title": "Granted By Character Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "character_id",
+          "character_name",
+          "granted_by_character_id",
+          "granted_at"
+        ],
+        "title": "ManagerOut",
+        "type": "object"
+      },
+      "MarketGroupOut": {
+        "properties": {
+          "market_group_id": {
+            "title": "Market Group Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "required": [
+          "market_group_id",
+          "parent_id",
+          "name"
+        ],
+        "title": "MarketGroupOut",
+        "type": "object"
+      },
+      "RuleOut": {
+        "properties": {
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "buy",
+                  "sell",
+                  "split"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "percentage": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Percentage",
+            "type": "string"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "integer"
+          },
+          "target_kind": {
+            "enum": [
+              "market_group",
+              "type"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_kind",
+          "target_id",
+          "basis",
+          "percentage",
+          "enabled"
+        ],
+        "title": "RuleOut",
+        "type": "object"
+      },
+      "RulePutRequest": {
+        "description": "The full rule state for a target (the target comes from the URL). `PUT` is an\nidempotent create-or-replace, so this is the complete representation.",
+        "properties": {
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "buy",
+                  "sell",
+                  "split"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Percentage"
+          }
+        },
+        "required": [
+          "percentage"
+        ],
+        "title": "RulePutRequest",
+        "type": "object"
+      },
+      "SessionUser": {
+        "description": "The authenticated user returned by /me and /login (API DTO).",
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "character_name": {
+            "title": "Character Name",
+            "type": "string"
+          },
+          "corporation_id": {
+            "title": "Corporation Id",
+            "type": "integer"
+          },
+          "corporation_name": {
+            "title": "Corporation Name",
+            "type": "string"
+          },
+          "corporation_registered": {
+            "default": false,
+            "title": "Corporation Registered",
+            "type": "boolean"
+          },
+          "is_director": {
+            "default": false,
+            "title": "Is Director",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "member",
+              "manager",
+              "ceo"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character_id",
+          "character_name",
+          "corporation_id",
+          "corporation_name",
+          "role"
+        ],
+        "title": "SessionUser",
+        "type": "object"
+      },
+      "TypeSearchResult": {
+        "properties": {
+          "market_group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Group Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type_id",
+          "name",
+          "market_group_id"
+        ],
+        "title": "TypeSearchResult",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Buyback API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/appraisals": {
+      "get": {
+        "operationId": "list_appraisals_api_v1_appraisals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AppraisalSummaryOut"
+                  },
+                  "title": "Response List Appraisals Api V1 Appraisals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Appraisals",
+        "tags": [
+          "appraisals"
+        ]
+      },
+      "post": {
+        "operationId": "create_appraisal_api_v1_appraisals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppraisalCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppraisalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Appraisal",
+        "tags": [
+          "appraisals"
+        ]
+      }
+    },
+    "/api/v1/appraisals/{public_id}": {
+      "get": {
+        "operationId": "get_appraisal_api_v1_appraisals__public_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_id",
+            "required": true,
+            "schema": {
+              "title": "Public Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppraisalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Appraisal",
+        "tags": [
+          "appraisals"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Begin login: mint state + PKCE (stashed in the session) and return the EVE\nauthorization URL for the SPA to redirect to.",
+        "operationId": "begin_login_api_v1_auth_login_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginUrlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Begin Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "delete": {
+        "description": "Log out: clear the session cookie.",
+        "operationId": "delete_session_api_v1_auth_session_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete Session",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "description": "Complete login: validate the OAuth state, exchange the code, open a session.",
+        "operationId": "create_session_api_v1_auth_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/corporations": {
+      "post": {
+        "operationId": "register_corporation_api_v1_corporations_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Register Corporation",
+        "tags": [
+          "corporations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me": {
+      "get": {
+        "operationId": "get_my_corporation_api_v1_corporations_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get My Corporation",
+        "tags": [
+          "corporations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/config": {
+      "get": {
+        "operationId": "get_config_api_v1_corporations_me_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Config",
+        "tags": [
+          "pricing"
+        ]
+      },
+      "put": {
+        "operationId": "update_config_api_v1_corporations_me_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Config",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/managers": {
+      "get": {
+        "operationId": "list_managers_api_v1_corporations_me_managers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagerOut"
+                  },
+                  "title": "Response List Managers Api V1 Corporations Me Managers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Managers",
+        "tags": [
+          "corporations"
+        ]
+      },
+      "post": {
+        "operationId": "add_manager_api_v1_corporations_me_managers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagerCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Manager",
+        "tags": [
+          "corporations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/managers/{character_id}": {
+      "delete": {
+        "operationId": "remove_manager_api_v1_corporations_me_managers__character_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+              "title": "Character Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Manager",
+        "tags": [
+          "corporations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/rules": {
+      "get": {
+        "operationId": "list_rules_api_v1_corporations_me_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleOut"
+                  },
+                  "title": "Response List Rules Api V1 Corporations Me Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Rules",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/rules/{target_kind}/{target_id}": {
+      "delete": {
+        "operationId": "delete_rule_api_v1_corporations_me_rules__target_kind___target_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "market_group",
+                "type"
+              ],
+              "title": "Target Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "title": "Target Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Rule",
+        "tags": [
+          "pricing"
+        ]
+      },
+      "put": {
+        "description": "Create or replace the rule for a target (idempotent). 201 on create, 200 on\nreplace.",
+        "operationId": "set_rule_api_v1_corporations_me_rules__target_kind___target_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "market_group",
+                "type"
+              ],
+              "title": "Target Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "title": "Target Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Rule",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Liveness + DB connectivity check (proves the two halves talk).",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/market-groups": {
+      "get": {
+        "operationId": "list_market_groups_api_v1_market_groups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarketGroupOut"
+                  },
+                  "title": "Response List Market Groups Api V1 Market Groups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Market Groups",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/types/search": {
+      "get": {
+        "operationId": "search_types_api_v1_types_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TypeSearchResult"
+                  },
+                  "title": "Response Search Types Api V1 Types Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Types",
+        "tags": [
+          "reference"
+        ]
+      }
+    }
+  }
+}

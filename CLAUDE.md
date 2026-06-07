@@ -49,11 +49,13 @@ buyback/
 │   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
 │   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO, Fuzzwork, SDE source); return pydantic
 │   │   ├── schemas/      # API request/response DTOs (interface contracts)
-│   │   └── sde/          # deploy-time SDE seed CLI (python -m app.sde.seed)
+│   │   ├── sde/          # deploy-time SDE seed CLI (python -m app.sde.seed)
+│   │   └── openapi_export.py  # writes frontend/openapi.json for TS type-gen (ADR-0011)
 │   ├── alembic/          # migrations (async env.py)
 │   └── tests/            # pytest
-├── frontend/             # TypeScript SPA (Vite + React + TanStack Query)
-│   └── src/{api,}        # fetch wrapper + health view; App.tsx
+├── frontend/             # TypeScript SPA (Vite + React + TanStack Query); Pico.css (ADR-0023)
+│   ├── openapi.json      # exported backend schema (source for gen:api)
+│   └── src/              # api/ (+ generated schema.d.ts, types.ts), components/, pages/, lib/, test/
 ├── docs/                 # architecture.md + adr/
 └── .github/workflows/    # CI
 ```
@@ -112,12 +114,19 @@ uv run pytest --cov                      # tests + coverage (greenlet-aware, see
 uv run ruff check .                      # lint
 uv run alembic upgrade head              # apply migrations (once models exist)
 uv run python -m app.sde.seed            # seed SDE reference data from Fuzzwork (ADR-0009)
+uv run python -m app.openapi_export      # write frontend/openapi.json for TS type-gen
 
 # Frontend (from frontend/)
 npm install
 npm run dev                              # Vite dev server :5173 (proxies /api)
+npm run gen:api                          # regenerate src/api/schema.d.ts from openapi.json (ADR-0011)
+npm run lint                             # ESLint
+npm run test                             # Vitest + React Testing Library
 npm run build                            # typecheck (tsc) + production build
 ```
+
+> Regenerate API types after a backend DTO change:
+> `uv run python -m app.openapi_export` (in `backend/`) then `npm run gen:api` (in `frontend/`).
 
 ## Conventions
 
@@ -127,7 +136,7 @@ npm run build                            # typecheck (tsc) + production build
 - Don't commit secrets — use `.env` files (already gitignored).
 - A pre-commit hook (`.githooks/pre-commit`) runs checks for what you stage:
   `backend/` changes → `ruff check` + `pytest`; `frontend/` changes → typecheck
-  (`tsc`). Enable per clone: `git config core.hooksPath .githooks` (needs `uv` and
+  (`tsc`) + `eslint` + `vitest`. Enable per clone: `git config core.hooksPath .githooks` (needs `uv` and
   `npm` on PATH).
 
 ## Notes for Claude
