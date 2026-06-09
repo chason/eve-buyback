@@ -10,7 +10,6 @@ import {
   getStructureStatus,
   revokeStructure,
   searchStructures,
-  STRUCTURE_AUTH_FLAG,
 } from "../api/structures"
 import type { AggregateField, Basis } from "../api/types"
 import { FUZZWORK_HUBS, hubName, isFuzzworkHub } from "../lib/hubs"
@@ -145,7 +144,8 @@ export default function Config() {
     setAuthorizing(true)
     try {
       const { authorization_url } = await beginStructureAuthorize()
-      sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
+      // The callback routes back to the structure completion by the OAuth state
+      // prefix (set server-side), so no client-side flag is needed here.
       // Full-page redirect to EVE SSO; `authorizing` stays true until unload so
       // the button keeps spinning right up to the navigation.
       window.location.href = authorization_url

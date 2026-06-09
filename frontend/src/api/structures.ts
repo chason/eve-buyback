@@ -43,6 +43,9 @@ export async function revokeStructure(): Promise<void> {
   if (!res.ok) throw new Error(`Revoke failed: ${res.status}`)
 }
 
-// Set before redirecting to the structure SSO flow so the shared /auth/callback
-// knows to complete a structure grant rather than a login.
-export const STRUCTURE_AUTH_FLAG = "buyback_structure_authorize"
+// The login and structure flows share one /auth/callback. We route on the OAuth
+// `state` echoed back by EVE — the structure flow's state carries this prefix
+// (set server-side). This is reliable across the redirect, unlike sessionStorage,
+// which could be lost and misroute the structure round-trip to the login endpoint
+// (→ a 400 "Invalid or expired OAuth state"). Login states never contain ".".
+export const STRUCTURE_STATE_PREFIX = "structure."

@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { login } from "../api/auth"
 import {
   completeStructureAuthorize,
-  STRUCTURE_AUTH_FLAG,
+  STRUCTURE_STATE_PREFIX,
 } from "../api/structures"
 
 export default function Callback() {
@@ -15,7 +15,9 @@ export default function Callback() {
   const [error, setError] = useState<string | null>(null)
   const handled = useRef(false)
   // The same SSO callback completes either a login or a structure-access grant.
-  const isStructure = sessionStorage.getItem(STRUCTURE_AUTH_FLAG) === "1"
+  // Route on the OAuth `state` echoed back by EVE (the structure flow's state
+  // carries a prefix) — reliable across the redirect, unlike client-side storage.
+  const isStructure = (params.get("state") ?? "").startsWith(STRUCTURE_STATE_PREFIX)
 
   useEffect(() => {
     if (handled.current) return
@@ -29,7 +31,6 @@ export default function Callback() {
     }
 
     if (isStructure) {
-      sessionStorage.removeItem(STRUCTURE_AUTH_FLAG)
       completeStructureAuthorize(code, state)
         .then(() =>
           queryClient.invalidateQueries({ queryKey: ["structureStatus"] }),

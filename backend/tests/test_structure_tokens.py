@@ -78,6 +78,16 @@ class FakeSso:
         )
 
 
+# --- authorize challenge (state routing) ---
+
+
+def test_begin_authorize_state_is_prefixed():
+    # The shared /auth/callback routes on this prefix; login states never carry it,
+    # so a structure round-trip can't be misrouted to the login completion (400).
+    challenge = structures_app.begin_structure_authorize(FakeSso())
+    assert challenge.state.startswith(structures_app.STRUCTURE_STATE_PREFIX)
+
+
 # --- TokenCipher ---
 
 

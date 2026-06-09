@@ -32,12 +32,20 @@ from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
 
+# The login and structure flows share one SSO callback (EVE allows a single
+# redirect URI). The callback must route the round-trip to the right completion
+# endpoint, so the structure flow's `state` is self-identifying with this prefix —
+# the OAuth state is echoed back by EVE in the redirect, unlike fragile client-side
+# storage. Login states are base64url (`token_urlsafe`) and never contain ".", so
+# the prefix is unambiguous.
+STRUCTURE_STATE_PREFIX = "structure."
+
 
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
     """Mint the PKCE/state challenge for the structure-scope authorization."""
     if not sso.configured:
         raise SsoNotConfigured()
-    state = auth_rules.generate_state()
+    state = STRUCTURE_STATE_PREFIX + auth_rules.generate_state()
     verifier, challenge = auth_rules.generate_pkce()
     url = sso.build_authorize_url(
         state=state,
