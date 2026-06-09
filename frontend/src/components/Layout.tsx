@@ -2,11 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, Outlet } from "react-router-dom"
 
 import { getMe, logout } from "../api/auth"
+import { getVersion } from "../api/version"
 import { isManager } from "../lib/roles"
 
 export default function Layout() {
   const queryClient = useQueryClient()
   const me = useQuery({ queryKey: ["me"], queryFn: getMe })
+  const version = useQuery({
+    queryKey: ["version"],
+    queryFn: getVersion,
+    staleTime: Infinity,
+  })
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
@@ -60,6 +66,9 @@ export default function Layout() {
       <main className="container">
         <Outlet />
       </main>
+      <footer className="container">
+        <small>{version.data ? `v${version.data.version}` : " "}</small>
+      </footer>
     </>
   )
 }
