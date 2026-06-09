@@ -39,6 +39,8 @@ services:
       - BUYBACK_EVE_CLIENT_SECRET=${BUYBACK_EVE_CLIENT_SECRET}
       - BUYBACK_EVE_REDIRECT_URI=${BUYBACK_EVE_REDIRECT_URI}
       - BUYBACK_MARKET_HUB_ID=${BUYBACK_MARKET_HUB_ID:-60003760}
+      # SDE auto-seeds on first boot; set to 0 to disable and seed manually.
+      - BUYBACK_AUTO_SEED=${BUYBACK_AUTO_SEED:-1}
     healthcheck:
       test:
         - CMD
