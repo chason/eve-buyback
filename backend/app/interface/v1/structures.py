@@ -33,7 +33,11 @@ STRUCT_OAUTH_STATE_KEY = "struct_oauth_state"
 STRUCT_PKCE_VERIFIER_KEY = "struct_pkce_verifier"
 
 
-def _status(record: StructureMarketTokenRecord | None) -> StructureTokenStatus:
+def _status(
+    record: StructureMarketTokenRecord | None,
+    *,
+    replaced_character_name: str | None = None,
+) -> StructureTokenStatus:
     if record is None:
         return StructureTokenStatus(authorized=False)
     return StructureTokenStatus(
@@ -42,6 +46,7 @@ def _status(record: StructureMarketTokenRecord | None) -> StructureTokenStatus:
         scopes=record.scopes,
         expired=record.last_refresh_failed_at is not None,
         created_at=record.created_at,
+        replaced_character_name=replaced_character_name,
     )
 
 
@@ -97,14 +102,20 @@ async def complete(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state",
         )
-    record = await structures_app.complete_structure_authorize(
+    result = await structures_app.complete_structure_authorize(
         session, sso, code=payload.code, verifier=verifier, user=user, cipher=cipher
     )
     request.session.pop(STRUCT_OAUTH_STATE_KEY, None)
     request.session.pop(STRUCT_PKCE_VERIFIER_KEY, None)
-    return _status(record)
+    return _status(
+        result.token, replaced_character_name=result.replaced_character_name
+    )
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke(user: ManagerUser, session: SessionDep) -> None:
-    await structures_app.revoke(session, corporation_id=user.corporation_id)
+async def revoke(
+    user: ManagerUser, session: SessionDep, sso: SsoDep, cipher: CipherDep
+) -> None:
+    await structures_app.revoke(
+        session, sso, corporation_id=user.corporation_id, cipher=cipher
+    )

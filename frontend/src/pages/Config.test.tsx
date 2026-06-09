@@ -136,6 +136,23 @@ describe("Config", () => {
     expect(screen.getByText("Capsuleer")).toBeInTheDocument()
   })
 
+  it("warns when re-auth switched to a different character", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      authorized: true,
+      character_name: "Alt Pilot",
+      expired: false,
+    })
+
+    // Callback passes the previous character name when the picker swapped it.
+    renderConfig(["/config?authorized=structure&replaced=Old%20Pilot"])
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/switched from/i)
+    expect(alert).toHaveTextContent("Old Pilot")
+  })
+
   it("shows a member a read-only view", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("member"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)

@@ -795,6 +795,8 @@ export interface components {
              * @default false
              */
             expired: boolean;
+            /** Replaced Character Name */
+            replaced_character_name?: string | null;
             /** Scopes */
             scopes?: string | null;
         };

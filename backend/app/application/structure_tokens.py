@@ -7,10 +7,13 @@ persisted — they're refreshed server-side at point of use and held only transi
 """
 
 import asyncio
+import logging
 import uuid
 from datetime import UTC, datetime
 
 import httpx
+from cryptography.fernet import InvalidToken
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.auth import AuthenticatedUser, LoginChallenge
@@ -32,12 +35,31 @@ from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
 
+log = logging.getLogger(__name__)
+
+# The login and structure flows share one SSO callback (EVE allows a single
+# redirect URI). The callback must route the round-trip to the right completion
+# endpoint, so the structure flow's `state` is self-identifying with this prefix —
+# the OAuth state is echoed back by EVE in the redirect, unlike fragile client-side
+# storage. Login states are base64url (`token_urlsafe`) and never contain ".", so
+# the prefix is unambiguous.
+STRUCTURE_STATE_PREFIX = "structure."
+
+
+class StructureAuthorizeResult(BaseModel):
+    """Outcome of completing a structure-access grant. `replaced_character_name` is
+    set when a re-authorization switched the authorizing character (EVE can't pin the
+    SSO picker), so the interface can warn that the token now belongs to someone else."""
+
+    token: StructureMarketTokenRecord
+    replaced_character_name: str | None = None
+
 
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
     """Mint the PKCE/state challenge for the structure-scope authorization."""
     if not sso.configured:
         raise SsoNotConfigured()
-    state = auth_rules.generate_state()
+    state = STRUCTURE_STATE_PREFIX + auth_rules.generate_state()
     verifier, challenge = auth_rules.generate_pkce()
     url = sso.build_authorize_url(
         state=state,
@@ -55,9 +77,11 @@ async def complete_structure_authorize(
     verifier: str,
     user: AuthenticatedUser,
     cipher: TokenCipher,
-) -> StructureMarketTokenRecord:
+) -> StructureAuthorizeResult:
     """Exchange the code and store the (encrypted) refresh token for the caller's
-    corp. Only a Buyback Manager / CEO may authorize."""
+    corp. Only a Buyback Manager / CEO may authorize. A re-authorization replaces any
+    existing token; if it switched to a different character, the previous character's
+    name is returned so the caller can warn about the swap."""
     if not role_at_least(user.role, "manager"):
         raise NotAuthorizedToAuthorizeStructure()
     if not get_settings().structure_tokens_configured:
@@ -68,6 +92,25 @@ async def complete_structure_authorize(
     if not token.refresh_token:
         raise StructureTokenExpired("EVE did not return a refresh token")
     character = await sso.verify_token(token.access_token)
+
+    # Note the outgoing character before we overwrite it — the picker is mandatory,
+    # so a re-auth can silently land on a different character (warn, but allow).
+    existing = await tokens_repo.get_for_corp(session, corp.id)
+    replaced_character_name = (
+        existing.character_name
+        if existing is not None
+        and existing.character_eve_id != character.character_id
+        else None
+    )
+
+    # Sign the previous grant out at EVE — replacing the row only forgets the old
+    # refresh token, leaving it live on EVE's side. A fresh code exchange always
+    # mints a new refresh token, so the old one is safe to revoke.
+    if existing is not None:
+        old_refresh = _decrypt_or_none(cipher, existing.encrypted_refresh_token)
+        if old_refresh is not None and old_refresh != token.refresh_token:
+            await _revoke_at_eve(sso, old_refresh)
+
     char = await characters_repo.upsert_character(
         session, eve_character_id=character.character_id, name=character.name
     )
@@ -81,7 +124,9 @@ async def complete_structure_authorize(
         scopes=get_settings().eve_structure_scopes,
     )
     await session.commit()
-    return record
+    return StructureAuthorizeResult(
+        token=record, replaced_character_name=replaced_character_name
+    )
 
 
 async def get_status(
@@ -92,12 +137,43 @@ async def get_status(
     return await tokens_repo.get_for_corp(session, corp.id)
 
 
-async def revoke(session: AsyncSession, *, corporation_id: int) -> None:
+async def revoke(
+    session: AsyncSession,
+    sso: EveSsoClient,
+    *,
+    corporation_id: int,
+    cipher: TokenCipher,
+) -> None:
+    """Revoke the corp's structure authorization: sign the grant out at EVE (so the
+    refresh token is actually killed, not just deleted locally), then drop the row."""
     corp = await get_registered_corporation(session, corporation_id)
-    removed = await tokens_repo.delete_for_corp(session, corp.id)
-    if not removed:
+    token = await tokens_repo.get_for_corp(session, corp.id)
+    if token is None:
         raise StructureTokenMissing()
+    old_refresh = _decrypt_or_none(cipher, token.encrypted_refresh_token)
+    if old_refresh is not None:
+        await _revoke_at_eve(sso, old_refresh)
+    await tokens_repo.delete_for_corp(session, corp.id)
     await session.commit()
+
+
+def _decrypt_or_none(cipher: TokenCipher, ciphertext: bytes) -> str | None:
+    """Decrypt a stored refresh token, or None if the key can no longer read it
+    (e.g. the encryption key was rotated) — in which case we can't revoke it anyway."""
+    try:
+        return cipher.decrypt(ciphertext)
+    except InvalidToken:
+        log.warning("Could not decrypt a stored structure refresh token to revoke it")
+        return None
+
+
+async def _revoke_at_eve(sso: EveSsoClient, refresh_token: str) -> None:
+    """Best-effort revoke at EVE. A lingering grant is not worth failing the user's
+    action over, so transport/HTTP errors are logged and swallowed."""
+    try:
+        await sso.revoke_refresh_token(refresh_token)
+    except httpx.HTTPError:
+        log.warning("Revoking a structure refresh token at EVE failed", exc_info=True)
 
 
 async def search_structures(
