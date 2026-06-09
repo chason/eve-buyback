@@ -51,23 +51,30 @@ class FakeSdeSource:
     def __init__(self, types, groups):
         self._types = types
         self._groups = groups
+        self.fetches = 0  # how many times any dump was fetched (proves no re-download)
 
     async def fetch_types(self):
+        self.fetches += 1
         return self._types
 
     async def fetch_market_groups(self):
+        self.fetches += 1
         return self._groups
 
     async def fetch_group_categories(self):
+        self.fetches += 1
         return GROUP_CATEGORIES
 
     async def fetch_type_materials(self):
+        self.fetches += 1
         return MATERIALS
 
     async def fetch_stations(self):
+        self.fetches += 1
         return STATIONS
 
     async def fetch_systems(self):
+        self.fetches += 1
         return SYSTEMS
 
 
@@ -121,15 +128,20 @@ async def test_seed_stations_join_system_name():
 
 async def test_seed_if_needed_seeds_then_skips():
     source = FakeSdeSource(TYPES, GROUPS)
-    # Empty DB → seeds.
+    # Empty DB → seeds (and fetches the dumps).
     async with SessionLocal() as session:
         first = await seed_if_needed(session, source, source_label="test")
     assert first is not None
     assert first.type_count == 2
-    # Already complete → cheap no-op (returns None, no re-download).
+    assert source.fetches > 0
+
+    # Already complete → cheap no-op: returns None AND does NOT re-fetch from
+    # Fuzzwork (the whole point of --if-needed on every boot/restart).
+    fetched_before = source.fetches
     async with SessionLocal() as session:
         second = await seed_if_needed(session, source, source_label="test")
     assert second is None
+    assert source.fetches == fetched_before  # no re-download when up to date
 
 
 async def test_seed_is_idempotent():
