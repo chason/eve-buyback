@@ -5,6 +5,7 @@ import httpx
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from app._version import APP_VERSION
 from app.application.errors import ApplicationError
 from app.config import Settings, get_settings
 from app.interface.errors import application_error_handler
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Buyback API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Buyback API", version=APP_VERSION, lifespan=lifespan)
 
     # Translate application-layer errors into HTTP responses (interface concern).
     app.add_exception_handler(ApplicationError, application_error_handler)

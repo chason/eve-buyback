@@ -910,7 +910,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "0.1.0"
+    "version": "7"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1563,6 +1563,32 @@
         "summary": "Search Types",
         "tags": [
           "reference"
+        ]
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "description": "The app version (bumped per merged PR). Public \u2014 shown in the UI footer.",
+        "operationId": "version_api_v1_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Version Api V1 Version Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Version",
+        "tags": [
+          "health"
         ]
       }
     }
