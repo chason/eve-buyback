@@ -58,10 +58,28 @@ variable in the compose). Go back and set the EVE app's **Callback URL** to
 
 ## 4. Connect the app to the database
 
-The managed DB and the compose app are separate resources, so put them on a shared
-network: on the **application** settings enable **Connect to Predefined Network**
-(and/or keep both resources in the same Coolify project). Then reference the DB by
-its internal host from step 1.
+The managed DB and the compose app start on **separate Docker networks**, so the app
+can't resolve the DB's hostname until they share one. (A Docker Compose app does
+**not** show the "Connect to Predefined Network" UI toggle — networking is defined in
+the compose file instead.)
+
+`docker-compose.coolify.yml` already attaches the app to the external **`coolify`**
+network (Coolify's shared predefined network) for exactly this reason. You just need
+the managed Postgres to be on that same network. Confirm it on the server (tailnet
+SSH):
+
+```bash
+# Find the Postgres container, then list its networks — `coolify` should appear.
+docker ps --format '{{.Names}}' | grep -i postgres
+docker inspect <postgres-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
+- If `coolify` is listed → you're set; use the DB's internal host (step 1) in the URL.
+- If it's **not** listed → on the Postgres resource enable **Connect To Predefined
+  Network** (under the DB's settings) and redeploy the DB, then re-check.
+- If your predefined network has a **different name**, change `coolify` in
+  `docker-compose.coolify.yml` (the `networks:` block and the app's `networks:` list)
+  to match, and redeploy the app.
 
 ## 5. Environment variables
 
@@ -115,9 +133,15 @@ seed is **not** re-run automatically.
 
 ## Troubleshooting
 
-- **DB connection refused / name resolution:** the app isn't on the DB's network
-  (step 4), or `BUYBACK_DATABASE_URL` uses `postgres://` instead of
-  `postgresql+asyncpg://`.
+- **`socket.gaierror: Temporary failure in name resolution` (at boot, during the
+  migration step):** the app can't resolve the DB hostname — the app and DB aren't on
+  a shared network (step 4). Confirm Postgres is on the `coolify` network and the app
+  compose attaches to it. This is a *DNS* failure, distinct from `Connection refused`
+  (network OK, wrong host/port) and `password authentication failed` (network OK,
+  bad creds).
+- **Wrong driver:** `BUYBACK_DATABASE_URL` must start with `postgresql+asyncpg://`,
+  not `postgres://` — but note a wrong scheme raises a SQLAlchemy *dialect* error,
+  not a name-resolution error.
 - **Boots then exits with a session-secret error:** `BUYBACK_SESSION_SECRET` is
   empty or the dev placeholder.
 - **EVE login bounces / "invalid redirect":** `BUYBACK_EVE_REDIRECT_URI` ≠ the EVE
