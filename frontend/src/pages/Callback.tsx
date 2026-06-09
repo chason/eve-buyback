@@ -34,7 +34,11 @@ export default function Callback() {
         .then(() =>
           queryClient.invalidateQueries({ queryKey: ["structureStatus"] }),
         )
-        .then(() => navigate("/config", { replace: true }))
+        .then(() =>
+          // Carry the intent so Config re-selects the structure hub (the saved
+          // config still points at the old hub until they pick + save a structure).
+          navigate("/config?authorized=structure", { replace: true }),
+        )
         .catch((e) => setError((e as Error).message))
       return
     }

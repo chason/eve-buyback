@@ -7,12 +7,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import * as authApi from "../api/auth"
 import * as pricingApi from "../api/pricing"
 import * as sdeApi from "../api/sde"
+import * as structuresApi from "../api/structures"
 import type { SessionUser } from "../api/types"
 import Config from "./Config"
 
 vi.mock("../api/auth")
 vi.mock("../api/pricing")
 vi.mock("../api/sde")
+vi.mock("../api/structures")
 
 const CUSTOM_HUB = "custom" // the hub picker's "Other NPC station…" option value
 
@@ -40,13 +42,13 @@ const config = {
   default_accepted: true,
 }
 
-function renderConfig() {
+function renderConfig(initialEntries: string[] = ["/config"]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <Config />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -110,6 +112,27 @@ describe("Config", () => {
       market_hub_id: "60012345",
       market_hub_kind: "npc_station",
     })
+  })
+
+  it("keeps the structure hub selected after returning from authorization", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    // Saved config still points at Jita — the structure isn't picked/saved yet.
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      authorized: true,
+      character_name: "Capsuleer",
+      expired: false,
+    })
+
+    // Callback redirects here with this param after the SSO round-trip.
+    renderConfig(["/config?authorized=structure"])
+
+    const hub = (await screen.findByLabelText("Market hub")) as HTMLSelectElement
+    // Picker stays on "Player structure" instead of snapping back to Jita…
+    await waitFor(() => expect(hub.value).toBe("structure"))
+    // …and the connected status resolves (no longer the not-authorized prompt).
+    expect(await screen.findByText(/connected as/)).toBeInTheDocument()
+    expect(screen.getByText("Capsuleer")).toBeInTheDocument()
   })
 
   it("shows a member a read-only view", async () => {

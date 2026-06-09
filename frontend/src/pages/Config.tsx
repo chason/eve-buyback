@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
@@ -46,6 +47,20 @@ export default function Config() {
   const [structure, setStructure] = useState<{ id: string; label: string } | null>(
     null,
   )
+  const [authorizing, setAuthorizing] = useState(false)
+
+  // Did we just return from the structure-access SSO round-trip? (Callback
+  // navigates here with ?authorized=structure.) Captured once so a later config
+  // refetch or refresh doesn't re-force the structure hub. A manual hub change
+  // clears it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const justAuthorized = useRef(searchParams.get("authorized") === "structure")
+
+  // Strip the one-shot param from the URL after capturing it above.
+  useEffect(() => {
+    if (searchParams.get("authorized")) setSearchParams({}, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -61,6 +76,11 @@ export default function Config() {
           id: hub,
           label: config.data.market_hub_name ?? `Structure ${hub}`,
         })
+      } else if (justAuthorized.current) {
+        // Just authorized but no structure saved yet — keep the picker on
+        // "Player structure" so the search box is ready instead of snapping
+        // back to the saved (Fuzzwork) hub.
+        setHubChoice(STRUCTURE)
       } else if (isFuzzworkHub(hub)) {
         setHubChoice(hub)
       } else {
@@ -118,9 +138,16 @@ export default function Config() {
   })
 
   async function startStructureAuthorize() {
-    const { authorization_url } = await beginStructureAuthorize()
-    sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
-    window.location.href = authorization_url
+    setAuthorizing(true)
+    try {
+      const { authorization_url } = await beginStructureAuthorize()
+      sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
+      // Full-page redirect to EVE SSO; `authorizing` stays true until unload so
+      // the button keeps spinning right up to the navigation.
+      window.location.href = authorization_url
+    } catch {
+      setAuthorizing(false)
+    }
   }
 
   if (config.isLoading) return <p aria-busy="true">Loading…</p>
@@ -146,7 +173,10 @@ export default function Config() {
           <select
             value={hubChoice}
             disabled={!canEdit}
-            onChange={(e) => setHubChoice(e.target.value)}
+            onChange={(e) => {
+              justAuthorized.current = false
+              setHubChoice(e.target.value)
+            }}
             aria-label="Market hub"
           >
             {FUZZWORK_HUBS.map((h) => (
@@ -205,41 +235,57 @@ export default function Config() {
         {hubChoice === STRUCTURE && (
           <>
             <article>
-              {authorized ? (
-                <p>
-                  Structure access: connected as{" "}
-                  <strong>{structureStatus.data?.character_name}</strong>
-                  {structureStatus.data?.expired && (
-                    <span className="error"> — expired, please re-authorize</span>
-                  )}
-                  .{" "}
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (canEdit) revoke.mutate()
-                    }}
-                  >
-                    Revoke
-                  </a>
+              {structureStatus.isLoading || authorizing ? (
+                <p aria-busy="true">
+                  {authorizing
+                    ? "Redirecting to EVE for authorization…"
+                    : "Checking structure access…"}
                 </p>
               ) : (
-                <p>Authorize structure access to search and price at a structure.</p>
+                <>
+                  {authorized ? (
+                    <p>
+                      Structure access: connected as{" "}
+                      <strong>{structureStatus.data?.character_name}</strong>
+                      {structureStatus.data?.expired && (
+                        <span className="error">
+                          {" "}
+                          — expired, please re-authorize
+                        </span>
+                      )}
+                      .{" "}
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (canEdit) revoke.mutate()
+                        }}
+                      >
+                        Revoke
+                      </a>
+                    </p>
+                  ) : (
+                    <p>
+                      Authorize structure access to search and price at a
+                      structure.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={!canEdit}
+                    onClick={() => void startStructureAuthorize()}
+                  >
+                    {authorized
+                      ? "Re-authorize structure access"
+                      : "Authorize structure access"}
+                  </button>
+                  <small className="field-hint">
+                    Log in with a character that has docking + market access to
+                    the structure. The token is stored encrypted (ADR-0029).
+                  </small>
+                </>
               )}
-              <button
-                type="button"
-                className="secondary"
-                disabled={!canEdit}
-                onClick={() => void startStructureAuthorize()}
-              >
-                {authorized
-                  ? "Re-authorize structure access"
-                  : "Authorize structure access"}
-              </button>
-              <small className="field-hint">
-                Log in with a character that has docking + market access to the
-                structure. The token is stored encrypted (ADR-0029).
-              </small>
             </article>
 
             {authorized && (
