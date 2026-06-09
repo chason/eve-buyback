@@ -1,0 +1,58 @@
+# Self-host stack (ADR-0012): PostgreSQL + the single app image that serves
+# /api/v1 and the built SPA on one origin.
+#
+#   cp .env.example .env   # then fill in the secrets
+#   docker compose up --build -d
+#   # one-time, after the app is healthy, seed SDE reference data:
+#   docker compose exec app python -m app.sde.seed
+#
+# Coolify can consume this compose file directly, or build the Dockerfile alone
+# and point BUYBACK_DATABASE_URL at a managed Postgres.
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: buyback
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: buyback
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buyback -d buyback"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BUYBACK_ENVIRONMENT: production
+      BUYBACK_DATABASE_URL: postgresql+asyncpg://buyback:${POSTGRES_PASSWORD}@db:5432/buyback
+      BUYBACK_SESSION_SECRET: ${BUYBACK_SESSION_SECRET:?set BUYBACK_SESSION_SECRET in .env}
+      BUYBACK_EVE_CLIENT_ID: ${BUYBACK_EVE_CLIENT_ID:-}
+      BUYBACK_EVE_CLIENT_SECRET: ${BUYBACK_EVE_CLIENT_SECRET:-}
+      BUYBACK_EVE_REDIRECT_URI: ${BUYBACK_EVE_REDIRECT_URI:-}
+      BUYBACK_MARKET_HUB_ID: ${BUYBACK_MARKET_HUB_ID:-60003760}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request, sys;
+          sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status == 200 else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pgdata:

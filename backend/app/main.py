@@ -1,13 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.application.errors import ApplicationError
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.interface.errors import application_error_handler
 from app.interface.middleware import CsrfHeaderMiddleware
+from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
 
 
@@ -44,7 +46,22 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix="/api/v1")
+
+    # Production single-deployable: serve the built SPA under "/" (ADR-0012).
+    # Mounted last so /api/v1 keeps priority. No-op in dev (no static_dir / dist),
+    # where Vite serves the SPA and proxies /api.
+    _mount_spa(app, settings)
     return app
+
+
+def _mount_spa(app: FastAPI, settings: Settings) -> None:
+    """Mount the compiled SPA when present, with index.html history fallback."""
+    if not settings.static_dir:
+        return
+    static_dir = Path(settings.static_dir)
+    if not static_dir.is_dir():
+        return
+    app.mount("/", SpaStaticFiles(directory=static_dir, html=True), name="spa")
 
 
 app = create_app()
