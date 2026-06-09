@@ -1,0 +1,34 @@
+# Keep the build context small and never bake secrets/build junk into the image.
+
+# VCS & docs
+.git
+.github
+docs
+
+# Python
+**/__pycache__
+**/*.py[cod]
+backend/.venv
+backend/.pytest_cache
+backend/.ruff_cache
+backend/.mypy_cache
+backend/.coverage
+backend/htmlcov
+
+# Node — node_modules and dist are reproduced inside the image
+frontend/node_modules
+frontend/dist
+frontend/build
+.vite
+
+# Env / secrets — never copy these in (the image gets config at runtime)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editors / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db

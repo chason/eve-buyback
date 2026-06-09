@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     app_name: str = "buyback"
     environment: str = "development"
 
+    # Path to the built SPA (frontend/dist). When set and present, the backend
+    # serves it alongside /api/v1 as a single deployable (ADR-0012); empty in
+    # development, where the Vite dev server serves the SPA and proxies /api.
+    static_dir: str = ""
+
     # PostgreSQL via asyncpg (ADR-0024). Override per environment in .env.
     database_url: str = (
         "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback"

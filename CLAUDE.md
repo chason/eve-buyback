@@ -52,11 +52,15 @@ buyback/
 │   │   ├── sde/          # deploy-time SDE seed CLI (python -m app.sde.seed)
 │   │   └── openapi_export.py  # writes frontend/openapi.json for TS type-gen (ADR-0011)
 │   ├── alembic/          # migrations (async env.py)
+│   ├── docker-entrypoint.sh  # container start: alembic upgrade head → uvicorn
 │   └── tests/            # pytest
 ├── frontend/             # TypeScript SPA (Vite + React + TanStack Query); Pico.css (ADR-0023)
 │   ├── openapi.json      # exported backend schema (source for gen:api)
 │   └── src/              # api/ (+ generated schema.d.ts, types.ts), components/, pages/, lib/, test/
 ├── docs/                 # architecture.md + adr/
+├── Dockerfile            # single-deployable image: builds SPA, serves it + /api/v1 (ADR-0012)
+├── docker-compose.yml    # self-host stack: Postgres + app
+├── .env.example          # compose config template (copy to .env)
 └── .github/workflows/    # CI
 ```
 
@@ -127,6 +131,12 @@ npm run gen:api                          # regenerate src/api/schema.d.ts from o
 npm run lint                             # ESLint
 npm run test                             # Vitest + React Testing Library
 npm run build                            # typecheck (tsc) + production build
+
+# Deploy — single image serves the built SPA + /api/v1 (ADR-0012). From repo root:
+cp .env.example .env                     # then fill in secrets (SESSION_SECRET, EVE SSO, POSTGRES_PASSWORD)
+docker compose up --build -d             # Postgres + app; entrypoint runs alembic upgrade head on boot
+docker compose exec app python -m app.sde.seed   # one-time: seed SDE reference data
+docker build -t buyback .                # build the image alone (e.g. for Coolify + managed Postgres)
 ```
 
 > Regenerate API types after a backend DTO change:

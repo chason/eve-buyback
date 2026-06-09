@@ -272,7 +272,11 @@ Fuzzwork usage, image/link helpers, and caching.
      (an operator running fresh — or after a DB reset — hits this). Surface it: a
      readiness check (e.g. `/health` reports `sde: seeded|empty` from `sde_metadata`)
      and an empty-state banner on the appraisal page prompting `python -m app.sde.seed`.
-   - **Packaging/Docker** for self-hosting (incl. running the seed as a deploy step).
+   - **Packaging/Docker** for self-hosting — *done*: a root multi-stage `Dockerfile`
+     builds the SPA and serves it from the backend under `/` (history fallback to
+     `index.html`) alongside `/api/v1`; the entrypoint runs `alembic upgrade head`
+     on boot; `docker-compose.yml` bundles Postgres + the app. The SDE seed
+     (`python -m app.sde.seed`) is a one-time post-deploy step ([ADR-0012](adr/0012-single-deployable-packaging.md)).
 
 ## 13. Out of scope (MVP) / future
 
