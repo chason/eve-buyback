@@ -401,6 +401,68 @@ async def test_appraisal_paste_ambiguous_name_is_rejected():
         assert line["reason"] == "Ambiguous name (2 matches)"
 
 
+async def test_appraisal_defaults_drop_off_to_market_hub():
+    # No accepted locations configured → the appraisal records the market hub (ADR-0030).
+    await _seed_sde()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1}]}
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["delivery_location_id"] == "60003760"  # default Jita hub
+        assert body["delivery_location_name"]  # resolved to a friendly name
+
+
+async def _add_structure_location(http, location_id: str, name: str) -> None:
+    resp = await http.post(
+        "/api/v1/corporations/me/locations",
+        json={"location_id": location_id, "kind": "structure", "name": name},
+    )
+    assert resp.status_code == 201
+
+
+async def test_appraisal_requires_drop_off_when_locations_configured():
+    await _seed_sde()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await _add_structure_location(http, "1035000000001", "1DQ - Palace")
+
+        # Omitting the drop-off is rejected now that a location exists.
+        missing = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1}]}
+        )
+        assert missing.status_code == 422
+
+        # An id outside the accepted list is rejected.
+        bad = await http.post(
+            "/api/v1/appraisals",
+            json={
+                "items": [{"type_id": 34, "quantity": 1}],
+                "delivery_location_id": "60003760",
+            },
+        )
+        assert bad.status_code == 422
+
+        # The accepted location is snapshotted onto the appraisal.
+        ok = await http.post(
+            "/api/v1/appraisals",
+            json={
+                "items": [{"type_id": 34, "quantity": 1}],
+                "delivery_location_id": "1035000000001",
+            },
+        )
+        assert ok.status_code == 201
+        body = ok.json()
+        assert body["delivery_location_id"] == "1035000000001"
+        assert body["delivery_location_name"] == "1DQ - Palace"
+
+
 async def test_appraisal_requires_items_or_paste():
     _use_fuzzwork({})  # so the fuzzwork dependency resolves; body validation fails first
     async with make_client(CeoEsi()) as http:

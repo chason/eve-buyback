@@ -17,6 +17,8 @@ from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     AppraisalNotFound,
     AppraisalTooLarge,
+    DeliveryLocationInvalid,
+    DeliveryLocationRequired,
     EmptyAppraisal,
 )
 from app.application.pricing import get_config
@@ -24,16 +26,18 @@ from app.data.records import (
     AppraisalRecord,
     AppraisalSummaryRecord,
     BuybackConfigRecord,
+    CorporationRecord,
     MarketPriceRecord,
     SdeTypeRecord,
 )
 from app.data.repositories import appraisals as appraisals_repo
+from app.data.repositories import buyback_locations as locations_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
-from app.domain.market import HubDescriptor
+from app.domain.market import FUZZWORK_HUB_NAMES, HubDescriptor
 from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
 from app.plugins.esi_market import EsiMarketClient
@@ -69,6 +73,7 @@ async def create_appraisal(
     user: AuthenticatedUser,
     items: list[AppraisalItem],
     paste: str | None,
+    delivery_location_id: str | None = None,
     now: datetime,
 ) -> AppraisalRecord:
     corp = await get_registered_corporation(session, user.corporation_id)  # 404 if not
@@ -79,6 +84,11 @@ async def create_appraisal(
         kind=config.market_hub_kind,
         region_id=config.market_region_id,
     )
+
+    # Resolve the drop-off location up front (fail fast before pricing work): a member
+    # must pick from the corp's accepted list, or — if the corp configured none — the
+    # appraisal defaults to the market-hub station (ADR-0030).
+    delivery = await _resolve_delivery(session, corp, config, delivery_location_id)
 
     # For a structure hub, supply a fresh access token (refreshed server-side) to the
     # market layer; an unauthorized/expired token degrades to cached prices (ADR-0029).
@@ -176,6 +186,8 @@ async def create_appraisal(
         created_by_character_id=user.character_id,
         created_by_character_name=user.character_name,
         market_hub_id=hub_id,
+        delivery_location_id=delivery[0],
+        delivery_location_name=delivery[1],
         accepted_total=accepted_total,
         rejected_count=rejected_count,
         request_json={
@@ -230,6 +242,35 @@ async def _gather_items(
                     )
                 )
     return work
+
+
+async def _resolve_delivery(
+    session: AsyncSession,
+    corp: CorporationRecord,
+    config: BuybackConfigRecord,
+    delivery_location_id: str | None,
+) -> tuple[str, str]:
+    """Resolve the (id, name) drop-off snapshot for an appraisal (ADR-0030). When the
+    corp has accepted locations the member must pick one of them; otherwise the
+    appraisal falls back to the corp's market-hub station."""
+    locations = await locations_repo.list_for_corp(session, corp.id)
+    if locations:
+        if delivery_location_id is None:
+            raise DeliveryLocationRequired()
+        match = next(
+            (loc for loc in locations if loc.location_id == delivery_location_id),
+            None,
+        )
+        if match is None:
+            raise DeliveryLocationInvalid()
+        return match.location_id, match.name
+    # No accepted locations configured → default to the pricing hub's station.
+    name = (
+        config.market_hub_name
+        or FUZZWORK_HUB_NAMES.get(config.market_hub_id)
+        or f"Station {config.market_hub_id}"
+    )
+    return config.market_hub_id, name
 
 
 async def get_appraisal(

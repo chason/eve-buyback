@@ -78,3 +78,19 @@ class StructureTokenMissing(ApplicationError):
 
 class StructureTokenExpired(ApplicationError):
     default_detail = "Structure access has expired; please re-authorize"
+
+
+class LocationInvalid(ApplicationError):
+    default_detail = "Drop-off location could not be resolved"
+
+
+class LocationNotFound(ApplicationError):
+    default_detail = "Drop-off location not found"
+
+
+class DeliveryLocationRequired(ApplicationError):
+    default_detail = "Select a drop-off location for this appraisal"
+
+
+class DeliveryLocationInvalid(ApplicationError):
+    default_detail = "That drop-off location is not accepted by your corporation"

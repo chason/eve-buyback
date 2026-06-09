@@ -45,6 +45,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 27 | **Deploy on Coolify** (Docker Compose app + managed PostgreSQL, Traefik TLS) | [0027](adr/0027-deploy-coolify.md) |
 | 28 | **ESI market source** for non-Fuzzwork hubs (region orders + in-house aggregation) | [0028](adr/0028-esi-market-source-and-aggregation.md) |
 | 29 | **Encrypted refresh token** for structure-market access (amends 0004) | [0029](adr/0029-encrypted-refresh-token-structures.md) |
+| 30 | **Accepted drop-off locations** per corp; chosen at appraisal time, snapshotted | [0030](adr/0030-buyback-drop-off-locations.md) |
 
 ## 3. System context
 
@@ -81,7 +82,8 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | `SdeType` (ref) | `type_id` (EVE id, PK), `name`, `group_id`, `category_id`, `market_group_id`, `volume`, `portion_size`, `published` | Seeded from SDE; EVE-keyed. `category_id` 25 = ore; `portion_size` = refine batch ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 | `SdeTypeMaterial` (ref) | `type_id`, `material_type_id`, `quantity` (EVE-keyed) | Perfect-refine (100% base) yield per batch; seeded for ore types only ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 | `SdeMarketGroup` (ref) | `market_group_id` (EVE id, PK), `parent_id`, `name` | Hierarchy for rule resolution; EVE-keyed. |
-| `Appraisal` | `id` (UUID, PK), **`public_id`** (random slug), `corporation_id`→corp (UUID FK), `created_by`, `created_at`, `market_hub_id`, `accepted_total` | Persisted, immutable snapshot ([ADR-0014](adr/0014-persisted-appraisals.md)). |
+| `Appraisal` | `id` (UUID, PK), **`public_id`** (random slug), `corporation_id`→corp (UUID FK), `created_by`, `created_at`, `market_hub_id`, `delivery_location_id?`, `delivery_location_name?`, `accepted_total` | Persisted, immutable snapshot ([ADR-0014](adr/0014-persisted-appraisals.md)); `delivery_*` is the drop-off snapshot ([ADR-0030](adr/0030-buyback-drop-off-locations.md)). |
+| `BuybackLocation` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `kind` (`npc_station`\|`structure`), `location_id` (EVE id string), `name`, `system_name?` | A corp's accepted drop-off locations ([ADR-0030](adr/0030-buyback-drop-off-locations.md)); distinct from the pricing hub. |
 | `AppraisalLine` | `id` (UUID, PK), `appraisal_id`→appraisal (UUID FK), `position`, `type_id`, `quantity`, `basis`, `percentage`, `unit_value`, `unit_price`, `line_total`, `status`, `reason?`, `reprocess?` (JSON) | Per-line snapshot; write-once, ordered by `position`. `reprocess` holds the mineral breakdown for a reprocess-priced ore ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 
 `basis ∈ {buy, sell, split}`. `market_hub_id` defaults to **Jita 4-4** (station
@@ -204,11 +206,15 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | POST | `/appraisals` | member | Price a list of items → persist + return appraisal (the core endpoint) |
 | GET | `/appraisals/{public_id}` | member | Fetch a saved appraisal (corp-scoped; doubles as share link) |
 | GET | `/appraisals` | member | List appraisals (own; managers/CEO see the corp's) |
+| GET | `/corporations/me/locations` | member | List accepted drop-off locations (to pick one) ([ADR-0030](adr/0030-buyback-drop-off-locations.md)) |
+| POST/DELETE | `/corporations/me/locations[/{location_id}]` | manager | Add/remove an accepted drop-off location |
 | GET | `/market-groups` / `/types/search` | member | Pickers for the rule editor |
 
-`POST /appraisals` accepts `{ items: [{type_id, quantity}], paste? }` — structured
-items and/or a raw EVE inventory paste that the backend parses and name-resolves via
-the SDE ([ADR-0021](adr/0021-appraisal-computation-and-storage.md)). It stores an
+`POST /appraisals` accepts `{ items: [{type_id, quantity}], paste?, delivery_location_id? }`
+— structured items and/or a raw EVE inventory paste that the backend parses and
+name-resolves via the SDE ([ADR-0021](adr/0021-appraisal-computation-and-storage.md)),
+plus the chosen drop-off (required when the corp has accepted locations, else the
+market hub by default — [ADR-0030](adr/0030-buyback-drop-off-locations.md)). It stores an
 immutable snapshot and returns a `public_id` for later reference
 ([ADR-0014](adr/0014-persisted-appraisals.md)). Lines with no usable market price (or
 an unresolved pasted name) are rejected with a reason; configurable data-quality

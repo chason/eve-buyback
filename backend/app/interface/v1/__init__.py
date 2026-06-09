@@ -5,6 +5,7 @@ from app.interface.v1 import (
     auth,
     corporations,
     health,
+    locations,
     pricing,
     sde,
     structures,
@@ -18,3 +19,4 @@ api_router.include_router(pricing.router)
 api_router.include_router(appraisals.router)
 api_router.include_router(sde.router)
 api_router.include_router(structures.router)
+api_router.include_router(locations.router)

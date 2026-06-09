@@ -29,6 +29,13 @@ class Appraisal(Base):
     accepted_total: Mapped[Decimal] = mapped_column(Numeric)
     rejected_count: Mapped[int]
 
+    # Drop-off location snapshot (ADR-0030): where the member delivers the items. A
+    # string id (station or 64-bit structure, ADR-0029) + the name captured at create
+    # time, so the appraisal stays self-contained if the corp's location list changes.
+    # Nullable only for appraisals created before this feature; new ones always set it.
+    delivery_location_id: Mapped[str | None] = mapped_column(String, default=None)
+    delivery_location_name: Mapped[str | None] = mapped_column(default=None)
+
     # Log-only audit copy of the original request payload (ADR-0021). This field is
     # for documentation/debugging and MUST NOT be queried under normal operation —
     # the authoritative line data lives in `appraisal_lines`.

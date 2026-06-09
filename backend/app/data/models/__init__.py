@@ -2,6 +2,7 @@
 from app.data.models.appraisal import Appraisal
 from app.data.models.appraisal_line import AppraisalLine
 from app.data.models.buyback_config import BuybackConfig
+from app.data.models.buyback_location import BuybackLocation
 from app.data.models.character import Character
 from app.data.models.corporation import Corporation
 from app.data.models.manager_assignment import ManagerAssignment
@@ -18,6 +19,7 @@ __all__ = [
     "Appraisal",
     "AppraisalLine",
     "BuybackConfig",
+    "BuybackLocation",
     "Character",
     "Corporation",
     "ManagerAssignment",

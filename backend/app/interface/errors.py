@@ -11,7 +11,11 @@ from app.application.errors import (
     CharacterNotInCorporation,
     CorporationAlreadyRegistered,
     CorporationNotRegistered,
+    DeliveryLocationInvalid,
+    DeliveryLocationRequired,
     EmptyAppraisal,
+    LocationInvalid,
+    LocationNotFound,
     ManagerAlreadyExists,
     ManagerNotFound,
     MarketHubInvalid,
@@ -43,6 +47,10 @@ _STATUS: dict[type[ApplicationError], int] = {
     StructureEncryptionNotConfigured: 503,
     StructureTokenMissing: 409,
     StructureTokenExpired: 409,
+    LocationInvalid: 422,
+    LocationNotFound: 404,
+    DeliveryLocationRequired: 422,
+    DeliveryLocationInvalid: 422,
 }
 
 

@@ -4,6 +4,18 @@
       "AppraisalCreateRequest": {
         "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side. The\ncombined item count (structured + paste) is capped in the use case; the bounds\nhere are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).",
         "properties": {
+          "delivery_location_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Location Id"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/AppraisalItemIn"
@@ -198,6 +210,28 @@
             ],
             "title": "Created By Character Name"
           },
+          "delivery_location_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Location Id"
+          },
+          "delivery_location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Location Name"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/AppraisalLineOut"
@@ -256,6 +290,28 @@
               }
             ],
             "title": "Created By Character Name"
+          },
+          "delivery_location_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Location Id"
+          },
+          "delivery_location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Location Name"
           },
           "market_hub_id": {
             "title": "Market Hub Id",
@@ -482,6 +538,79 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LocationCreateRequest": {
+        "description": "Add a drop-off location. For an NPC station the name is resolved server-side\nfrom the SDE (any supplied name is ignored); for a structure \u2014 which has no SDE \u2014\nthe name from the structure search is required.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "npc_station",
+              "structure"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "location_id",
+          "kind"
+        ],
+        "title": "LocationCreateRequest",
+        "type": "object"
+      },
+      "LocationOut": {
+        "description": "An accepted buyback drop-off location (ADR-0030).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "npc_station",
+              "structure"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "system_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Name"
+          }
+        },
+        "required": [
+          "location_id",
+          "kind",
+          "name"
+        ],
+        "title": "LocationOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -1070,7 +1199,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "15"
+    "version": "16"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1377,6 +1506,105 @@
         "summary": "Update Config",
         "tags": [
           "pricing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/locations": {
+      "get": {
+        "operationId": "list_locations_api_v1_corporations_me_locations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LocationOut"
+                  },
+                  "title": "Response List Locations Api V1 Corporations Me Locations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Locations",
+        "tags": [
+          "locations"
+        ]
+      },
+      "post": {
+        "operationId": "add_location_api_v1_corporations_me_locations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Location",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/locations/{location_id}": {
+      "delete": {
+        "operationId": "remove_location_api_v1_corporations_me_locations__location_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "location_id",
+            "required": true,
+            "schema": {
+              "title": "Location Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Location",
+        "tags": [
+          "locations"
         ]
       }
     },

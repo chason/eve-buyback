@@ -3,7 +3,10 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { createAppraisal } from "../api/appraisals"
+import { listLocations } from "../api/locations"
+import { getConfig } from "../api/pricing"
 import { searchTypes } from "../api/sde"
+import { hubName } from "../lib/hubs"
 
 interface PickedItem {
   type_id: number
@@ -16,6 +19,7 @@ export default function Appraise() {
   const [paste, setPaste] = useState("")
   const [items, setItems] = useState<PickedItem[]>([])
   const [search, setSearch] = useState("")
+  const [location, setLocation] = useState("")
 
   const query = search.trim()
   const results = useQuery({
@@ -23,6 +27,12 @@ export default function Appraise() {
     queryFn: () => searchTypes(query),
     enabled: query.length >= 2,
   })
+
+  // Drop-off locations (ADR-0030): if the corp configured any, picking one is
+  // required; otherwise the appraisal falls back to the market hub (shown for clarity).
+  const locations = useQuery({ queryKey: ["locations"], queryFn: listLocations })
+  const config = useQuery({ queryKey: ["config"], queryFn: getConfig })
+  const hasLocations = (locations.data?.length ?? 0) > 0
 
   const appraise = useMutation({
     mutationFn: createAppraisal,
@@ -52,18 +62,51 @@ export default function Appraise() {
     setItems((prev) => prev.filter((i) => i.type_id !== typeId))
   }
 
-  const canSubmit = items.length > 0 || paste.trim().length > 0
+  const hasItems = items.length > 0 || paste.trim().length > 0
+  const canSubmit = hasItems && (!hasLocations || location !== "")
 
   function submit() {
     appraise.mutate({
       items: items.map((i) => ({ type_id: i.type_id, quantity: i.quantity })),
       paste: paste.trim() ? paste : null,
+      delivery_location_id: hasLocations ? location : null,
     })
   }
 
   return (
     <>
       <h1>Appraise</h1>
+
+      {hasLocations ? (
+        <label>
+          Drop-off location
+          <select
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            aria-label="Drop-off location"
+            required
+          >
+            <option value="">Select where you'll deliver…</option>
+            {locations.data?.map((loc) => (
+              <option key={loc.location_id} value={loc.location_id}>
+                {loc.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        config.data && (
+          <p>
+            <small className="field-hint">
+              Drop-off:{" "}
+              <strong>
+                {config.data.market_hub_name ?? hubName(config.data.market_hub_id)}
+              </strong>{" "}
+              (corp default)
+            </small>
+          </p>
+        )
+      )}
 
       <label>
         Paste items

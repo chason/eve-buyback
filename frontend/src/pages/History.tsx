@@ -36,6 +36,7 @@ export default function History() {
             <tr>
               <th>When</th>
               {corpWide && <th>By</th>}
+              <th>Drop-off</th>
               <th>Accepted</th>
               <th>Rejected</th>
               <th />
@@ -48,6 +49,7 @@ export default function History() {
                 {corpWide && (
                   <td>{a.created_by_character_name ?? a.created_by_character_id}</td>
                 )}
+                <td>{a.delivery_location_name ?? "—"}</td>
                 <td className="num isk">{formatIsk(a.accepted_total)}</td>
                 <td className="num">{a.rejected_count}</td>
                 <td>

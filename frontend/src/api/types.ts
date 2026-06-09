@@ -22,6 +22,11 @@ export type StructureTokenStatus = Schemas["StructureTokenStatus"]
 export type StructureAuthorizeResponse = Schemas["StructureAuthorizeResponse"]
 export type StructureSearchResult = Schemas["StructureSearchResult"]
 
+// Accepted buyback drop-off locations (ADR-0030).
+export type LocationOut = Schemas["LocationOut"]
+export type LocationCreateRequest = Schemas["LocationCreateRequest"]
+export type LocationKind = LocationOut["kind"]
+
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]
 export type ConfigUpdateRequest = Schemas["ConfigUpdateRequest"]

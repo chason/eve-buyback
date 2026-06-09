@@ -153,6 +153,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Locations */
+        get: operations["list_locations_api_v1_corporations_me_locations_get"];
+        put?: never;
+        /** Add Location */
+        post: operations["add_location_api_v1_corporations_me_locations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/locations/{location_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Location */
+        delete: operations["remove_location_api_v1_corporations_me_locations__location_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/managers": {
         parameters: {
             query?: never;
@@ -411,6 +446,8 @@ export interface components {
          *     here are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).
          */
         AppraisalCreateRequest: {
+            /** Delivery Location Id */
+            delivery_location_id?: string | null;
             /** Items */
             items?: components["schemas"]["AppraisalItemIn"][];
             /** Paste */
@@ -463,6 +500,10 @@ export interface components {
             created_by_character_id: number;
             /** Created By Character Name */
             created_by_character_name?: string | null;
+            /** Delivery Location Id */
+            delivery_location_id?: string | null;
+            /** Delivery Location Name */
+            delivery_location_name?: string | null;
             /** Lines */
             lines: components["schemas"]["AppraisalLineOut"][];
             /** Market Hub Id */
@@ -485,6 +526,10 @@ export interface components {
             created_by_character_id: number;
             /** Created By Character Name */
             created_by_character_name?: string | null;
+            /** Delivery Location Id */
+            delivery_location_id?: string | null;
+            /** Delivery Location Name */
+            delivery_location_name?: string | null;
             /** Market Hub Id */
             market_hub_id: string;
             /** Public Id */
@@ -576,6 +621,40 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * LocationCreateRequest
+         * @description Add a drop-off location. For an NPC station the name is resolved server-side
+         *     from the SDE (any supplied name is ignored); for a structure — which has no SDE —
+         *     the name from the structure search is required.
+         */
+        LocationCreateRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "npc_station" | "structure";
+            /** Location Id */
+            location_id: string;
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * LocationOut
+         * @description An accepted buyback drop-off location (ADR-0030).
+         */
+        LocationOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "npc_station" | "structure";
+            /** Location Id */
+            location_id: string;
+            /** Name */
+            name: string;
+            /** System Name */
+            system_name?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1087,6 +1166,88 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConfigOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_locations_api_v1_corporations_me_locations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationOut"][];
+                };
+            };
+        };
+    };
+    add_location_api_v1_corporations_me_locations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_location_api_v1_corporations_me_locations__location_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
