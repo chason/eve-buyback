@@ -72,6 +72,11 @@ export default function Appraisal() {
         <strong className="isk">{formatIsk(a.accepted_total)}</strong> accepted
         {a.rejected_count > 0 && ` · ${a.rejected_count} rejected`}
       </p>
+      {a.delivery_location_name && (
+        <p>
+          Drop-off: <strong>{a.delivery_location_name}</strong>
+        </p>
+      )}
       <button
         className="secondary"
         onClick={() => copy("link", window.location.href)}

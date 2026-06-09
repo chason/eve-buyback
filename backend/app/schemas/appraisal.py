@@ -22,6 +22,9 @@ class AppraisalCreateRequest(BaseModel):
         default_factory=list, max_length=MAX_APPRAISAL_ITEMS
     )
     paste: str | None = Field(default=None, max_length=MAX_PASTE_CHARS)
+    # The chosen drop-off location (ADR-0030). Required when the corp has accepted
+    # locations; omit it when none are configured (the backend defaults to the hub).
+    delivery_location_id: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _require_some_input(self) -> "AppraisalCreateRequest":
@@ -71,6 +74,8 @@ class AppraisalOut(BaseModel):
     created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: str
+    delivery_location_id: str | None = None
+    delivery_location_name: str | None = None
     accepted_total: Decimal
     rejected_count: int
     lines: list[AppraisalLineOut]
@@ -84,5 +89,7 @@ class AppraisalSummaryOut(BaseModel):
     created_by_character_name: str | None = None
     created_at: datetime
     market_hub_id: str
+    delivery_location_id: str | None = None
+    delivery_location_name: str | None = None
     accepted_total: Decimal
     rejected_count: int

@@ -57,6 +57,9 @@ export default function Layout() {
                 <li>
                   <Link to="/rules">Rules</Link>
                 </li>
+                <li>
+                  <Link to="/locations">Locations</Link>
+                </li>
               </>
             )}
             <li>{user.character_name}</li>

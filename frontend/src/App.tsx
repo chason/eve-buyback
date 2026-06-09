@@ -8,6 +8,7 @@ import Callback from "./pages/Callback"
 import Config from "./pages/Config"
 import History from "./pages/History"
 import Home from "./pages/Home"
+import Locations from "./pages/Locations"
 import Rules from "./pages/Rules"
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/appraisals" element={<History />} />
           <Route path="/config" element={<Config />} />
           <Route path="/rules" element={<Rules />} />
+          <Route path="/locations" element={<Locations />} />
         </Route>
       </Route>
     </Routes>

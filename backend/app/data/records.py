@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.locations import LocationKind
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 
@@ -165,6 +166,18 @@ class AppraisalLineRecord(BaseModel):
     reprocess: dict | None = None
 
 
+class BuybackLocationRecord(BaseModel):
+    """An accepted drop-off location (ADR-0030). `location_id` is the EVE station or
+    structure id as a string; `system_name` is set for NPC stations only."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    location_id: str
+    kind: LocationKind
+    name: str
+    system_name: str | None = None
+
+
 class AppraisalRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -176,6 +189,9 @@ class AppraisalRecord(BaseModel):
     market_hub_id: str
     accepted_total: Decimal
     rejected_count: int
+    # Drop-off location snapshot (ADR-0030); null for pre-feature appraisals.
+    delivery_location_id: str | None = None
+    delivery_location_name: str | None = None
     lines: list[AppraisalLineRecord]
 
 
@@ -191,6 +207,8 @@ class AppraisalSummaryRecord(BaseModel):
     market_hub_id: str
     accepted_total: Decimal
     rejected_count: int
+    delivery_location_id: str | None = None
+    delivery_location_name: str | None = None
 
 
 class StructureMarketTokenRecord(BaseModel):

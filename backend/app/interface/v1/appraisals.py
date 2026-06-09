@@ -47,6 +47,7 @@ async def create_appraisal(
         user=user,
         items=items,
         paste=payload.paste,
+        delivery_location_id=payload.delivery_location_id,
         now=datetime.now(UTC),
     )
     return AppraisalOut(**record.model_dump())

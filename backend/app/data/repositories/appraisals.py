@@ -24,6 +24,8 @@ async def create_appraisal(
     created_by_character_id: int,
     created_by_character_name: str | None = None,
     market_hub_id: str,
+    delivery_location_id: str | None = None,
+    delivery_location_name: str | None = None,
     accepted_total: Decimal,
     rejected_count: int,
     request_json: dict,
@@ -34,6 +36,8 @@ async def create_appraisal(
         corporation_id=corporation_id,
         created_by_character_id=created_by_character_id,
         market_hub_id=market_hub_id,
+        delivery_location_id=delivery_location_id,
+        delivery_location_name=delivery_location_name,
         accepted_total=accepted_total,
         rejected_count=rejected_count,
         request_json=request_json,
@@ -123,6 +127,8 @@ def _to_summary(
         market_hub_id=appraisal.market_hub_id,
         accepted_total=appraisal.accepted_total,
         rejected_count=appraisal.rejected_count,
+        delivery_location_id=appraisal.delivery_location_id,
+        delivery_location_name=appraisal.delivery_location_name,
     )
 
 
@@ -140,5 +146,7 @@ def _to_record(
         market_hub_id=appraisal.market_hub_id,
         accepted_total=appraisal.accepted_total,
         rejected_count=appraisal.rejected_count,
+        delivery_location_id=appraisal.delivery_location_id,
+        delivery_location_name=appraisal.delivery_location_name,
         lines=[AppraisalLineRecord.model_validate(line) for line in lines],
     )
