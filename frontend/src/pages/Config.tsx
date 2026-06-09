@@ -54,8 +54,11 @@ export default function Config() {
   // clears it.
   const [searchParams, setSearchParams] = useSearchParams()
   const justAuthorized = useRef(searchParams.get("authorized") === "structure")
+  // If the re-auth picker switched the authorizing character, Callback passes the
+  // previous name here so we can warn (the swap is allowed, but worth flagging).
+  const replacedCharacter = useRef(searchParams.get("replaced"))
 
-  // Strip the one-shot param from the URL after capturing it above.
+  // Strip the one-shot param(s) from the URL after capturing them above.
   useEffect(() => {
     if (searchParams.get("authorized")) setSearchParams({}, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,6 +241,15 @@ export default function Config() {
 
         {hubChoice === STRUCTURE && (
           <>
+            {replacedCharacter.current && (
+              <p role="alert">
+                ⚠️ Structure access was switched from{" "}
+                <strong>{replacedCharacter.current}</strong> to the character you
+                just authorized — the new token replaced the old one. If that
+                wasn&apos;t intended, re-authorize as{" "}
+                <strong>{replacedCharacter.current}</strong>.
+              </p>
+            )}
             <article>
               {structureStatus.isLoading || authorizing ? (
                 <p aria-busy="true">

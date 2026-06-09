@@ -121,16 +121,50 @@ async def test_member_cannot_authorize():
 async def test_manager_authorize_stores_encrypted_token():
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        record = await structures_app.complete_structure_authorize(
+        result = await structures_app.complete_structure_authorize(
             session, FakeSso(refresh="refresh-secret"), code="c", verifier="v",
             user=_user("manager"), cipher=CIPHER,
         )
-    assert record.character_name == "Boss"
+    assert result.token.character_name == "Boss"
+    assert result.replaced_character_name is None  # first authorization, no swap
     async with SessionLocal() as session:
         stored = await tokens_repo.get_for_corp(session, corp_uuid)
     assert stored is not None
     assert stored.encrypted_refresh_token != b"refresh-secret"  # encrypted at rest
     assert CIPHER.decrypt(stored.encrypted_refresh_token) == "refresh-secret"
+
+
+async def test_reauthorize_with_different_character_warns():
+    await _register_corp()
+    # First authorize as Boss (the default FakeSso character).
+    async with SessionLocal() as session:
+        first = await structures_app.complete_structure_authorize(
+            session, FakeSso(), code="c", verifier="v",
+            user=_user("manager"), cipher=CIPHER,
+        )
+    assert first.replaced_character_name is None
+
+    # Re-authorize, but the SSO picker returned a *different* character.
+    class OtherCharSso(FakeSso):
+        async def verify_token(self, access_token):
+            return VerifiedCharacter(character_id=67890, name="Alt Pilot")
+
+    async with SessionLocal() as session:
+        again = await structures_app.complete_structure_authorize(
+            session, OtherCharSso(), code="c", verifier="v",
+            user=_user("manager"), cipher=CIPHER,
+        )
+    # The new token replaces the old, and we surface the previous character.
+    assert again.token.character_name == "Alt Pilot"
+    assert again.replaced_character_name == "Boss"
+
+    # Re-authorizing again as the *same* (new) character does not warn.
+    async with SessionLocal() as session:
+        same = await structures_app.complete_structure_authorize(
+            session, OtherCharSso(), code="c", verifier="v",
+            user=_user("manager"), cipher=CIPHER,
+        )
+    assert same.replaced_character_name is None
 
 
 # --- get_structure_access_token (refresh / rotation / expiry / missing) ---

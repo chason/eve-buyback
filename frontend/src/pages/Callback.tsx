@@ -32,14 +32,18 @@ export default function Callback() {
 
     if (isStructure) {
       completeStructureAuthorize(code, state)
-        .then(() =>
-          queryClient.invalidateQueries({ queryKey: ["structureStatus"] }),
-        )
-        .then(() =>
+        .then(async (status) => {
+          await queryClient.invalidateQueries({ queryKey: ["structureStatus"] })
           // Carry the intent so Config re-selects the structure hub (the saved
           // config still points at the old hub until they pick + save a structure).
-          navigate("/config?authorized=structure", { replace: true }),
-        )
+          // If the picker switched the authorizing character, pass the previous
+          // name so Config can warn about the swap.
+          const replaced = status?.replaced_character_name
+          const q = replaced
+            ? `&replaced=${encodeURIComponent(replaced)}`
+            : ""
+          navigate(`/config?authorized=structure${q}`, { replace: true })
+        })
         .catch((e) => setError((e as Error).message))
       return
     }

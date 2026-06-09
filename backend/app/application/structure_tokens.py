@@ -11,6 +11,7 @@ import uuid
 from datetime import UTC, datetime
 
 import httpx
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.auth import AuthenticatedUser, LoginChallenge
@@ -41,6 +42,15 @@ from app.plugins.token_cipher import TokenCipher
 STRUCTURE_STATE_PREFIX = "structure."
 
 
+class StructureAuthorizeResult(BaseModel):
+    """Outcome of completing a structure-access grant. `replaced_character_name` is
+    set when a re-authorization switched the authorizing character (EVE can't pin the
+    SSO picker), so the interface can warn that the token now belongs to someone else."""
+
+    token: StructureMarketTokenRecord
+    replaced_character_name: str | None = None
+
+
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
     """Mint the PKCE/state challenge for the structure-scope authorization."""
     if not sso.configured:
@@ -63,9 +73,11 @@ async def complete_structure_authorize(
     verifier: str,
     user: AuthenticatedUser,
     cipher: TokenCipher,
-) -> StructureMarketTokenRecord:
+) -> StructureAuthorizeResult:
     """Exchange the code and store the (encrypted) refresh token for the caller's
-    corp. Only a Buyback Manager / CEO may authorize."""
+    corp. Only a Buyback Manager / CEO may authorize. A re-authorization replaces any
+    existing token; if it switched to a different character, the previous character's
+    name is returned so the caller can warn about the swap."""
     if not role_at_least(user.role, "manager"):
         raise NotAuthorizedToAuthorizeStructure()
     if not get_settings().structure_tokens_configured:
@@ -76,6 +88,17 @@ async def complete_structure_authorize(
     if not token.refresh_token:
         raise StructureTokenExpired("EVE did not return a refresh token")
     character = await sso.verify_token(token.access_token)
+
+    # Note the outgoing character before we overwrite it — the picker is mandatory,
+    # so a re-auth can silently land on a different character (warn, but allow).
+    existing = await tokens_repo.get_for_corp(session, corp.id)
+    replaced_character_name = (
+        existing.character_name
+        if existing is not None
+        and existing.character_eve_id != character.character_id
+        else None
+    )
+
     char = await characters_repo.upsert_character(
         session, eve_character_id=character.character_id, name=character.name
     )
@@ -89,7 +112,9 @@ async def complete_structure_authorize(
         scopes=get_settings().eve_structure_scopes,
     )
     await session.commit()
-    return record
+    return StructureAuthorizeResult(
+        token=record, replaced_character_name=replaced_character_name
+    )
 
 
 async def get_status(

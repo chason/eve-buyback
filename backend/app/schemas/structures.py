@@ -26,6 +26,10 @@ class StructureTokenStatus(BaseModel):
     # True when the last refresh failed (revoked grant / lost docking) → re-authorize.
     expired: bool = False
     created_at: datetime | None = None
+    # Set only on the completion response when a re-authorization switched the
+    # authorizing character (EVE can't pin the picker) — the *previous* character's
+    # name, so the UI can warn that the structure token now belongs to someone else.
+    replaced_character_name: str | None = None
 
 
 class StructureSearchResult(BaseModel):

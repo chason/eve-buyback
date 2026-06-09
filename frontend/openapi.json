@@ -967,6 +967,17 @@
             "title": "Expired",
             "type": "boolean"
           },
+          "replaced_character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced Character Name"
+          },
           "scopes": {
             "anyOf": [
               {
@@ -1059,7 +1070,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "14"
+    "version": "15"
   },
   "openapi": "3.1.0",
   "paths": {
