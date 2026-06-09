@@ -1,11 +1,14 @@
 """Reader for Fuzzwork's SDE CSV conversions, used by the deploy-time seed (ADR-0009).
 
-A plugin (outside-API gateway): downloads the bzip2-compressed CSV dumps, parses
-them, and yields faithful Pydantic rows. It does **no** filtering — the seed use
-case decides which rows to keep — so the source stays a dumb, testable reader.
+A plugin (outside-API gateway): downloads the per-table CSV dumps, parses them, and
+yields faithful Pydantic rows. It does **no** filtering — the seed use case decides
+which rows to keep — so the source stays a dumb, testable reader.
+
+Fuzzwork serves these as plain (uncompressed) CSV under `/dump/latest/csv/`; the
+files carry a UTF-8 BOM, so they're decoded with `utf-8-sig` to keep the first
+column header clean.
 """
 
-import bz2
 import csv
 import io
 from decimal import Decimal
@@ -13,11 +16,11 @@ from decimal import Decimal
 import httpx
 from pydantic import BaseModel
 
-FUZZWORK_DUMP_BASE = "https://www.fuzzwork.co.uk/dump/latest"
-INV_TYPES_URL = f"{FUZZWORK_DUMP_BASE}/invTypes.csv.bz2"
-INV_MARKET_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invMarketGroups.csv.bz2"
-INV_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invGroups.csv.bz2"
-INV_TYPE_MATERIALS_URL = f"{FUZZWORK_DUMP_BASE}/invTypeMaterials.csv.bz2"
+FUZZWORK_DUMP_BASE = "https://www.fuzzwork.co.uk/dump/latest/csv"
+INV_TYPES_URL = f"{FUZZWORK_DUMP_BASE}/invTypes.csv"
+INV_MARKET_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invMarketGroups.csv"
+INV_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invGroups.csv"
+INV_TYPE_MATERIALS_URL = f"{FUZZWORK_DUMP_BASE}/invTypeMaterials.csv"
 
 
 class SdeTypeRow(BaseModel):
@@ -56,7 +59,9 @@ class SdeSource:
     async def _fetch_csv(self, url: str) -> csv.DictReader:
         resp = await self._client.get(url)
         resp.raise_for_status()
-        text = bz2.decompress(resp.content).decode("utf-8")
+        # Plain CSV with a UTF-8 BOM; utf-8-sig strips it so the first column
+        # header (e.g. "typeID") isn't prefixed with ﻿ and lookups by name work.
+        text = resp.content.decode("utf-8-sig")
         return csv.DictReader(io.StringIO(text))
 
     async def fetch_types(self) -> list[SdeTypeRow]:
