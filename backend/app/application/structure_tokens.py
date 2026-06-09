@@ -6,6 +6,7 @@ behalf. The normal login stays token-free (ADR-0004). Access tokens are never
 persisted — they're refreshed server-side at point of use and held only transiently.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
@@ -120,14 +121,21 @@ async def search_structures(
     structure_ids = await esi_market.search_structures(
         character_id=token.character_eve_id, query=query, access_token=access_token
     )
-    results: list[dict] = []
-    for structure_id in structure_ids:
-        name = await esi_market.resolve_structure_name(
-            structure_id=structure_id, access_token=access_token
+    # Resolve names concurrently — this is a typeahead path, so the per-id round
+    # trips fan out rather than running serially. gather preserves order.
+    names = await asyncio.gather(
+        *(
+            esi_market.resolve_structure_name(
+                structure_id=structure_id, access_token=access_token
+            )
+            for structure_id in structure_ids
         )
-        if name:
-            results.append({"structure_id": str(structure_id), "name": name})
-    return results
+    )
+    return [
+        {"structure_id": str(structure_id), "name": name}
+        for structure_id, name in zip(structure_ids, names, strict=True)
+        if name
+    ]
 
 
 async def get_structure_access_token(

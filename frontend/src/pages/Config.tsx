@@ -123,6 +123,10 @@ export default function Config() {
       updateConfig({
         market_hub_id: hubId,
         market_hub_kind: hubKind,
+        // Structures have no SDE to resolve against, so persist the friendly name
+        // from the search (NPC/Fuzzwork names are resolved server-side).
+        market_hub_name:
+          hubChoice === STRUCTURE ? (structure?.label ?? null) : null,
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
@@ -306,6 +310,12 @@ export default function Config() {
                   <ul className="search-results">
                     {structureResults.isLoading && (
                       <li aria-busy="true">Searching…</li>
+                    )}
+                    {structureResults.isError && (
+                      <li className="error">
+                        Search failed — your structure access may have expired.
+                        Re-authorize and try again.
+                      </li>
                     )}
                     {structureResults.data?.map((s) => (
                       <li key={s.structure_id}>

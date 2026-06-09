@@ -24,9 +24,12 @@ class ConfigOut(BaseModel):
 
 class ConfigUpdateRequest(BaseModel):
     market_hub_id: str
-    # Defaults to an NPC station; structures arrive in a later phase. region_id/name
-    # are resolved server-side from the id, so they aren't part of the request.
+    # Defaults to an NPC station. For NPC/Fuzzwork hubs the region_id/name are
+    # resolved server-side from the id. For a **structure** there's no SDE to resolve
+    # against, so the client passes the friendly name it got from the structure
+    # search (ADR-0029); ignored for the other kinds.
     market_hub_kind: HubKind = "npc_station"
+    market_hub_name: str | None = None
     default_basis: Basis
     default_percentage: Decimal = Field(ge=0)
     aggregate_field: AggregateField

@@ -415,6 +415,17 @@
             ],
             "title": "Market Hub Kind",
             "type": "string"
+          },
+          "market_hub_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Hub Name"
           }
         },
         "required": [
@@ -1048,7 +1059,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "13"
+    "version": "14"
   },
   "openapi": "3.1.0",
   "paths": {

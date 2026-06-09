@@ -77,6 +77,7 @@ describe("Config", () => {
     expect(vi.mocked(pricingApi.updateConfig).mock.calls[0][0]).toEqual({
       market_hub_id: "60003760",
       market_hub_kind: "npc_station",
+      market_hub_name: null,
       default_basis: "buy",
       default_percentage: "85",
       aggregate_field: "percentile",

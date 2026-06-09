@@ -553,6 +553,8 @@ export interface components {
              * @enum {string}
              */
             market_hub_kind: "npc_station" | "structure";
+            /** Market Hub Name */
+            market_hub_name?: string | null;
         };
         /** CorporationOut */
         CorporationOut: {

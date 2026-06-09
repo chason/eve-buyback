@@ -65,10 +65,11 @@ async def update_config(
     aggregate_field: AggregateField,
     default_accepted: bool = True,
     market_hub_kind: HubKind = "npc_station",
+    market_hub_name: str | None = None,
 ) -> BuybackConfigRecord:
     corp = await get_registered_corporation(session, corporation_id)
     region_id, hub_name = await _resolve_hub(
-        session, corp.id, market_hub_id, market_hub_kind
+        session, corp.id, market_hub_id, market_hub_kind, market_hub_name
     )
     config = await config_repo.upsert_config(
         session,
@@ -91,6 +92,7 @@ async def _resolve_hub(
     corporation_uuid: uuid.UUID,
     hub_id: str,
     kind: HubKind,
+    name_hint: str | None = None,
 ) -> tuple[int | None, str | None]:
     """Resolve a chosen hub to `(region_id, display_name)`, validating it (ADR-0028,
     ADR-0029). Fuzzwork hubs need no region; a non-Fuzzwork NPC station is resolved
@@ -107,7 +109,9 @@ async def _resolve_hub(
             raise MarketHubInvalid(
                 "Authorize structure access before selecting a structure hub"
             )
-        return None, f"Structure {hub_id}"
+        # No SDE for structures — keep the friendly name the client got from the
+        # structure search, falling back to the id if it wasn't supplied.
+        return None, name_hint or f"Structure {hub_id}"
     source = resolve_market_source(HubDescriptor(hub_id=hub_id, kind=kind))
     if source == "fuzzwork":
         return None, FUZZWORK_HUB_NAMES.get(hub_id)

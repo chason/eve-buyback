@@ -277,4 +277,21 @@ async def test_structure_hub_accepted_once_authorized():
         assert resp.status_code == 200
         body = resp.json()
         assert body["market_hub_kind"] == "structure"
+        # No name supplied → falls back to the id-based label.
         assert body["market_hub_name"] == "Structure 1035000000001"
+
+        # A friendly name from the structure search is persisted as-is (there's no
+        # SDE to resolve a structure against).
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": "1035000000001",
+                "market_hub_kind": "structure",
+                "market_hub_name": "1DQ1-A - Palace",
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["market_hub_name"] == "1DQ1-A - Palace"
