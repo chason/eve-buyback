@@ -185,6 +185,45 @@ async def test_missing_token_raises():
             )
 
 
+# --- structure search by name ---
+
+
+class FakeEsiMarketSearch:
+    def __init__(self, ids, names):
+        self._ids = ids
+        self._names = names
+
+    async def search_structures(self, *, character_id, query, access_token, limit=10):
+        return self._ids
+
+    async def resolve_structure_name(self, *, structure_id, access_token):
+        return self._names.get(structure_id)
+
+
+async def test_search_structures_returns_named_results():
+    await _authorize()
+    esi = FakeEsiMarketSearch(
+        ids=[1035000000001, 1035000000002],
+        names={1035000000001: "1DQ1-A - Palace", 1035000000002: None},  # 2nd inaccessible
+    )
+    async with SessionLocal() as session:
+        results = await structures_app.search_structures(
+            session, FakeSso(), esi, corporation_id=CORP_EVE_ID, query="pal", cipher=CIPHER
+        )
+    # Only the resolvable structure is returned, id as a string.
+    assert results == [{"structure_id": "1035000000001", "name": "1DQ1-A - Palace"}]
+
+
+async def test_search_structures_requires_authorization():
+    await _register_corp()  # corp registered but no structure token
+    async with SessionLocal() as session:
+        with pytest.raises(StructureTokenMissing):
+            await structures_app.search_structures(
+                session, FakeSso(), FakeEsiMarketSearch([], {}),
+                corporation_id=CORP_EVE_ID, query="x", cipher=CIPHER,
+            )
+
+
 # --- API wiring (manager-gated status) ---
 
 

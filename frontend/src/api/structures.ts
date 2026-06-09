@@ -1,11 +1,21 @@
 import { apiGet, apiSend } from "./client"
-import type { StructureAuthorizeResponse, StructureTokenStatus } from "./types"
+import type {
+  StructureAuthorizeResponse,
+  StructureSearchResult,
+  StructureTokenStatus,
+} from "./types"
 
-export type { StructureTokenStatus } from "./types"
+export type { StructureSearchResult, StructureTokenStatus } from "./types"
 
 /** The corp's structure-market authorization status (ADR-0029). */
 export const getStructureStatus = () =>
   apiGet<StructureTokenStatus>("/corporations/me/structure-token")
+
+/** Search the corp's accessible structures by name (requires authorization first). */
+export const searchStructures = (q: string) =>
+  apiGet<StructureSearchResult[]>(
+    `/corporations/me/structure-token/search?q=${encodeURIComponent(q)}`,
+  )
 
 /** Begin the structure-access grant: returns the EVE SSO URL to redirect to. */
 export async function beginStructureAuthorize(): Promise<StructureAuthorizeResponse> {

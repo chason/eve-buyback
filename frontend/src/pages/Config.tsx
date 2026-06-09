@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
@@ -8,6 +9,7 @@ import {
   beginStructureAuthorize,
   getStructureStatus,
   revokeStructure,
+  searchStructures,
   STRUCTURE_AUTH_FLAG,
 } from "../api/structures"
 import type { AggregateField, Basis } from "../api/types"
@@ -41,7 +43,24 @@ export default function Config() {
   const [station, setStation] = useState<{ id: string; label: string } | null>(
     null,
   )
-  const [structureId, setStructureId] = useState("")
+  const [structureQuery, setStructureQuery] = useState("")
+  const [structure, setStructure] = useState<{ id: string; label: string } | null>(
+    null,
+  )
+  const [authorizing, setAuthorizing] = useState(false)
+
+  // Did we just return from the structure-access SSO round-trip? (Callback
+  // navigates here with ?authorized=structure.) Captured once so a later config
+  // refetch or refresh doesn't re-force the structure hub. A manual hub change
+  // clears it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const justAuthorized = useRef(searchParams.get("authorized") === "structure")
+
+  // Strip the one-shot param from the URL after capturing it above.
+  useEffect(() => {
+    if (searchParams.get("authorized")) setSearchParams({}, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -53,7 +72,15 @@ export default function Config() {
       const hub = config.data.market_hub_id
       if (config.data.market_hub_kind === "structure") {
         setHubChoice(STRUCTURE)
-        setStructureId(hub)
+        setStructure({
+          id: hub,
+          label: config.data.market_hub_name ?? `Structure ${hub}`,
+        })
+      } else if (justAuthorized.current) {
+        // Just authorized but no structure saved yet — keep the picker on
+        // "Player structure" so the search box is ready instead of snapping
+        // back to the saved (Fuzzwork) hub.
+        setHubChoice(STRUCTURE)
       } else if (isFuzzworkHub(hub)) {
         setHubChoice(hub)
       } else {
@@ -74,23 +101,32 @@ export default function Config() {
     queryFn: getStructureStatus,
     enabled: hubChoice === STRUCTURE,
   })
+  const authorized = !!structureStatus.data?.authorized
+  const sQuery = structureQuery.trim()
+  const structureResults = useQuery({
+    queryKey: ["structures", sQuery],
+    queryFn: () => searchStructures(sQuery),
+    enabled: hubChoice === STRUCTURE && authorized && sQuery.length >= 3,
+  })
 
   const hubKind = hubChoice === STRUCTURE ? "structure" : "npc_station"
   const hubId =
     hubChoice === STRUCTURE
-      ? structureId.trim()
+      ? (structure?.id ?? "")
       : hubChoice === CUSTOM
         ? (station?.id ?? "")
         : hubChoice
-  // A structure id must be numeric (the server validates too — defence in depth).
-  const hubInvalid =
-    hubId === "" || (hubChoice === STRUCTURE && !/^\d+$/.test(hubId))
+  const hubInvalid = hubId === ""
 
   const save = useMutation({
     mutationFn: () =>
       updateConfig({
         market_hub_id: hubId,
         market_hub_kind: hubKind,
+        // Structures have no SDE to resolve against, so persist the friendly name
+        // from the search (NPC/Fuzzwork names are resolved server-side).
+        market_hub_name:
+          hubChoice === STRUCTURE ? (structure?.label ?? null) : null,
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
@@ -106,9 +142,16 @@ export default function Config() {
   })
 
   async function startStructureAuthorize() {
-    const { authorization_url } = await beginStructureAuthorize()
-    sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
-    window.location.href = authorization_url
+    setAuthorizing(true)
+    try {
+      const { authorization_url } = await beginStructureAuthorize()
+      sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
+      // Full-page redirect to EVE SSO; `authorizing` stays true until unload so
+      // the button keeps spinning right up to the navigation.
+      window.location.href = authorization_url
+    } catch {
+      setAuthorizing(false)
+    }
   }
 
   if (config.isLoading) return <p aria-busy="true">Loading…</p>
@@ -134,7 +177,10 @@ export default function Config() {
           <select
             value={hubChoice}
             disabled={!canEdit}
-            onChange={(e) => setHubChoice(e.target.value)}
+            onChange={(e) => {
+              justAuthorized.current = false
+              setHubChoice(e.target.value)
+            }}
             aria-label="Market hub"
           >
             {FUZZWORK_HUBS.map((h) => (
@@ -192,55 +238,107 @@ export default function Config() {
 
         {hubChoice === STRUCTURE && (
           <>
-            <label>
-              Structure ID
-              <input
-                type="text"
-                inputMode="numeric"
-                value={structureId}
-                placeholder="e.g. 1035000000001"
-                aria-label="Structure ID"
-                disabled={!canEdit}
-                onChange={(e) => setStructureId(e.target.value)}
-              />
-            </label>
             <article>
-              {structureStatus.data?.authorized ? (
-                <p>
-                  Structure access: connected as{" "}
-                  <strong>{structureStatus.data.character_name}</strong>
-                  {structureStatus.data.expired && (
-                    <span className="error"> — expired, please re-authorize</span>
-                  )}
-                  .{" "}
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (canEdit) revoke.mutate()
-                    }}
-                  >
-                    Revoke
-                  </a>
+              {structureStatus.isLoading || authorizing ? (
+                <p aria-busy="true">
+                  {authorizing
+                    ? "Redirecting to EVE for authorization…"
+                    : "Checking structure access…"}
                 </p>
               ) : (
-                <p>Structure access is not authorized yet.</p>
+                <>
+                  {authorized ? (
+                    <p>
+                      Structure access: connected as{" "}
+                      <strong>{structureStatus.data?.character_name}</strong>
+                      {structureStatus.data?.expired && (
+                        <span className="error">
+                          {" "}
+                          — expired, please re-authorize
+                        </span>
+                      )}
+                      .{" "}
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (canEdit) revoke.mutate()
+                        }}
+                      >
+                        Revoke
+                      </a>
+                    </p>
+                  ) : (
+                    <p>
+                      Authorize structure access to search and price at a
+                      structure.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={!canEdit}
+                    onClick={() => void startStructureAuthorize()}
+                  >
+                    {authorized
+                      ? "Re-authorize structure access"
+                      : "Authorize structure access"}
+                  </button>
+                  <small className="field-hint">
+                    Log in with a character that has docking + market access to
+                    the structure. The token is stored encrypted (ADR-0029).
+                  </small>
+                </>
               )}
-              <button
-                type="button"
-                className="secondary"
-                disabled={!canEdit}
-                onClick={() => void startStructureAuthorize()}
-              >
-                {structureStatus.data?.authorized
-                  ? "Re-authorize structure access"
-                  : "Authorize structure access"}
-              </button>
-              <small className="field-hint">
-                Log in with a character that has docking + market access to the
-                structure. The token is stored encrypted (ADR-0029).
-              </small>
             </article>
+
+            {authorized && (
+              <label>
+                Structure
+                <input
+                  type="search"
+                  value={structure ? structure.label : structureQuery}
+                  placeholder="Search structures by name…"
+                  aria-label="Search structure"
+                  disabled={!canEdit}
+                  onChange={(e) => {
+                    setStructure(null)
+                    setStructureQuery(e.target.value)
+                  }}
+                />
+                {!structure && sQuery.length >= 3 && (
+                  <ul className="search-results">
+                    {structureResults.isLoading && (
+                      <li aria-busy="true">Searching…</li>
+                    )}
+                    {structureResults.isError && (
+                      <li className="error">
+                        Search failed — your structure access may have expired.
+                        Re-authorize and try again.
+                      </li>
+                    )}
+                    {structureResults.data?.map((s) => (
+                      <li key={s.structure_id}>
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setStructure({ id: s.structure_id, label: s.name })
+                            setStructureQuery("")
+                          }}
+                        >
+                          {s.name}
+                        </a>
+                      </li>
+                    ))}
+                    {structureResults.data?.length === 0 && <li>No matches.</li>}
+                  </ul>
+                )}
+                <small className="field-hint">
+                  Only structures your authorized character can dock at appear.
+                </small>
+              </label>
+            )}
           </>
         )}
 

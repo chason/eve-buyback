@@ -26,7 +26,12 @@ entirely token-free.
   (`POST /corporations/me/structure-token/authorize` → `…/session`) requests the
   structure scopes (`build_authorize_url(scopes=…)` — overriding the default login
   scopes) with its own session-cookie state/PKCE keys. Only a **Buyback Manager / CEO**
-  may run it. Normal `/auth/login` is unchanged.
+  may run it. Normal `/auth/login` is unchanged. The scopes are
+  `esi-markets.structure_markets.v1` (read the market), `esi-search.search_structures.v1`
+  (find structures by name), and `esi-universe.read_structures.v1` (resolve their names)
+  — the last two power the **structure-by-name picker** (`GET …/structure-token/search`),
+  which uses the stored token's character so only structures that character can dock at
+  appear.
 - **Encrypted at rest.** The refresh token is stored Fernet-encrypted
   (`structure_market_tokens.encrypted_refresh_token`) with a new
   `BUYBACK_TOKEN_ENCRYPTION_KEY`; only the ciphertext touches the DB. Outside

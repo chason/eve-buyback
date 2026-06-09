@@ -53,10 +53,13 @@ class Settings(BaseSettings):
     eve_redirect_uri: str = "http://localhost:5173/auth/callback"
     # Roles scope lets us detect Directors for corp registration (ADR-0015).
     eve_scopes: str = "publicData esi-characters.read_corporation_roles.v1"
-    # Scopes requested by the separate "authorize structure access" flow (ADR-0029).
-    # Only the structure-market scope is needed (we don't resolve structure metadata);
-    # publicData is the basic identity scope. NB: the ESI scope has no ".read" suffix.
-    eve_structure_scopes: str = "publicData esi-markets.structure_markets.v1"
+    # Scopes requested by the separate "authorize structure access" flow (ADR-0029):
+    # read the structure's market, search structures by name, and resolve their names.
+    # (ESI structure scopes have no ".read" suffix.)
+    eve_structure_scopes: str = (
+        "publicData esi-markets.structure_markets.v1 "
+        "esi-search.search_structures.v1 esi-universe.read_structures.v1"
+    )
 
     # Fernet key encrypting persisted structure-market refresh tokens at rest
     # (ADR-0029). Required (a real value) to use structure hubs in production.

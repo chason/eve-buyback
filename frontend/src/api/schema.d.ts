@@ -265,6 +265,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/structure-token/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Search the corp's accessible structures by name (requires prior authorization).
+         */
+        get: operations["search_api_v1_corporations_me_structure_token_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/structure-token/session": {
         parameters: {
             query?: never;
@@ -533,6 +553,8 @@ export interface components {
              * @enum {string}
              */
             market_hub_kind: "npc_station" | "structure";
+            /** Market Hub Name */
+            market_hub_name?: string | null;
         };
         /** CorporationOut */
         CorporationOut: {
@@ -746,6 +768,16 @@ export interface components {
             authorization_url: string;
             /** State */
             state: string;
+        };
+        /**
+         * StructureSearchResult
+         * @description A structure the authorizing character can access, matched by name.
+         */
+        StructureSearchResult: {
+            /** Name */
+            name: string;
+            /** Structure Id */
+            structure_id: string;
         };
         /**
          * StructureTokenStatus
@@ -1287,6 +1319,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructureAuthorizeResponse"];
+                };
+            };
+        };
+    };
+    search_api_v1_corporations_me_structure_token_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureSearchResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
