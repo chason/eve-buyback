@@ -32,7 +32,7 @@ jobs:
       BUYBACK_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           enable-cache: true
       - run: uv sync --extra dev
