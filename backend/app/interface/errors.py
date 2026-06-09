@@ -14,6 +14,7 @@ from app.application.errors import (
     EmptyAppraisal,
     ManagerAlreadyExists,
     ManagerNotFound,
+    MarketHubInvalid,
     NotAuthorized,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
@@ -33,6 +34,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     AppraisalNotFound: 404,
     EmptyAppraisal: 400,
     AppraisalTooLarge: 422,
+    MarketHubInvalid: 422,
 }
 
 

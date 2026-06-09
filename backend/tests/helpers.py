@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
+from app.plugins.esi_market import get_esi_market_client
 from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
 
 CHAR_ID = 12345
@@ -49,9 +50,26 @@ class MemberEsi(BaseEsi):
     pass
 
 
+class FakeEsiMarket:
+    """Stand-in for the ESI market client. The default Jita hub is a Fuzzwork hub, so
+    pricing/resolution never touch this; a test that selects a non-Fuzzwork station
+    gets a canned region/name resolution."""
+
+    def __init__(self) -> None:
+        self.region_calls = 0
+
+    async def resolve_station(self, station_id: int) -> tuple[int, str]:
+        return 10000002, f"Station {station_id}"
+
+    async def get_region_aggregates(self, *, region_id, station_id, type_ids):
+        self.region_calls += 1
+        return {}
+
+
 def make_client(esi: BaseEsi) -> AsyncClient:
     app.dependency_overrides[get_sso_client] = lambda: FakeSso()
     app.dependency_overrides[get_esi_client] = lambda: esi
+    app.dependency_overrides[get_esi_market_client] = lambda: FakeEsiMarket()
     return AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",

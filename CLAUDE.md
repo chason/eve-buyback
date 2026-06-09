@@ -29,7 +29,7 @@ domain model, auth flow, and pricing-rule resolution.
 | Persistence | SQLAlchemy 2.0 + Alembic on PostgreSQL (asyncpg) | Sole DB; UUID app-entity PKs (ADR-0024, 0025) |
 | Frontend    | TypeScript + React (Vite) + TanStack Query | SPA; types generated from OpenAPI (ADR-0011, 0013) |
 | Auth        | EVE SSO → backend session cookie         | No persisted EVE tokens (ADR-0004)      |
-| Market data | Fuzzwork aggregates, cached              | (ADR-0006)                              |
+| Market data | Fuzzwork aggregates, cached; ESI orders for other hubs | (ADR-0006, 0028)            |
 | Tooling     | `uv`/`venv` (py), `npm` (front)          | Pin exact tooling once chosen           |
 
 If any of these change, edit this table **and the relevant ADR** so the rest of the

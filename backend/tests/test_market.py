@@ -6,9 +6,14 @@ import httpx
 from app.application.market import get_market_prices
 from app.data.db import SessionLocal
 from app.data.repositories import prices as prices_repo
+from app.domain.aggregates import OrderBookAggregate, SideAggregate
+from app.domain.market import HubDescriptor
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide
 
-HUB = 60003760
+HUB = 60003760  # Jita — a Fuzzwork hub
+FUZ_HUB = HubDescriptor(hub_id=HUB, kind="npc_station")
+# A non-Fuzzwork NPC station (priced via ESI region orders), with its region cached.
+ESI_HUB = HubDescriptor(hub_id=60012345, kind="npc_station", region_id=10000002)
 NOW = datetime(2026, 6, 7, 12, 0, 0, tzinfo=UTC)
 
 
@@ -25,6 +30,17 @@ def _aggregate(buy: str, sell: str) -> FuzzworkAggregate:
             percentile=sell, volume="100", orderCount=5,
         ),
     )
+
+
+def _esi_book(buy: str, sell: str) -> OrderBookAggregate:
+    def side(value: str) -> SideAggregate:
+        m = Decimal(value)
+        return SideAggregate(
+            weighted_average=m, max=m, min=m, median=m, percentile=m,
+            volume=Decimal("100"), order_count=5,
+        )
+
+    return OrderBookAggregate(buy=side(buy), sell=side(sell))
 
 
 def _price_row(type_id: int, marker: str, fetched_at: datetime) -> dict:
@@ -54,19 +70,34 @@ class FakeFuzzwork:
         return {tid: self.response[tid] for tid in type_ids if tid in self.response}
 
 
-async def _seed_cache(rows: list[dict]) -> None:
+class FakeEsiMarket:
+    def __init__(self, response=None, error=None):
+        self.response = response or {}
+        self.error = error
+        self.region_calls = 0
+
+    async def get_region_aggregates(self, *, region_id, station_id, type_ids):
+        self.region_calls += 1
+        if self.error is not None:
+            raise self.error
+        return {tid: self.response[tid] for tid in type_ids if tid in self.response}
+
+
+async def _seed_cache(rows: list[dict], hub_id: int = HUB) -> None:
     async with SessionLocal() as session:
-        await prices_repo.upsert_prices(session, hub_id=HUB, rows=rows)
+        await prices_repo.upsert_prices(session, hub_id=hub_id, rows=rows)
         await session.commit()
 
 
 async def test_cache_miss_fetches_and_stores():
     fuzz = FakeFuzzwork(response={34: _aggregate(buy="5.0", sell="8.0")})
+    esi = FakeEsiMarket()
     async with SessionLocal() as session:
         result = await get_market_prices(
-            session, fuzz, hub_id=HUB, type_ids=[34], now=NOW
+            session, fuzz, esi, hub=FUZ_HUB, type_ids=[34], now=NOW
         )
     assert fuzz.calls == 1
+    assert esi.region_calls == 0  # a Fuzzwork hub never touches ESI
     assert len(result) == 1
     assert result[0].type_id == 34
     assert result[0].buy_percentile == Decimal("5.0")
@@ -77,12 +108,13 @@ async def test_cache_miss_fetches_and_stores():
     assert cached[0].sell_percentile == Decimal("8.0")
 
 
-async def test_fresh_cache_does_not_call_fuzzwork():
+async def test_fresh_cache_does_not_call_source():
     await _seed_cache([_price_row(34, marker="1.0", fetched_at=NOW)])
     fuzz = FakeFuzzwork(response={34: _aggregate(buy="99.0", sell="99.0")})
+    esi = FakeEsiMarket()
     async with SessionLocal() as session:
         result = await get_market_prices(
-            session, fuzz, hub_id=HUB, type_ids=[34], now=NOW
+            session, fuzz, esi, hub=FUZ_HUB, type_ids=[34], now=NOW
         )
     assert fuzz.calls == 0
     assert result[0].buy_percentile == Decimal("1.0")  # served from cache
@@ -92,9 +124,10 @@ async def test_stale_cache_is_refetched():
     stale_at = NOW - timedelta(seconds=7200)  # older than the 1h TTL
     await _seed_cache([_price_row(34, marker="1.0", fetched_at=stale_at)])
     fuzz = FakeFuzzwork(response={34: _aggregate(buy="42.0", sell="43.0")})
+    esi = FakeEsiMarket()
     async with SessionLocal() as session:
         result = await get_market_prices(
-            session, fuzz, hub_id=HUB, type_ids=[34], now=NOW
+            session, fuzz, esi, hub=FUZ_HUB, type_ids=[34], now=NOW
         )
     assert fuzz.calls == 1
     assert result[0].buy_percentile == Decimal("42.0")  # refreshed value
@@ -104,11 +137,48 @@ async def test_outage_serves_stale_and_omits_unpriced():
     stale_at = NOW - timedelta(seconds=7200)
     await _seed_cache([_price_row(34, marker="1.0", fetched_at=stale_at)])
     fuzz = FakeFuzzwork(error=httpx.HTTPError("fuzzwork down"))
+    esi = FakeEsiMarket()
     async with SessionLocal() as session:
         result = await get_market_prices(
-            session, fuzz, hub_id=HUB, type_ids=[34, 999], now=NOW
+            session, fuzz, esi, hub=FUZ_HUB, type_ids=[34, 999], now=NOW
         )
     assert fuzz.calls == 1
     # 34 falls back to stale cache; 999 (never priced) is omitted, no exception.
+    assert [r.type_id for r in result] == [34]
+    assert result[0].buy_percentile == Decimal("1.0")
+
+
+async def test_non_fuzzwork_hub_prices_from_esi_region_orders():
+    fuzz = FakeFuzzwork(response={34: _aggregate(buy="99.0", sell="99.0")})
+    esi = FakeEsiMarket(response={34: _esi_book(buy="5.0", sell="8.0")})
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, fuzz, esi, hub=ESI_HUB, type_ids=[34], now=NOW
+        )
+    assert esi.region_calls == 1
+    assert fuzz.calls == 0  # ESI hub never touches Fuzzwork
+    assert result[0].buy_percentile == Decimal("5.0")
+    assert result[0].sell_percentile == Decimal("8.0")
+
+    # Written through under the ESI hub's id.
+    async with SessionLocal() as session:
+        cached = await prices_repo.get_prices(
+            session, hub_id=ESI_HUB.hub_id, type_ids=[34]
+        )
+    assert cached and cached[0].buy_weighted_average == Decimal("5.0")
+
+
+async def test_esi_outage_serves_stale_cache():
+    stale_at = NOW - timedelta(seconds=7200)
+    await _seed_cache(
+        [_price_row(34, marker="1.0", fetched_at=stale_at)], hub_id=ESI_HUB.hub_id
+    )
+    fuzz = FakeFuzzwork()
+    esi = FakeEsiMarket(error=httpx.HTTPError("esi down"))
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, fuzz, esi, hub=ESI_HUB, type_ids=[34, 999], now=NOW
+        )
+    assert esi.region_calls == 1
     assert [r.type_id for r in result] == [34]
     assert result[0].buy_percentile == Decimal("1.0")

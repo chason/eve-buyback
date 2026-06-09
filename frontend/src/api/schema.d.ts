@@ -397,6 +397,16 @@ export interface components {
             default_percentage: string;
             /** Market Hub Id */
             market_hub_id: number;
+            /**
+             * Market Hub Kind
+             * @default npc_station
+             * @enum {string}
+             */
+            market_hub_kind: "npc_station" | "structure";
+            /** Market Hub Name */
+            market_hub_name?: string | null;
+            /** Market Region Id */
+            market_region_id?: number | null;
         };
         /** ConfigUpdateRequest */
         ConfigUpdateRequest: {
@@ -419,6 +429,12 @@ export interface components {
             default_percentage: number | string;
             /** Market Hub Id */
             market_hub_id: number;
+            /**
+             * Market Hub Kind
+             * @default npc_station
+             * @enum {string}
+             */
+            market_hub_kind: "npc_station" | "structure";
         };
         /** CorporationOut */
         CorporationOut: {

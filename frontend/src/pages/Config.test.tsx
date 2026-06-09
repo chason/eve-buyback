@@ -12,6 +12,8 @@ import Config from "./Config"
 vi.mock("../api/auth")
 vi.mock("../api/pricing")
 
+const CUSTOM_HUB = "custom" // the hub picker's "Other NPC station…" option value
+
 function user(role: SessionUser["role"]): SessionUser {
   return {
     character_id: 1,
@@ -27,6 +29,9 @@ function user(role: SessionUser["role"]): SessionUser {
 const config = {
   corporation_id: 2,
   market_hub_id: 60003760,
+  market_hub_kind: "npc_station" as const,
+  market_region_id: null,
+  market_hub_name: "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
   default_basis: "buy" as const,
   default_percentage: "90",
   aggregate_field: "percentile" as const,
@@ -67,10 +72,31 @@ describe("Config", () => {
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
     expect(vi.mocked(pricingApi.updateConfig).mock.calls[0][0]).toEqual({
       market_hub_id: 60003760,
+      market_hub_kind: "npc_station",
       default_basis: "buy",
       default_percentage: "85",
       aggregate_field: "percentile",
       default_accepted: false,
+    })
+  })
+
+  it("prices at a custom NPC station selected from the hub picker", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(pricingApi.updateConfig).mockResolvedValue(config)
+
+    renderConfig()
+
+    const hub = await screen.findByLabelText("Market hub")
+    await u.selectOptions(hub, CUSTOM_HUB)
+    await u.type(screen.getByLabelText("Station ID"), "60012345")
+    await u.click(screen.getByRole("button", { name: "Save config" }))
+
+    await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
+    expect(vi.mocked(pricingApi.updateConfig).mock.calls[0][0]).toMatchObject({
+      market_hub_id: 60012345,
+      market_hub_kind: "npc_station",
     })
   })
 

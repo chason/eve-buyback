@@ -1,9 +1,11 @@
-"""Market-price use case (ADR-0006): a read-through cache over Fuzzwork.
+"""Market-price use case (ADR-0006, ADR-0028): a read-through cache over whichever
+source covers the hub.
 
-Returns cached prices that are still fresh, fetches the misses/stale ones from
-Fuzzwork, and writes them back. Owns the unit of work (commit). Degrades
-gracefully on a Fuzzwork outage: serves whatever (possibly stale) cache exists and
-simply omits items it has never priced, rather than failing the whole request.
+Returns cached prices that are still fresh, fetches the misses/stale ones from the
+hub's source (Fuzzwork for the 5 covered hubs; ESI region orders for any other NPC
+station), and writes them back. Owns the unit of work (commit). Degrades gracefully
+on a source outage: serves whatever (possibly stale) cache exists and simply omits
+items it has never priced, rather than failing the whole request.
 """
 
 import logging
@@ -14,13 +16,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
-from app.domain.market import is_fresh
-from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkClient
+from app.domain.market import HubDescriptor, is_fresh, resolve_market_source
+from app.plugins.esi_market import EsiMarketClient
+from app.plugins.fuzzwork import FuzzworkClient
 
 log = logging.getLogger(__name__)
 
 
-def _row_from_aggregate(type_id: int, agg: FuzzworkAggregate, fetched_at) -> dict:
+def _row_from_aggregate(type_id: int, agg, fetched_at) -> dict:
+    """Build a `market_prices` row from any buy/sell aggregate — Fuzzwork's
+    `FuzzworkAggregate` or ESI's `OrderBookAggregate` share the 7-field side shape."""
     return {
         "type_id": type_id,
         "buy_weighted_average": agg.buy.weighted_average,
@@ -41,11 +46,44 @@ def _row_from_aggregate(type_id: int, agg: FuzzworkAggregate, fetched_at) -> dic
     }
 
 
+async def _fetch_aggregates(
+    fuzzwork: FuzzworkClient,
+    esi_market: EsiMarketClient,
+    hub: HubDescriptor,
+    type_ids: list[int],
+) -> dict:
+    """Fetch buy/sell aggregates for the cache misses from the hub's source. Returns
+    `{}` on any outage so the caller falls back to cached prices."""
+    source = resolve_market_source(hub)
+    try:
+        if source == "fuzzwork":
+            return await fuzzwork.get_aggregates(station=hub.hub_id, type_ids=type_ids)
+        if source == "esi_region":
+            if hub.region_id is None:
+                log.warning("hub %s has no region_id; cannot price via ESI", hub.hub_id)
+                return {}
+            return await esi_market.get_region_aggregates(
+                region_id=hub.region_id, station_id=hub.hub_id, type_ids=type_ids
+            )
+        # esi_structure → a later phase; treat as unpriced for now.
+        log.warning("structure pricing not yet available (hub %s)", hub.hub_id)
+        return {}
+    except httpx.HTTPError:
+        log.warning(
+            "market fetch failed (source=%s) for hub %s; serving cache",
+            source,
+            hub.hub_id,
+            exc_info=True,
+        )
+        return {}
+
+
 async def get_market_prices(
     session: AsyncSession,
     fuzzwork: FuzzworkClient,
+    esi_market: EsiMarketClient,
     *,
-    hub_id: int,
+    hub: HubDescriptor,
     type_ids: list[int],
     now,
 ) -> list[MarketPriceRecord]:
@@ -56,7 +94,7 @@ async def get_market_prices(
     cached = {
         r.type_id: r
         for r in await prices_repo.get_prices(
-            session, hub_id=hub_id, type_ids=type_ids
+            session, hub_id=hub.hub_id, type_ids=type_ids
         )
     }
     fresh = {
@@ -68,28 +106,16 @@ async def get_market_prices(
 
     refreshed: dict[int, MarketPriceRecord] = {}
     if to_fetch:
-        try:
-            aggregates = await fuzzwork.get_aggregates(
-                station=hub_id, type_ids=to_fetch
-            )
-        except httpx.HTTPError:
-            log.warning(
-                "Fuzzwork fetch failed for hub %s (%d types); serving cache",
-                hub_id,
-                len(to_fetch),
-                exc_info=True,
-            )
-            aggregates = {}
-
+        aggregates = await _fetch_aggregates(fuzzwork, esi_market, hub, to_fetch)
         if aggregates:
             rows = [
                 _row_from_aggregate(tid, agg, now)
                 for tid, agg in aggregates.items()
             ]
-            await prices_repo.upsert_prices(session, hub_id=hub_id, rows=rows)
+            await prices_repo.upsert_prices(session, hub_id=hub.hub_id, rows=rows)
             await session.commit()
             refreshed = {
-                row["type_id"]: MarketPriceRecord(hub_id=hub_id, **row)
+                row["type_id"]: MarketPriceRecord(hub_id=hub.hub_id, **row)
                 for row in rows
             }
 

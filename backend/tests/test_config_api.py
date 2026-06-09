@@ -147,3 +147,41 @@ async def test_config_rejects_bad_basis():
             },
         )
         assert resp.status_code == 422  # Literal rejects the bad enum
+
+
+async def test_non_fuzzwork_station_resolves_region_via_esi():
+    # A station that isn't one of the 5 Fuzzwork hubs is resolved + cached (ADR-0028).
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": 60012345,
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["market_hub_kind"] == "npc_station"
+        assert body["market_region_id"] == 10000002  # from FakeEsiMarket
+        assert body["market_hub_name"] == "Station 60012345"
+
+
+async def test_structure_hub_rejected_for_now():
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": 1035000000001,
+                "market_hub_kind": "structure",
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 422  # structures not yet supported (MarketHubInvalid)

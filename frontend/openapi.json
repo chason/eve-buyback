@@ -320,6 +320,37 @@
           "market_hub_id": {
             "title": "Market Hub Id",
             "type": "integer"
+          },
+          "market_hub_kind": {
+            "default": "npc_station",
+            "enum": [
+              "npc_station",
+              "structure"
+            ],
+            "title": "Market Hub Kind",
+            "type": "string"
+          },
+          "market_hub_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Hub Name"
+          },
+          "market_region_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Region Id"
           }
         },
         "required": [
@@ -375,6 +406,15 @@
           "market_hub_id": {
             "title": "Market Hub Id",
             "type": "integer"
+          },
+          "market_hub_kind": {
+            "default": "npc_station",
+            "enum": [
+              "npc_station",
+              "structure"
+            ],
+            "title": "Market Hub Kind",
+            "type": "string"
           }
         },
         "required": [

@@ -4,10 +4,12 @@ at the interface; these enforce existence/uniqueness/target rules and own the co
 
 from decimal import Decimal
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
+    MarketHubInvalid,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
 )
@@ -16,6 +18,12 @@ from app.data.records import BuybackConfigRecord, PricingRuleRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
+from app.domain.market import (
+    FUZZWORK_HUB_NAMES,
+    HubDescriptor,
+    HubKind,
+    resolve_market_source,
+)
 from app.domain.pricing import (
     DEFAULT_AGGREGATE_FIELD,
     DEFAULT_BASIS,
@@ -24,6 +32,7 @@ from app.domain.pricing import (
     Basis,
     TargetKind,
 )
+from app.plugins.esi_market import EsiMarketClient
 
 
 async def get_config(
@@ -49,18 +58,26 @@ async def get_config(
 async def update_config(
     session: AsyncSession,
     corporation_id: int,
+    esi_market: EsiMarketClient,
     *,
     market_hub_id: int,
     default_basis: Basis,
     default_percentage: Decimal,
     aggregate_field: AggregateField,
     default_accepted: bool = True,
+    market_hub_kind: HubKind = "npc_station",
 ) -> BuybackConfigRecord:
     corp = await get_registered_corporation(session, corporation_id)
+    region_id, hub_name = await _resolve_hub(
+        esi_market, market_hub_id, market_hub_kind
+    )
     config = await config_repo.upsert_config(
         session,
         corporation_id=corp.id,
         market_hub_id=market_hub_id,
+        market_hub_kind=market_hub_kind,
+        market_region_id=region_id,
+        market_hub_name=hub_name,
         default_basis=default_basis,
         default_percentage=default_percentage,
         aggregate_field=aggregate_field,
@@ -68,6 +85,26 @@ async def update_config(
     )
     await session.commit()
     return config
+
+
+async def _resolve_hub(
+    esi_market: EsiMarketClient, hub_id: int, kind: HubKind
+) -> tuple[int | None, str | None]:
+    """Resolve a chosen hub to `(region_id, display_name)`, validating it exists
+    (ADR-0028). Fuzzwork hubs need no ESI hop; a non-Fuzzwork NPC station is resolved
+    + cached so the hot path never touches the universe endpoints. Raises
+    `MarketHubInvalid` (422) if the hub can't be resolved."""
+    if kind == "structure":
+        raise MarketHubInvalid("Structure hubs are not yet supported")
+    source = resolve_market_source(HubDescriptor(hub_id=hub_id, kind=kind))
+    if source == "fuzzwork":
+        return None, FUZZWORK_HUB_NAMES.get(hub_id)
+    try:
+        return await esi_market.resolve_station(hub_id)
+    except httpx.HTTPError as exc:
+        raise MarketHubInvalid(
+            f"Could not resolve station {hub_id} from ESI"
+        ) from exc
 
 
 async def list_rules(
