@@ -207,7 +207,7 @@
           },
           "market_hub_id": {
             "title": "Market Hub Id",
-            "type": "integer"
+            "type": "string"
           },
           "public_id": {
             "title": "Public Id",
@@ -259,7 +259,7 @@
           },
           "market_hub_id": {
             "title": "Market Hub Id",
-            "type": "integer"
+            "type": "string"
           },
           "public_id": {
             "title": "Public Id",
@@ -319,7 +319,7 @@
           },
           "market_hub_id": {
             "title": "Market Hub Id",
-            "type": "integer"
+            "type": "string"
           },
           "market_hub_kind": {
             "default": "npc_station",
@@ -405,7 +405,7 @@
           },
           "market_hub_id": {
             "title": "Market Hub Id",
-            "type": "integer"
+            "type": "string"
           },
           "market_hub_kind": {
             "default": "npc_station",

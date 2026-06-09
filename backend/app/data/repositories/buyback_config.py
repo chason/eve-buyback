@@ -24,7 +24,7 @@ async def upsert_config(
     session: AsyncSession,
     *,
     corporation_id: uuid.UUID,
-    market_hub_id: int,
+    market_hub_id: str,
     default_basis: Basis,
     default_percentage: Decimal,
     aggregate_field: AggregateField,

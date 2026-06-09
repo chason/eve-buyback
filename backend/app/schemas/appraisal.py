@@ -70,7 +70,7 @@ class AppraisalOut(BaseModel):
     created_by_character_id: int
     created_by_character_name: str | None = None
     created_at: datetime
-    market_hub_id: int
+    market_hub_id: str
     accepted_total: Decimal
     rejected_count: int
     lines: list[AppraisalLineOut]
@@ -83,6 +83,6 @@ class AppraisalSummaryOut(BaseModel):
     created_by_character_id: int
     created_by_character_name: str | None = None
     created_at: datetime
-    market_hub_id: int
+    market_hub_id: str
     accepted_total: Decimal
     rejected_count: int

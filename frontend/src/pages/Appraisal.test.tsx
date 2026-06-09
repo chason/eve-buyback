@@ -45,7 +45,7 @@ describe("Appraisal", () => {
       public_id: "abc123",
       created_by_character_id: 1,
       created_at: "2026-06-07T00:00:00Z",
-      market_hub_id: 60003760,
+      market_hub_id: "60003760",
       accepted_total: "4500.0000000000",
       rejected_count: 1,
       lines: [
@@ -82,7 +82,7 @@ describe("Appraisal", () => {
       public_id: "z9",
       created_by_character_id: 1,
       created_at: "2026-06-07T00:00:00Z",
-      market_hub_id: 60003760,
+      market_hub_id: "60003760",
       accepted_total: "0",
       rejected_count: 1,
       lines: [
@@ -106,7 +106,7 @@ describe("Appraisal", () => {
       public_id: "ore1",
       created_by_character_id: 1,
       created_at: "2026-06-07T00:00:00Z",
-      market_hub_id: 60003760,
+      market_hub_id: "60003760",
       accepted_total: "36252.00",
       rejected_count: 0,
       lines: [

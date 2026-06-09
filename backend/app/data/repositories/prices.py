@@ -33,7 +33,7 @@ _AGGREGATE_COLUMNS = (
 
 
 async def get_prices(
-    session: AsyncSession, *, hub_id: int, type_ids: Sequence[int]
+    session: AsyncSession, *, hub_id: str, type_ids: Sequence[int]
 ) -> list[MarketPriceRecord]:
     if not type_ids:
         return []
@@ -45,7 +45,7 @@ async def get_prices(
 
 
 async def upsert_prices(
-    session: AsyncSession, *, hub_id: int, rows: Sequence[dict]
+    session: AsyncSession, *, hub_id: str, rows: Sequence[dict]
 ) -> None:
     """Insert-or-update cached prices keyed by `(hub_id, type_id)`. Each row dict
     carries `type_id`, the buy/sell aggregate fields, and `fetched_at`."""

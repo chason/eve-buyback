@@ -45,7 +45,7 @@ class FuzzworkClient:
         self._client = client
 
     async def get_aggregates(
-        self, *, station: int, type_ids: list[int]
+        self, *, station: str, type_ids: list[int]
     ) -> dict[int, FuzzworkAggregate]:
         """Fetch buy/sell aggregates for `type_ids` at one station, keyed by type id."""
         result: dict[int, FuzzworkAggregate] = {}

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Numeric, Uuid, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Numeric, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -25,7 +25,7 @@ class Appraisal(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    market_hub_id: Mapped[int]
+    market_hub_id: Mapped[str] = mapped_column(String)
     accepted_total: Mapped[Decimal] = mapped_column(Numeric)
     rejected_count: Mapped[int]
 

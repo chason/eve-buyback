@@ -30,7 +30,7 @@ function user(role: SessionUser["role"]): SessionUser {
 
 const config = {
   corporation_id: 2,
-  market_hub_id: 60003760,
+  market_hub_id: "60003760",
   market_hub_kind: "npc_station" as const,
   market_region_id: null,
   market_hub_name: "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
@@ -73,7 +73,7 @@ describe("Config", () => {
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
     expect(vi.mocked(pricingApi.updateConfig).mock.calls[0][0]).toEqual({
-      market_hub_id: 60003760,
+      market_hub_id: "60003760",
       market_hub_kind: "npc_station",
       default_basis: "buy",
       default_percentage: "85",
@@ -107,7 +107,7 @@ describe("Config", () => {
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
     expect(vi.mocked(pricingApi.updateConfig).mock.calls[0][0]).toMatchObject({
-      market_hub_id: 60012345,
+      market_hub_id: "60012345",
       market_hub_kind: "npc_station",
     })
   })

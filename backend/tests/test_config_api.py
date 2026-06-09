@@ -28,7 +28,7 @@ async def _seed_registered_corp() -> None:
         await config_repo.upsert_config(
             session,
             corporation_id=corp.id,
-            market_hub_id=60003760,
+            market_hub_id="60003760",
             default_basis="buy",
             default_percentage=90,
             aggregate_field="percentile",
@@ -47,7 +47,7 @@ async def test_default_config_created_on_registration():
         assert body["default_basis"] == "buy"
         assert Decimal(body["default_percentage"]) == 90
         assert body["aggregate_field"] == "percentile"
-        assert body["market_hub_id"] == 60003760
+        assert body["market_hub_id"] == "60003760"
 
 
 async def test_manager_can_update_config():
@@ -58,7 +58,7 @@ async def test_manager_can_update_config():
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 60003760,
+                "market_hub_id": "60003760",
                 "default_basis": "split",
                 "default_percentage": "85.5",
                 "aggregate_field": "weighted_average",
@@ -81,7 +81,7 @@ async def test_default_accepted_round_trips():
         await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 60003760,
+                "market_hub_id": "60003760",
                 "default_basis": "buy",
                 "default_percentage": "90",
                 "aggregate_field": "percentile",
@@ -103,7 +103,7 @@ async def test_member_cannot_update_config_but_can_read():
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 60003760,
+                "market_hub_id": "60003760",
                 "default_basis": "buy",
                 "default_percentage": "50",
                 "aggregate_field": "percentile",
@@ -141,7 +141,7 @@ async def test_config_rejects_bad_basis():
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 60003760,
+                "market_hub_id": "60003760",
                 "default_basis": "bananas",
                 "default_percentage": "90",
                 "aggregate_field": "percentile",
@@ -172,7 +172,7 @@ async def test_non_fuzzwork_station_resolves_region_from_sde():
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 60012345,
+                "market_hub_id": "60012345",
                 "default_basis": "buy",
                 "default_percentage": "90",
                 "aggregate_field": "percentile",
@@ -195,7 +195,7 @@ async def test_unknown_station_rejected():
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 69999999,  # not seeded
+                "market_hub_id": "69999999",  # not seeded
                 "default_basis": "buy",
                 "default_percentage": "90",
                 "aggregate_field": "percentile",
@@ -204,18 +204,59 @@ async def test_unknown_station_rejected():
         assert resp.status_code == 422  # MarketHubInvalid: unknown station
 
 
-async def test_structure_hub_rejected_for_now():
+async def test_structure_hub_requires_authorization():
+    # Without an authorized structure token, a structure hub is rejected (422).
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
         resp = await http.put(
             "/api/v1/corporations/me/config",
             json={
-                "market_hub_id": 1035000000001,
+                "market_hub_id": "1035000000001",
                 "market_hub_kind": "structure",
                 "default_basis": "buy",
                 "default_percentage": "90",
                 "aggregate_field": "percentile",
             },
         )
-        assert resp.status_code == 422  # structures not yet supported (MarketHubInvalid)
+        assert resp.status_code == 422  # MarketHubInvalid: not authorized
+
+
+async def test_structure_hub_accepted_once_authorized():
+    from app.data.repositories import characters as ch_repo
+    from app.data.repositories import structure_tokens as st_repo
+
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # Seed an authorization for the corp.
+        async with SessionLocal() as session:
+            corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+            char = await ch_repo.upsert_character(
+                session, eve_character_id=1, name="Pilot"
+            )
+            await st_repo.upsert_token(
+                session,
+                corporation_id=corp.id,
+                character_id=char.id,
+                character_eve_id=1,
+                character_name="Pilot",
+                encrypted_refresh_token=b"ciphertext",
+                scopes="s",
+            )
+            await session.commit()
+
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": "1035000000001",
+                "market_hub_kind": "structure",
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["market_hub_kind"] == "structure"
+        assert body["market_hub_name"] == "Structure 1035000000001"

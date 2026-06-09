@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, Uuid, text
+from sqlalchemy import ForeignKey, Numeric, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -22,7 +22,8 @@ class BuybackConfig(Base):
     corporation_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("corporations.id", ondelete="CASCADE"), unique=True
     )
-    market_hub_id: Mapped[int]
+    # EVE location id as a string (station or 64-bit structure id) — ADR-0029.
+    market_hub_id: Mapped[str] = mapped_column(String)
     # Hub kind + ESI region (ADR-0028). The 5 Fuzzwork hubs are npc_station with no
     # stored region (Fuzzwork is keyed by station). A non-Fuzzwork NPC station caches
     # its region_id (for ESI region-orders) and a display name, both resolved at save.

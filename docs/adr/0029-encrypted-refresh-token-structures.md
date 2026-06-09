@@ -53,6 +53,11 @@ entirely token-free.
 - Identity/auth (ADR-0004) stays token-free; this token is **only** for structure
   market data and never participates in login or role resolution.
 - `character_id`/`name` of the authorizing pilot are recorded for audit + display.
+- **Hub ids are now stored/transported as strings** (`market_prices.hub_id`,
+  `buyback_configs.market_hub_id`, `appraisals.market_hub_id`, and the API/TS types).
+  Player structure ids are 64-bit (beyond int32 and beyond JS's safe-integer range), so
+  a string is the only representation that's correct everywhere. NPC station/region/type
+  ids stay integers.
 
 ## Alternatives considered
 

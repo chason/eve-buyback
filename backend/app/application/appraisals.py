@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import market
+from app.application import structure_tokens as structure_tokens_app
 from app.application.auth import AuthenticatedUser
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
@@ -37,6 +38,8 @@ from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.fuzzwork import FuzzworkClient
+from app.plugins.sso import EveSsoClient
+from app.plugins.token_cipher import TokenCipher
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,8 @@ async def create_appraisal(
     session: AsyncSession,
     fuzzwork: FuzzworkClient,
     esi_market: EsiMarketClient,
+    sso: EveSsoClient,
+    cipher: TokenCipher,
     *,
     user: AuthenticatedUser,
     items: list[AppraisalItem],
@@ -74,6 +79,15 @@ async def create_appraisal(
         kind=config.market_hub_kind,
         region_id=config.market_region_id,
     )
+
+    # For a structure hub, supply a fresh access token (refreshed server-side) to the
+    # market layer; an unauthorized/expired token degrades to cached prices (ADR-0029).
+    structure_token_provider = None
+    if hub.kind == "structure":
+        async def structure_token_provider() -> str:
+            return await structure_tokens_app.get_structure_access_token(
+                session, sso, corporation_uuid=corp.id, cipher=cipher
+            )
 
     work = await _gather_items(session, items, paste)
     if not work:
@@ -140,6 +154,7 @@ async def create_appraisal(
         hub=hub,
         type_ids=list(set(type_ids) | mineral_ids),
         now=now,
+        structure_token_provider=structure_token_provider,
     )
     price_by_id = {p.type_id: p for p in prices}
 

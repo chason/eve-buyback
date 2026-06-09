@@ -36,7 +36,7 @@ async def _seed_registered_corp() -> None:
             ceo_character_id=99999, registered_by_character_id=99999,
         )
         await config_repo.upsert_config(
-            session, corporation_id=corp.id, market_hub_id=60003760,
+            session, corporation_id=corp.id, market_hub_id="60003760",
             default_basis="buy", default_percentage=90, aggregate_field="percentile",
         )
         await session.commit()

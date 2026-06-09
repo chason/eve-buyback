@@ -28,27 +28,19 @@ _ERROR_LIMIT_FLOOR = 5
 log = logging.getLogger(__name__)
 
 
+class StructureAccessDenied(Exception):
+    """ESI returned 403 for a structure market — the character lost docking/market
+    access. The market layer degrades gracefully (serves cache) rather than failing."""
+
+
 class EsiMarketClient:
     """Thin async wrapper over the shared httpx client for ESI market endpoints."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def resolve_station(self, station_id: int) -> tuple[int, str]:
-        """Resolve an NPC station id to `(region_id, station_name)` — station→system
-        →constellation→region. Called once when a manager sets the hub, not on the
-        hot path. Raises `httpx.HTTPStatusError` for an unknown station."""
-        station = await self._get(f"{ESI_BASE}/universe/stations/{station_id}/")
-        system = await self._get(
-            f"{ESI_BASE}/universe/systems/{station['system_id']}/"
-        )
-        constellation = await self._get(
-            f"{ESI_BASE}/universe/constellations/{system['constellation_id']}/"
-        )
-        return int(constellation["region_id"]), str(station["name"])
-
     async def get_region_aggregates(
-        self, *, region_id: int, station_id: int, type_ids: list[int]
+        self, *, region_id: int, station_id: str, type_ids: list[int]
     ) -> dict[int, OrderBookAggregate]:
         """Aggregate buy/sell at one NPC station from its region's order book, keyed
         by type id. One paginated request per type, fanned out under a concurrency
@@ -66,7 +58,7 @@ class EsiMarketClient:
                     is_buy_order=bool(o["is_buy_order"]),
                 )
                 for o in orders
-                if o.get("location_id") == station_id
+                if str(o.get("location_id")) == station_id
             ]
             return type_id, aggregate_orders(at_station)
 
@@ -81,6 +73,49 @@ class EsiMarketClient:
             type_id, aggregate = result
             out[type_id] = aggregate
         return out
+
+    async def get_structure_aggregates(
+        self, *, structure_id: str, type_ids: list[int], access_token: str
+    ) -> dict[int, OrderBookAggregate]:
+        """Aggregate buy/sell at a player structure (ADR-0029). The structure market
+        endpoint returns ALL orders (not type-filterable), paginated and authenticated
+        — fetch the whole book once, index by type, aggregate the requested types.
+        A 403 (lost docking/market access) raises `StructureAccessDenied`."""
+        orders_by_type = await self._structure_orders(structure_id, access_token)
+        return {
+            type_id: aggregate_orders(orders_by_type.get(type_id, []))
+            for type_id in type_ids
+        }
+
+    async def _structure_orders(
+        self, structure_id: int, access_token: str
+    ) -> dict[int, list[RawOrder]]:
+        url = f"{ESI_BASE}/markets/structures/{structure_id}/"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        by_type: dict[int, list[RawOrder]] = {}
+        page = 1
+        while True:
+            resp = await self._client.get(
+                url,
+                params={"page": page, "datasource": "tranquility"},
+                headers=headers,
+            )
+            if resp.status_code == 403:
+                raise StructureAccessDenied()
+            await self._respect_error_limit(resp)
+            resp.raise_for_status()
+            for order in json.loads(resp.text, parse_float=Decimal):
+                by_type.setdefault(int(order["type_id"]), []).append(
+                    RawOrder(
+                        price=Decimal(order["price"]),
+                        volume_remain=int(order["volume_remain"]),
+                        is_buy_order=bool(order["is_buy_order"]),
+                    )
+                )
+            if page >= int(resp.headers.get("X-Pages", "1")):
+                break
+            page += 1
+        return by_type
 
     async def _region_orders_for_type(
         self, region_id: int, type_id: int
@@ -102,12 +137,6 @@ class EsiMarketClient:
             resp.raise_for_status()
             orders.extend(json.loads(resp.text, parse_float=Decimal))
         return orders
-
-    async def _get(self, url: str) -> dict:
-        resp = await self._client.get(url, params={"datasource": "tranquility"})
-        await self._respect_error_limit(resp)
-        resp.raise_for_status()
-        return resp.json()
 
     async def _respect_error_limit(self, resp: httpx.Response) -> None:
         """Politely back off when ESI's error budget is nearly spent (ESI conventions)."""

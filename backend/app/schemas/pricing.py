@@ -10,7 +10,7 @@ class ConfigOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     corporation_id: int
-    market_hub_id: int
+    market_hub_id: str
     # Hub source (ADR-0028): kind + cached ESI region + display name (region/name are
     # null for the Fuzzwork hubs, which need no resolution).
     market_hub_kind: HubKind = "npc_station"
@@ -23,7 +23,7 @@ class ConfigOut(BaseModel):
 
 
 class ConfigUpdateRequest(BaseModel):
-    market_hub_id: int
+    market_hub_id: str
     # Defaults to an NPC station; structures arrive in a later phase. region_id/name
     # are resolved server-side from the id, so they aren't part of the request.
     market_hub_kind: HubKind = "npc_station"
