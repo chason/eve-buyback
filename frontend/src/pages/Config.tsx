@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
 import type { AggregateField, Basis } from "../api/types"
-import { hubName } from "../lib/hubs"
+import { FUZZWORK_HUBS, hubName, isFuzzworkHub } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
+const CUSTOM = "custom" // sentinel select value for "other NPC station"
 const BASES: Basis[] = ["buy", "sell", "split"]
 const AGGREGATES: AggregateField[] = [
   "percentile",
@@ -26,6 +27,10 @@ export default function Config() {
   const [percentage, setPercentage] = useState("90")
   const [aggregate, setAggregate] = useState<AggregateField>("percentile")
   const [defaultAccepted, setDefaultAccepted] = useState(true)
+  // Hub picker: a Fuzzwork preset id (as a string) or CUSTOM for an arbitrary NPC
+  // station whose id the manager types (priced via ESI).
+  const [hubChoice, setHubChoice] = useState<string>(String(FUZZWORK_HUBS[0].id))
+  const [customStation, setCustomStation] = useState("")
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -34,13 +39,25 @@ export default function Config() {
       setPercentage(config.data.default_percentage)
       setAggregate(config.data.aggregate_field)
       setDefaultAccepted(config.data.default_accepted)
+      const hub = config.data.market_hub_id
+      if (isFuzzworkHub(hub)) {
+        setHubChoice(String(hub))
+      } else {
+        setHubChoice(CUSTOM)
+        setCustomStation(String(hub))
+      }
     }
   }, [config.data])
+
+  const customStationId = Number(customStation)
+  const hubId = hubChoice === CUSTOM ? customStationId : Number(hubChoice)
+  const hubInvalid = hubChoice === CUSTOM && !Number.isInteger(customStationId)
 
   const save = useMutation({
     mutationFn: () =>
       updateConfig({
-        market_hub_id: config.data!.market_hub_id,
+        market_hub_id: hubId,
+        market_hub_kind: "npc_station",
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
@@ -69,9 +86,44 @@ export default function Config() {
       >
         <label>
           Market hub
-          <input type="text" value={hubName(config.data.market_hub_id)} readOnly />
-          <small>Jita-only for now.</small>
+          <select
+            value={hubChoice}
+            disabled={!canEdit}
+            onChange={(e) => setHubChoice(e.target.value)}
+            aria-label="Market hub"
+          >
+            {FUZZWORK_HUBS.map((h) => (
+              <option key={h.id} value={String(h.id)}>
+                {h.name}
+              </option>
+            ))}
+            <option value={CUSTOM}>Other NPC station…</option>
+          </select>
         </label>
+        {hubChoice === CUSTOM && (
+          <label>
+            Station ID
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={customStation}
+              disabled={!canEdit}
+              onChange={(e) => setCustomStation(e.target.value)}
+              aria-label="Station ID"
+            />
+            <small className="field-hint">
+              Any NPC station's id — priced live from EVE ESI region orders.
+            </small>
+          </label>
+        )}
+        <small className="field-hint">
+          Currently pricing at{" "}
+          <strong>
+            {config.data.market_hub_name ?? hubName(config.data.market_hub_id)}
+          </strong>{" "}
+          ({isFuzzworkHub(config.data.market_hub_id) ? "Fuzzwork" : "EVE ESI"}).
+        </small>
 
         <label>
           Default basis
@@ -130,7 +182,7 @@ export default function Config() {
         </small>
 
         {canEdit ? (
-          <button type="submit" aria-busy={save.isPending}>
+          <button type="submit" aria-busy={save.isPending} disabled={hubInvalid}>
             Save config
           </button>
         ) : (

@@ -7,6 +7,7 @@ from app.application import appraisals as appraisals_app
 from app.application.appraisals import AppraisalItem
 from app.interface.deps import SessionDep
 from app.interface.security import RequireUser
+from app.plugins.esi_market import EsiMarketClient, get_esi_market_client
 from app.plugins.fuzzwork import FuzzworkClient, get_fuzzwork_client
 from app.schemas.appraisal import (
     AppraisalCreateRequest,
@@ -17,6 +18,7 @@ from app.schemas.appraisal import (
 router = APIRouter(prefix="/appraisals", tags=["appraisals"])
 
 FuzzworkDep = Annotated[FuzzworkClient, Depends(get_fuzzwork_client)]
+EsiMarketDep = Annotated[EsiMarketClient, Depends(get_esi_market_client)]
 
 
 @router.post("", response_model=AppraisalOut, status_code=status.HTTP_201_CREATED)
@@ -25,6 +27,7 @@ async def create_appraisal(
     user: RequireUser,
     session: SessionDep,
     fuzzwork: FuzzworkDep,
+    esi_market: EsiMarketDep,
 ) -> AppraisalOut:
     items = [
         AppraisalItem(type_id=i.type_id, quantity=i.quantity) for i in payload.items
@@ -32,6 +35,7 @@ async def create_appraisal(
     record = await appraisals_app.create_appraisal(
         session,
         fuzzwork,
+        esi_market,
         user=user,
         items=items,
         paste=payload.paste,

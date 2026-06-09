@@ -32,8 +32,10 @@ from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
+from app.domain.market import HubDescriptor
 from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
+from app.plugins.esi_market import EsiMarketClient
 from app.plugins.fuzzwork import FuzzworkClient
 
 
@@ -57,6 +59,7 @@ class _WorkItem:
 async def create_appraisal(
     session: AsyncSession,
     fuzzwork: FuzzworkClient,
+    esi_market: EsiMarketClient,
     *,
     user: AuthenticatedUser,
     items: list[AppraisalItem],
@@ -66,6 +69,11 @@ async def create_appraisal(
     corp = await get_registered_corporation(session, user.corporation_id)  # 404 if not
     config = await get_config(session, user.corporation_id)
     hub_id = config.market_hub_id
+    hub = HubDescriptor(
+        hub_id=hub_id,
+        kind=config.market_hub_kind,
+        region_id=config.market_region_id,
+    )
 
     work = await _gather_items(session, items, paste)
     if not work:
@@ -128,7 +136,8 @@ async def create_appraisal(
     prices = await market.get_market_prices(
         session,
         fuzzwork,
-        hub_id=hub_id,
+        esi_market,
+        hub=hub,
         type_ids=list(set(type_ids) | mineral_ids),
         now=now,
     )

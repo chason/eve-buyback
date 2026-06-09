@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import BuybackConfig
 from app.data.records import BuybackConfigRecord
+from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis
 
 
@@ -28,12 +29,18 @@ async def upsert_config(
     default_percentage: Decimal,
     aggregate_field: AggregateField,
     default_accepted: bool = True,
+    market_hub_kind: HubKind = "npc_station",
+    market_region_id: int | None = None,
+    market_hub_name: str | None = None,
 ) -> BuybackConfigRecord:
     row = await _row(session, corporation_id)
     if row is None:
         row = BuybackConfig(corporation_id=corporation_id)
         session.add(row)
     row.market_hub_id = market_hub_id
+    row.market_hub_kind = market_hub_kind
+    row.market_region_id = market_region_id
+    row.market_hub_name = market_hub_name
     row.default_basis = default_basis
     row.default_percentage = default_percentage
     row.aggregate_field = aggregate_field

@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 
 
@@ -106,6 +107,10 @@ class BuybackConfigRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     market_hub_id: int
+    # Hub source descriptor (ADR-0028): kind + ESI region + cached display name.
+    market_hub_kind: HubKind = "npc_station"
+    market_region_id: int | None = None
+    market_hub_name: str | None = None
     default_basis: Basis
     default_percentage: Decimal
     aggregate_field: AggregateField

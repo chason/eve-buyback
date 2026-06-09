@@ -56,3 +56,7 @@ class EmptyAppraisal(ApplicationError):
 
 class AppraisalTooLarge(ApplicationError):
     default_detail = "An appraisal may contain at most 1000 items (EVE's contract limit)"
+
+
+class MarketHubInvalid(ApplicationError):
+    default_detail = "Market hub could not be resolved"

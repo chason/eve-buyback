@@ -7,6 +7,7 @@ from app.application.auth import AuthenticatedUser
 from app.domain.pricing import TargetKind
 from app.interface.deps import SessionDep
 from app.interface.security import RequireUser, require_role
+from app.plugins.esi_market import EsiMarketClient, get_esi_market_client
 from app.schemas.pricing import (
     ConfigOut,
     ConfigUpdateRequest,
@@ -17,6 +18,7 @@ from app.schemas.pricing import (
 router = APIRouter(prefix="/corporations/me", tags=["pricing"])
 
 ManagerUser = Annotated[AuthenticatedUser, Depends(require_role("manager"))]
+EsiMarketDep = Annotated[EsiMarketClient, Depends(get_esi_market_client)]
 
 
 @router.get("/config", response_model=ConfigOut)
@@ -27,10 +29,13 @@ async def get_config(user: RequireUser, session: SessionDep) -> ConfigOut:
 
 @router.put("/config", response_model=ConfigOut)
 async def update_config(
-    payload: ConfigUpdateRequest, user: ManagerUser, session: SessionDep
+    payload: ConfigUpdateRequest,
+    user: ManagerUser,
+    session: SessionDep,
+    esi_market: EsiMarketDep,
 ) -> ConfigOut:
     config = await pricing_app.update_config(
-        session, user.corporation_id, **payload.model_dump()
+        session, user.corporation_id, esi_market, **payload.model_dump()
     )
     return ConfigOut(corporation_id=user.corporation_id, **config.model_dump())
 

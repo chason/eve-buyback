@@ -1,6 +1,7 @@
 # 0006. Market data from Fuzzwork aggregates, cached with TTL
 
-- **Status:** Accepted
+- **Status:** Accepted — extended by [ADR-0028](0028-esi-market-source-and-aggregation.md)
+  (ESI as the source for hubs Fuzzwork doesn't cover)
 - **Date:** 2026-06-04
 
 ## Context
