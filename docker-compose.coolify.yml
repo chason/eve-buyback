@@ -13,6 +13,13 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # `default` keeps the app on its own compose network (Coolify wires Traefik
+    # here); `coolify` is the shared predefined network the managed Postgres lives
+    # on, so the app can resolve the DB by name. Without this the app's DNS lookup
+    # of the DB host fails (socket.gaierror / name resolution).
+    networks:
+      - default
+      - coolify
     # Coolify generates the public FQDN and wires Traefik + Let's Encrypt TLS to
     # container port 8000. Set the actual domain in the Coolify UI (Domains).
     expose:
@@ -44,3 +51,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+# Coolify's shared predefined network. The managed Postgres must also be attached
+# to it — verify on the server with:
+#   docker inspect <postgres-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+# If your predefined network is named differently, change `coolify` here to match.
+networks:
+  coolify:
+    external: true
