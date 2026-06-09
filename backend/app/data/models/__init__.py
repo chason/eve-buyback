@@ -9,6 +9,7 @@ from app.data.models.market_price import MarketPrice
 from app.data.models.pricing_rule import PricingRule
 from app.data.models.sde_market_group import SdeMarketGroup
 from app.data.models.sde_metadata import SdeMetadata
+from app.data.models.sde_station import SdeStation
 from app.data.models.sde_type import SdeType
 from app.data.models.sde_type_material import SdeTypeMaterial
 
@@ -23,6 +24,7 @@ __all__ = [
     "PricingRule",
     "SdeMarketGroup",
     "SdeMetadata",
+    "SdeStation",
     "SdeType",
     "SdeTypeMaterial",
 ]

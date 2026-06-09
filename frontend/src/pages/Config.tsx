@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
+import { searchStations } from "../api/sde"
 import type { AggregateField, Basis } from "../api/types"
 import { FUZZWORK_HUBS, hubName, isFuzzworkHub } from "../lib/hubs"
 import { isManager } from "../lib/roles"
@@ -27,10 +28,13 @@ export default function Config() {
   const [percentage, setPercentage] = useState("90")
   const [aggregate, setAggregate] = useState<AggregateField>("percentile")
   const [defaultAccepted, setDefaultAccepted] = useState(true)
-  // Hub picker: a Fuzzwork preset id (as a string) or CUSTOM for an arbitrary NPC
-  // station whose id the manager types (priced via ESI).
+  // Hub picker: a Fuzzwork preset id (as a string) or CUSTOM for any other NPC
+  // station, chosen from a searchable list (priced via ESI).
   const [hubChoice, setHubChoice] = useState<string>(String(FUZZWORK_HUBS[0].id))
-  const [customStation, setCustomStation] = useState("")
+  const [stationQuery, setStationQuery] = useState("")
+  const [station, setStation] = useState<{ id: number; label: string } | null>(
+    null,
+  )
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -44,14 +48,23 @@ export default function Config() {
         setHubChoice(String(hub))
       } else {
         setHubChoice(CUSTOM)
-        setCustomStation(String(hub))
+        setStation({
+          id: hub,
+          label: config.data.market_hub_name ?? `Station ${hub}`,
+        })
       }
     }
   }, [config.data])
 
-  const customStationId = Number(customStation)
-  const hubId = hubChoice === CUSTOM ? customStationId : Number(hubChoice)
-  const hubInvalid = hubChoice === CUSTOM && !Number.isInteger(customStationId)
+  const query = stationQuery.trim()
+  const stationResults = useQuery({
+    queryKey: ["stations", query],
+    queryFn: () => searchStations(query),
+    enabled: hubChoice === CUSTOM && query.length >= 2,
+  })
+
+  const hubId = hubChoice === CUSTOM ? (station?.id ?? 0) : Number(hubChoice)
+  const hubInvalid = hubChoice === CUSTOM && station === null
 
   const save = useMutation({
     mutationFn: () =>
@@ -102,18 +115,43 @@ export default function Config() {
         </label>
         {hubChoice === CUSTOM && (
           <label>
-            Station ID
+            Station
             <input
-              type="number"
-              min={0}
-              step="1"
-              value={customStation}
+              type="search"
+              value={station ? station.label : stationQuery}
+              placeholder="Search by system or station…"
+              aria-label="Search station"
               disabled={!canEdit}
-              onChange={(e) => setCustomStation(e.target.value)}
-              aria-label="Station ID"
+              onChange={(e) => {
+                setStation(null)
+                setStationQuery(e.target.value)
+              }}
             />
+            {!station && query.length >= 2 && (
+              <ul className="search-results">
+                {stationResults.isLoading && <li aria-busy="true">Searching…</li>}
+                {stationResults.data?.map((s) => (
+                  <li key={s.station_id}>
+                    <a
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setStation({
+                          id: s.station_id,
+                          label: `${s.system_name} - ${s.name}`,
+                        })
+                        setStationQuery("")
+                      }}
+                    >
+                      {s.system_name} - {s.name}
+                    </a>
+                  </li>
+                ))}
+                {stationResults.data?.length === 0 && <li>No matches.</li>}
+              </ul>
+            )}
             <small className="field-hint">
-              Any NPC station's id — priced live from EVE ESI region orders.
+              Any NPC station — priced live from EVE ESI region orders.
             </small>
           </label>
         )}

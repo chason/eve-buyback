@@ -836,6 +836,34 @@
         "title": "SessionUser",
         "type": "object"
       },
+      "StationSearchResult": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "region_id": {
+            "title": "Region Id",
+            "type": "integer"
+          },
+          "station_id": {
+            "title": "Station Id",
+            "type": "integer"
+          },
+          "system_name": {
+            "title": "System Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "station_id",
+          "name",
+          "system_name",
+          "region_id"
+        ],
+        "title": "StationSearchResult",
+        "type": "object"
+      },
       "TypeSearchResult": {
         "properties": {
           "market_group_id": {
@@ -1502,6 +1530,66 @@
           }
         },
         "summary": "List Market Groups",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/stations/search": {
+      "get": {
+        "description": "Search seeded NPC stations by system or station name, for the hub picker.",
+        "operationId": "search_stations_api_v1_stations_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StationSearchResult"
+                  },
+                  "title": "Response Search Stations Api V1 Stations Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Stations",
         "tags": [
           "reference"
         ]

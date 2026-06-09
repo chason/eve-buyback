@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as authApi from "../api/auth"
 import * as pricingApi from "../api/pricing"
+import * as sdeApi from "../api/sde"
 import type { SessionUser } from "../api/types"
 import Config from "./Config"
 
 vi.mock("../api/auth")
 vi.mock("../api/pricing")
+vi.mock("../api/sde")
 
 const CUSTOM_HUB = "custom" // the hub picker's "Other NPC station…" option value
 
@@ -80,17 +82,27 @@ describe("Config", () => {
     })
   })
 
-  it("prices at a custom NPC station selected from the hub picker", async () => {
+  it("prices at a custom NPC station picked from the search list", async () => {
     const u = userEvent.setup()
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
     vi.mocked(pricingApi.updateConfig).mockResolvedValue(config)
+    vi.mocked(sdeApi.searchStations).mockResolvedValue([
+      {
+        station_id: 60012345,
+        name: "Korsiki VII - Moon 1 - Expert Distribution Warehouse",
+        system_name: "Korsiki",
+        region_id: 10000033,
+      },
+    ])
 
     renderConfig()
 
     const hub = await screen.findByLabelText("Market hub")
     await u.selectOptions(hub, CUSTOM_HUB)
-    await u.type(screen.getByLabelText("Station ID"), "60012345")
+    await u.type(screen.getByLabelText("Search station"), "korsiki")
+    // Pick the match from the dropdown ("System - Station").
+    await u.click(await screen.findByText(/Korsiki - Korsiki VII/))
     await u.click(screen.getByRole("button", { name: "Save config" }))
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())

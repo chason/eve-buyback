@@ -113,3 +113,37 @@ async def test_list_market_groups(client):
     assert {g["market_group_id"] for g in body} == {1, 2}
     moon = next(g for g in body if g["market_group_id"] == 2)
     assert moon["parent_id"] == 1
+
+
+async def _seed_station() -> None:
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_stations(
+            session,
+            [
+                {
+                    "station_id": 60012345,
+                    "name": "Korsiki VII - Moon 1 - Expert Distribution Warehouse",
+                    "system_name": "Korsiki",
+                    "region_id": 10000033,
+                }
+            ],
+        )
+        await session.commit()
+
+
+async def test_search_stations(client):
+    await _seed_station()
+    async with client as http:
+        await _login(http)
+        resp = await http.get("/api/v1/stations/search?q=korsiki")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body[0]["station_id"] == 60012345
+    assert body[0]["system_name"] == "Korsiki"
+    assert body[0]["region_id"] == 10000033
+
+
+async def test_search_stations_requires_auth(client):
+    async with client as http:
+        resp = await http.get("/api/v1/stations/search?q=korsiki")
+    assert resp.status_code == 401

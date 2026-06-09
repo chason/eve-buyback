@@ -101,6 +101,15 @@ class SdeMetadataRecord(BaseModel):
     imported_at: datetime
 
 
+class SdeStationRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    station_id: int
+    name: str
+    system_name: str
+    region_id: int
+
+
 class BuybackConfigRecord(BaseModel):
     # No corporation_id: a config belongs to the caller's corp implicitly; the
     # interface sets the API's EVE corp id from the session.
