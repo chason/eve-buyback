@@ -27,6 +27,7 @@ from app.data.repositories import characters as characters_repo
 from app.data.repositories import structure_tokens as tokens_repo
 from app.domain import auth as auth_rules
 from app.domain.roles import role_at_least
+from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
 
@@ -96,6 +97,37 @@ async def revoke(session: AsyncSession, *, corporation_id: int) -> None:
     if not removed:
         raise StructureTokenMissing()
     await session.commit()
+
+
+async def search_structures(
+    session: AsyncSession,
+    sso: EveSsoClient,
+    esi_market: EsiMarketClient,
+    *,
+    corporation_id: int,
+    query: str,
+    cipher: TokenCipher,
+) -> list[dict]:
+    """Search the corp's accessible structures by name (ADR-0029), using the stored
+    token's character. Returns `[{structure_id, name}]`. Requires prior authorization."""
+    corp = await get_registered_corporation(session, corporation_id)
+    token = await tokens_repo.get_for_corp(session, corp.id)
+    if token is None:
+        raise StructureTokenMissing()
+    access_token = await get_structure_access_token(
+        session, sso, corporation_uuid=corp.id, cipher=cipher
+    )
+    structure_ids = await esi_market.search_structures(
+        character_id=token.character_eve_id, query=query, access_token=access_token
+    )
+    results: list[dict] = []
+    for structure_id in structure_ids:
+        name = await esi_market.resolve_structure_name(
+            structure_id=structure_id, access_token=access_token
+        )
+        if name:
+            results.append({"structure_id": str(structure_id), "name": name})
+    return results
 
 
 async def get_structure_access_token(

@@ -74,6 +74,41 @@ class EsiMarketClient:
             out[type_id] = aggregate
         return out
 
+    async def search_structures(
+        self, *, character_id: int, query: str, access_token: str, limit: int = 10
+    ) -> list[int]:
+        """Structure ids matching `query` by name, restricted to structures the
+        character can access (ADR-0029; scope esi-search.search_structures.v1).
+        Returns [] if the token/scope is missing (401/403)."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/characters/{character_id}/search/",
+            params={
+                "categories": "structure",
+                "search": query,
+                "datasource": "tranquility",
+            },
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code in (401, 403):
+            return []
+        resp.raise_for_status()
+        return list(resp.json().get("structure", []))[:limit]
+
+    async def resolve_structure_name(
+        self, *, structure_id: int, access_token: str
+    ) -> str | None:
+        """A structure's name via `universe/structures/{id}/` (scope
+        esi-universe.read_structures.v1). None if inaccessible (403/404)."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/universe/structures/{structure_id}/",
+            params={"datasource": "tranquility"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code in (403, 404):
+            return None
+        resp.raise_for_status()
+        return resp.json().get("name")
+
     async def get_structure_aggregates(
         self, *, structure_id: str, type_ids: list[int], access_token: str
     ) -> dict[int, OrderBookAggregate]:

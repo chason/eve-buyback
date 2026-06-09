@@ -902,6 +902,25 @@
         "title": "StructureAuthorizeResponse",
         "type": "object"
       },
+      "StructureSearchResult": {
+        "description": "A structure the authorizing character can access, matched by name.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "structure_id": {
+            "title": "Structure Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "structure_id",
+          "name"
+        ],
+        "title": "StructureSearchResult",
+        "type": "object"
+      },
       "StructureTokenStatus": {
         "description": "The corp's structure-market authorization status (never the token itself).",
         "properties": {
@@ -1029,7 +1048,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "11"
+    "version": "13"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1625,6 +1644,54 @@
           }
         },
         "summary": "Authorize",
+        "tags": [
+          "structures"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/structure-token/search": {
+      "get": {
+        "description": "Search the corp's accessible structures by name (requires prior authorization).",
+        "operationId": "search_api_v1_corporations_me_structure_token_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "minLength": 3,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StructureSearchResult"
+                  },
+                  "title": "Response Search Api V1 Corporations Me Structure Token Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
         "tags": [
           "structures"
         ]

@@ -26,3 +26,10 @@ class StructureTokenStatus(BaseModel):
     # True when the last refresh failed (revoked grant / lost docking) → re-authorize.
     expired: bool = False
     created_at: datetime | None = None
+
+
+class StructureSearchResult(BaseModel):
+    """A structure the authorizing character can access, matched by name."""
+
+    structure_id: str
+    name: str

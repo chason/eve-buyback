@@ -20,6 +20,7 @@ export type MarketGroupOut = Schemas["MarketGroupOut"]
 export type StationSearchResult = Schemas["StationSearchResult"]
 export type StructureTokenStatus = Schemas["StructureTokenStatus"]
 export type StructureAuthorizeResponse = Schemas["StructureAuthorizeResponse"]
+export type StructureSearchResult = Schemas["StructureSearchResult"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

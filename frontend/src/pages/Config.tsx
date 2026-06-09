@@ -8,6 +8,7 @@ import {
   beginStructureAuthorize,
   getStructureStatus,
   revokeStructure,
+  searchStructures,
   STRUCTURE_AUTH_FLAG,
 } from "../api/structures"
 import type { AggregateField, Basis } from "../api/types"
@@ -41,7 +42,10 @@ export default function Config() {
   const [station, setStation] = useState<{ id: string; label: string } | null>(
     null,
   )
-  const [structureId, setStructureId] = useState("")
+  const [structureQuery, setStructureQuery] = useState("")
+  const [structure, setStructure] = useState<{ id: string; label: string } | null>(
+    null,
+  )
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -53,7 +57,10 @@ export default function Config() {
       const hub = config.data.market_hub_id
       if (config.data.market_hub_kind === "structure") {
         setHubChoice(STRUCTURE)
-        setStructureId(hub)
+        setStructure({
+          id: hub,
+          label: config.data.market_hub_name ?? `Structure ${hub}`,
+        })
       } else if (isFuzzworkHub(hub)) {
         setHubChoice(hub)
       } else {
@@ -74,17 +81,22 @@ export default function Config() {
     queryFn: getStructureStatus,
     enabled: hubChoice === STRUCTURE,
   })
+  const authorized = !!structureStatus.data?.authorized
+  const sQuery = structureQuery.trim()
+  const structureResults = useQuery({
+    queryKey: ["structures", sQuery],
+    queryFn: () => searchStructures(sQuery),
+    enabled: hubChoice === STRUCTURE && authorized && sQuery.length >= 3,
+  })
 
   const hubKind = hubChoice === STRUCTURE ? "structure" : "npc_station"
   const hubId =
     hubChoice === STRUCTURE
-      ? structureId.trim()
+      ? (structure?.id ?? "")
       : hubChoice === CUSTOM
         ? (station?.id ?? "")
         : hubChoice
-  // A structure id must be numeric (the server validates too — defence in depth).
-  const hubInvalid =
-    hubId === "" || (hubChoice === STRUCTURE && !/^\d+$/.test(hubId))
+  const hubInvalid = hubId === ""
 
   const save = useMutation({
     mutationFn: () =>
@@ -192,24 +204,12 @@ export default function Config() {
 
         {hubChoice === STRUCTURE && (
           <>
-            <label>
-              Structure ID
-              <input
-                type="text"
-                inputMode="numeric"
-                value={structureId}
-                placeholder="e.g. 1035000000001"
-                aria-label="Structure ID"
-                disabled={!canEdit}
-                onChange={(e) => setStructureId(e.target.value)}
-              />
-            </label>
             <article>
-              {structureStatus.data?.authorized ? (
+              {authorized ? (
                 <p>
                   Structure access: connected as{" "}
-                  <strong>{structureStatus.data.character_name}</strong>
-                  {structureStatus.data.expired && (
+                  <strong>{structureStatus.data?.character_name}</strong>
+                  {structureStatus.data?.expired && (
                     <span className="error"> — expired, please re-authorize</span>
                   )}
                   .{" "}
@@ -224,7 +224,7 @@ export default function Config() {
                   </a>
                 </p>
               ) : (
-                <p>Structure access is not authorized yet.</p>
+                <p>Authorize structure access to search and price at a structure.</p>
               )}
               <button
                 type="button"
@@ -232,7 +232,7 @@ export default function Config() {
                 disabled={!canEdit}
                 onClick={() => void startStructureAuthorize()}
               >
-                {structureStatus.data?.authorized
+                {authorized
                   ? "Re-authorize structure access"
                   : "Authorize structure access"}
               </button>
@@ -241,6 +241,48 @@ export default function Config() {
                 structure. The token is stored encrypted (ADR-0029).
               </small>
             </article>
+
+            {authorized && (
+              <label>
+                Structure
+                <input
+                  type="search"
+                  value={structure ? structure.label : structureQuery}
+                  placeholder="Search structures by name…"
+                  aria-label="Search structure"
+                  disabled={!canEdit}
+                  onChange={(e) => {
+                    setStructure(null)
+                    setStructureQuery(e.target.value)
+                  }}
+                />
+                {!structure && sQuery.length >= 3 && (
+                  <ul className="search-results">
+                    {structureResults.isLoading && (
+                      <li aria-busy="true">Searching…</li>
+                    )}
+                    {structureResults.data?.map((s) => (
+                      <li key={s.structure_id}>
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setStructure({ id: s.structure_id, label: s.name })
+                            setStructureQuery("")
+                          }}
+                        >
+                          {s.name}
+                        </a>
+                      </li>
+                    ))}
+                    {structureResults.data?.length === 0 && <li>No matches.</li>}
+                  </ul>
+                )}
+                <small className="field-hint">
+                  Only structures your authorized character can dock at appear.
+                </small>
+              </label>
+            )}
           </>
         )}
 
