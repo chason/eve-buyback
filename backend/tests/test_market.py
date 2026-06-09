@@ -91,7 +91,7 @@ class FakeEsiMarket:
         return {tid: self.response[tid] for tid in type_ids if tid in self.response}
 
 
-async def _seed_cache(rows: list[dict], hub_id: int = HUB) -> None:
+async def _seed_cache(rows: list[dict], hub_id: str = HUB) -> None:
     async with SessionLocal() as session:
         await prices_repo.upsert_prices(session, hub_id=hub_id, rows=rows)
         await session.commit()

@@ -88,7 +88,7 @@ class EsiMarketClient:
         }
 
     async def _structure_orders(
-        self, structure_id: int, access_token: str
+        self, structure_id: str, access_token: str
     ) -> dict[int, list[RawOrder]]:
         url = f"{ESI_BASE}/markets/structures/{structure_id}/"
         headers = {"Authorization": f"Bearer {access_token}"}

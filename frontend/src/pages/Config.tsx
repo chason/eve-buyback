@@ -82,7 +82,9 @@ export default function Config() {
       : hubChoice === CUSTOM
         ? (station?.id ?? "")
         : hubChoice
-  const hubInvalid = hubId === ""
+  // A structure id must be numeric (the server validates too — defence in depth).
+  const hubInvalid =
+    hubId === "" || (hubChoice === STRUCTURE && !/^\d+$/.test(hubId))
 
   const save = useMutation({
     mutationFn: () =>

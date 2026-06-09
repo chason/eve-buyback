@@ -98,6 +98,10 @@ async def _resolve_hub(
     structure access first (region is unused — the structure endpoint is
     structure-scoped). Raises `MarketHubInvalid` (422) if it can't be resolved."""
     if kind == "structure":
+        # Numeric-only: the id is interpolated into an authenticated ESI URL when
+        # pricing, so reject anything that could inject a path (e.g. "1/../x").
+        if not hub_id.isdigit():
+            raise MarketHubInvalid(f"Invalid structure id {hub_id!r}")
         token = await structure_tokens_repo.get_for_corp(session, corporation_uuid)
         if token is None:
             raise MarketHubInvalid(

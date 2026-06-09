@@ -36,6 +36,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Only safe before any structure hub is used: a 64-bit structure id cast back to
+    # int32 (`::integer`) overflows and raises. Drop such rows first if downgrading.
     op.alter_column(
         "appraisals", "market_hub_id",
         type_=sa.Integer(), postgresql_using="market_hub_id::integer",

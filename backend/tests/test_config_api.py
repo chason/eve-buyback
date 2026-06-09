@@ -222,6 +222,24 @@ async def test_structure_hub_requires_authorization():
         assert resp.status_code == 422  # MarketHubInvalid: not authorized
 
 
+async def test_structure_hub_rejects_non_numeric_id():
+    # A non-numeric structure id is rejected before it can reach an ESI URL path.
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": "1/../characters/456/orders",
+                "market_hub_kind": "structure",
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 422  # MarketHubInvalid: not a numeric id
+
+
 async def test_structure_hub_accepted_once_authorized():
     from app.data.repositories import characters as ch_repo
     from app.data.repositories import structure_tokens as st_repo
