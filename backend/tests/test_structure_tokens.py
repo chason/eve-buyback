@@ -60,9 +60,13 @@ class FakeSso:
         self._new_access = new_access
         self._new_refresh = new_refresh
         self._refresh_error = refresh_error
+        self.revoked: list[str] = []
 
     def build_authorize_url(self, *, state, code_challenge, scopes=None):
         return f"https://login.eveonline.com/authorize?state={state}"
+
+    async def revoke_refresh_token(self, refresh_token):
+        self.revoked.append(refresh_token)
 
     async def exchange_code(self, code, code_verifier):
         return OAuthToken(access_token="access-initial", refresh_token=self._refresh)
@@ -136,7 +140,7 @@ async def test_manager_authorize_stores_encrypted_token():
 
 async def test_reauthorize_with_different_character_warns():
     await _register_corp()
-    # First authorize as Boss (the default FakeSso character).
+    # First authorize as Boss (the default FakeSso character), refresh "refresh-1".
     async with SessionLocal() as session:
         first = await structures_app.complete_structure_authorize(
             session, FakeSso(), code="c", verifier="v",
@@ -144,27 +148,54 @@ async def test_reauthorize_with_different_character_warns():
         )
     assert first.replaced_character_name is None
 
-    # Re-authorize, but the SSO picker returned a *different* character.
+    # Re-authorize, but the SSO picker returned a *different* character + token.
     class OtherCharSso(FakeSso):
         async def verify_token(self, access_token):
             return VerifiedCharacter(character_id=67890, name="Alt Pilot")
 
+    reauth = OtherCharSso(refresh="refresh-2")
     async with SessionLocal() as session:
         again = await structures_app.complete_structure_authorize(
-            session, OtherCharSso(), code="c", verifier="v",
+            session, reauth, code="c", verifier="v",
             user=_user("manager"), cipher=CIPHER,
         )
-    # The new token replaces the old, and we surface the previous character.
+    # The new token replaces the old, we surface the previous character, AND the
+    # previous grant is signed out at EVE.
     assert again.token.character_name == "Alt Pilot"
     assert again.replaced_character_name == "Boss"
+    assert reauth.revoked == ["refresh-1"]
 
-    # Re-authorizing again as the *same* (new) character does not warn.
+    # Re-authorizing again as the *same* (new) character does not warn, but still
+    # revokes the now-superseded refresh token.
+    reauth2 = OtherCharSso(refresh="refresh-3")
     async with SessionLocal() as session:
         same = await structures_app.complete_structure_authorize(
-            session, OtherCharSso(), code="c", verifier="v",
+            session, reauth2, code="c", verifier="v",
             user=_user("manager"), cipher=CIPHER,
         )
     assert same.replaced_character_name is None
+    assert reauth2.revoked == ["refresh-2"]
+
+
+async def test_revoke_signs_grant_out_at_eve_and_deletes():
+    corp_uuid = await _authorize("refresh-to-kill")
+    sso = FakeSso()
+    async with SessionLocal() as session:
+        await structures_app.revoke(
+            session, sso, corporation_id=CORP_EVE_ID, cipher=CIPHER
+        )
+    assert sso.revoked == ["refresh-to-kill"]  # killed at EVE, not just locally
+    async with SessionLocal() as session:
+        assert await tokens_repo.get_for_corp(session, corp_uuid) is None
+
+
+async def test_revoke_without_token_raises():
+    await _register_corp()
+    async with SessionLocal() as session:
+        with pytest.raises(StructureTokenMissing):
+            await structures_app.revoke(
+                session, FakeSso(), corporation_id=CORP_EVE_ID, cipher=CIPHER
+            )
 
 
 # --- get_structure_access_token (refresh / rotation / expiry / missing) ---

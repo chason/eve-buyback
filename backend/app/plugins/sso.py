@@ -9,6 +9,7 @@ from app.config import Settings, get_settings
 EVE_AUTHORIZE_URL = "https://login.eveonline.com/v2/oauth/authorize"
 EVE_TOKEN_URL = "https://login.eveonline.com/v2/oauth/token"
 EVE_VERIFY_URL = "https://login.eveonline.com/oauth/verify"
+EVE_REVOKE_URL = "https://login.eveonline.com/v2/oauth/revoke"
 
 
 class OAuthToken(BaseModel):
@@ -87,6 +88,18 @@ class EveSsoClient:
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token"),
         )
+
+    async def revoke_refresh_token(self, refresh_token: str) -> None:
+        """Revoke a refresh token at EVE SSO (RFC 7009 token revocation), so the
+        grant is actually terminated rather than merely forgotten by us. Idempotent:
+        EVE returns 200 with an empty body even for an unknown/already-revoked token."""
+        resp = await self._client.post(
+            EVE_REVOKE_URL,
+            data={"token": refresh_token, "token_type_hint": "refresh_token"},
+            auth=(self._settings.eve_client_id, self._settings.eve_client_secret),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        resp.raise_for_status()
 
     async def verify_token(self, access_token: str) -> VerifiedCharacter:
         resp = await self._client.get(

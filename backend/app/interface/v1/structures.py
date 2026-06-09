@@ -113,5 +113,9 @@ async def complete(
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke(user: ManagerUser, session: SessionDep) -> None:
-    await structures_app.revoke(session, corporation_id=user.corporation_id)
+async def revoke(
+    user: ManagerUser, session: SessionDep, sso: SsoDep, cipher: CipherDep
+) -> None:
+    await structures_app.revoke(
+        session, sso, corporation_id=user.corporation_id, cipher=cipher
+    )

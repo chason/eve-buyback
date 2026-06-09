@@ -7,10 +7,12 @@ persisted — they're refreshed server-side at point of use and held only transi
 """
 
 import asyncio
+import logging
 import uuid
 from datetime import UTC, datetime
 
 import httpx
+from cryptography.fernet import InvalidToken
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +34,8 @@ from app.domain.roles import role_at_least
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
+
+log = logging.getLogger(__name__)
 
 # The login and structure flows share one SSO callback (EVE allows a single
 # redirect URI). The callback must route the round-trip to the right completion
@@ -99,6 +103,14 @@ async def complete_structure_authorize(
         else None
     )
 
+    # Sign the previous grant out at EVE — replacing the row only forgets the old
+    # refresh token, leaving it live on EVE's side. A fresh code exchange always
+    # mints a new refresh token, so the old one is safe to revoke.
+    if existing is not None:
+        old_refresh = _decrypt_or_none(cipher, existing.encrypted_refresh_token)
+        if old_refresh is not None and old_refresh != token.refresh_token:
+            await _revoke_at_eve(sso, old_refresh)
+
     char = await characters_repo.upsert_character(
         session, eve_character_id=character.character_id, name=character.name
     )
@@ -125,12 +137,43 @@ async def get_status(
     return await tokens_repo.get_for_corp(session, corp.id)
 
 
-async def revoke(session: AsyncSession, *, corporation_id: int) -> None:
+async def revoke(
+    session: AsyncSession,
+    sso: EveSsoClient,
+    *,
+    corporation_id: int,
+    cipher: TokenCipher,
+) -> None:
+    """Revoke the corp's structure authorization: sign the grant out at EVE (so the
+    refresh token is actually killed, not just deleted locally), then drop the row."""
     corp = await get_registered_corporation(session, corporation_id)
-    removed = await tokens_repo.delete_for_corp(session, corp.id)
-    if not removed:
+    token = await tokens_repo.get_for_corp(session, corp.id)
+    if token is None:
         raise StructureTokenMissing()
+    old_refresh = _decrypt_or_none(cipher, token.encrypted_refresh_token)
+    if old_refresh is not None:
+        await _revoke_at_eve(sso, old_refresh)
+    await tokens_repo.delete_for_corp(session, corp.id)
     await session.commit()
+
+
+def _decrypt_or_none(cipher: TokenCipher, ciphertext: bytes) -> str | None:
+    """Decrypt a stored refresh token, or None if the key can no longer read it
+    (e.g. the encryption key was rotated) — in which case we can't revoke it anyway."""
+    try:
+        return cipher.decrypt(ciphertext)
+    except InvalidToken:
+        log.warning("Could not decrypt a stored structure refresh token to revoke it")
+        return None
+
+
+async def _revoke_at_eve(sso: EveSsoClient, refresh_token: str) -> None:
+    """Best-effort revoke at EVE. A lingering grant is not worth failing the user's
+    action over, so transport/HTTP errors are logged and swallowed."""
+    try:
+        await sso.revoke_refresh_token(refresh_token)
+    except httpx.HTTPError:
+        log.warning("Revoking a structure refresh token at EVE failed", exc_info=True)
 
 
 async def search_structures(
