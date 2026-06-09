@@ -10,6 +10,26 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # PostgreSQL for the test suite (ADR-0024). conftest derives a `<name>_test`
+    # database from BUYBACK_DATABASE_URL and creates only the schema, so the
+    # database itself must already exist — name the service DB `buyback_test`.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: buyback_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Base name is `buyback`; conftest appends `_test` → connects to buyback_test.
+      BUYBACK_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
