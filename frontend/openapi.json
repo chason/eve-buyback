@@ -864,6 +864,97 @@
         "title": "StationSearchResult",
         "type": "object"
       },
+      "StructureAuthorizeRequest": {
+        "description": "The OAuth callback payload completing the structure-access grant.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "StructureAuthorizeRequest",
+        "type": "object"
+      },
+      "StructureAuthorizeResponse": {
+        "description": "The SSO URL the SPA redirects to, to grant structure-market access.",
+        "properties": {
+          "authorization_url": {
+            "title": "Authorization Url",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_url",
+          "state"
+        ],
+        "title": "StructureAuthorizeResponse",
+        "type": "object"
+      },
+      "StructureTokenStatus": {
+        "description": "The corp's structure-market authorization status (never the token itself).",
+        "properties": {
+          "authorized": {
+            "title": "Authorized",
+            "type": "boolean"
+          },
+          "character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Character Name"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expired": {
+            "default": false,
+            "title": "Expired",
+            "type": "boolean"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "authorized"
+        ],
+        "title": "StructureTokenStatus",
+        "type": "object"
+      },
       "TypeSearchResult": {
         "properties": {
           "market_group_id": {
@@ -938,7 +1029,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "7"
+    "version": "11"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1481,6 +1572,103 @@
         "summary": "Set Rule",
         "tags": [
           "pricing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/structure-token": {
+      "delete": {
+        "operationId": "revoke_api_v1_corporations_me_structure_token_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke",
+        "tags": [
+          "structures"
+        ]
+      },
+      "get": {
+        "operationId": "get_status_api_v1_corporations_me_structure_token_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructureTokenStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Status",
+        "tags": [
+          "structures"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/structure-token/authorize": {
+      "post": {
+        "description": "Begin the structure-access grant: mint state + PKCE and return the SSO URL.",
+        "operationId": "authorize_api_v1_corporations_me_structure_token_authorize_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructureAuthorizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Authorize",
+        "tags": [
+          "structures"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/structure-token/session": {
+      "post": {
+        "description": "Complete the grant: validate state, exchange the code, store the token.",
+        "operationId": "complete_api_v1_corporations_me_structure_token_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StructureAuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructureTokenStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete",
+        "tags": [
+          "structures"
         ]
       }
     },

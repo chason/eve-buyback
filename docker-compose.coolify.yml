@@ -41,6 +41,10 @@ services:
       - BUYBACK_MARKET_HUB_ID=${BUYBACK_MARKET_HUB_ID:-60003760}
       # SDE auto-seeds on first boot; set to 0 to disable and seed manually.
       - BUYBACK_AUTO_SEED=${BUYBACK_AUTO_SEED:-1}
+      # Only needed for structure-market hubs (ADR-0029): encrypts the stored EVE
+      # refresh token. Generate with `python -c "from cryptography.fernet import
+      # Fernet; print(Fernet.generate_key().decode())"`.
+      - BUYBACK_TOKEN_ENCRYPTION_KEY=${BUYBACK_TOKEN_ENCRYPTION_KEY:-}
     healthcheck:
       test:
         - CMD

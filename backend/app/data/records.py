@@ -191,3 +191,18 @@ class AppraisalSummaryRecord(BaseModel):
     market_hub_id: int
     accepted_total: Decimal
     rejected_count: int
+
+
+class StructureMarketTokenRecord(BaseModel):
+    """A corp's structure-market authorization (ADR-0029). Carries the ciphertext for
+    internal refresh use; the API schema (`StructureTokenStatus`) omits it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    corporation_id: uuid.UUID
+    character_eve_id: int
+    character_name: str
+    encrypted_refresh_token: bytes
+    scopes: str
+    created_at: datetime
+    last_refresh_failed_at: datetime | None = None

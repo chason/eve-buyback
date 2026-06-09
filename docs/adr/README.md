@@ -38,5 +38,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0026](0026-ore-reprocess-pricing.md) | Ore reprocess pricing as a pricing-rule option | Accepted |
 | [0027](0027-deploy-coolify.md) | Deploy on Coolify with a managed PostgreSQL | Accepted |
 | [0028](0028-esi-market-source-and-aggregation.md) | ESI market source + aggregation for non-Fuzzwork hubs | Accepted |
+| [0029](0029-encrypted-refresh-token-structures.md) | Encrypted refresh token for structure-market access | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

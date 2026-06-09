@@ -94,6 +94,7 @@ such). The compose file reads them by name:
 | `BUYBACK_EVE_CLIENT_SECRET` | From the EVE app (secret). |
 | `BUYBACK_EVE_REDIRECT_URI` | `https://<your-domain>/auth/callback` (must equal the EVE registration). |
 | `BUYBACK_MARKET_HUB_ID` | Optional; defaults to `60003760` (Jita 4-4). |
+| `BUYBACK_TOKEN_ENCRYPTION_KEY` | Optional — **only** to price at player structures (ADR-0029): a Fernet key encrypting the stored EVE refresh token. `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Until set, structure authorization is refused; NPC hubs are unaffected. |
 
 `BUYBACK_ENVIRONMENT=production` is already set in the compose (forces secure
 cookies and the session-secret check).
