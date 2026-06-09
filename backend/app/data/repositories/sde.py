@@ -215,6 +215,17 @@ async def bulk_upsert_market_groups(
     return len(rows)
 
 
+async def is_seeded(session: AsyncSession) -> bool:
+    """True only if every seeded reference table has rows. Used to decide whether a
+    boot-time auto-seed is needed — a newly added reference table starts empty and so
+    triggers a one-off re-seed (which is idempotent)."""
+    for model in (SdeType, SdeMarketGroup, SdeStation):
+        count = await session.scalar(select(func.count()).select_from(model))
+        if not count:
+            return False
+    return True
+
+
 async def get_metadata(session: AsyncSession) -> SdeMetadataRecord | None:
     row = await session.get(SdeMetadata, 1)
     return SdeMetadataRecord.model_validate(row) if row is not None else None

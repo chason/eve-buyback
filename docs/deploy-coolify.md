@@ -105,17 +105,22 @@ against the managed DB (idempotent), then starts uvicorn. Watch the deploy logs 
 `Applying database migrations…` followed by `Uvicorn running`. Coolify marks the app
 healthy via the container healthcheck hitting `/api/v1/health`.
 
-## 7. Seed the SDE reference data (one-time)
+## 7. SDE reference data (auto-seeded)
 
-Until this runs, every appraisal rejects every line as "Unknown item". Open the
-application's **Terminal** (or *Execute Command*) in Coolify and run:
+The container **auto-seeds** the SDE reference data (types, market groups, ore
+reprocessing yields, NPC stations) in the background on first boot — the entrypoint
+runs `python -m app.sde.seed --if-needed`, which downloads from Fuzzwork only when
+the data is missing/incomplete and is a cheap no-op thereafter. So there's **no
+manual step** on a fresh deploy; the data fills in within a minute or two (until then
+appraisals show "Unknown item"). A newly added reference table also triggers a
+one-off re-seed automatically.
+
+Disable with `BUYBACK_AUTO_SEED=0`. To force a refresh (e.g. after a major EVE
+expansion), run it manually from the app's **Terminal**:
 
 ```bash
 python -m app.sde.seed
 ```
-
-This pulls ~18k types, market groups, and ore reprocessing data from Fuzzwork
-(takes a couple of minutes). Re-run after a major EVE expansion to refresh.
 
 ## 8. Verify
 
@@ -128,8 +133,9 @@ This pulls ~18k types, market groups, and ore reprocessing data from Fuzzwork
 ## Updating
 
 Push to `main` (or your chosen branch) and **Deploy** again — or enable Coolify's
-auto-deploy webhook on the repo. Migrations run automatically on each boot. The SDE
-seed is **not** re-run automatically.
+auto-deploy webhook on the repo. Migrations run automatically on each boot, and the
+SDE auto-seeds when incomplete (a new reference table triggers a one-off re-seed); an
+already-seeded DB is left as-is, so redeploys don't re-download.
 
 ## Troubleshooting
 

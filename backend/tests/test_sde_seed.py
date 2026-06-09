@@ -1,4 +1,4 @@
-from app.application.sde import seed_reference_data
+from app.application.sde import seed_if_needed, seed_reference_data
 from app.data.db import SessionLocal
 from app.data.repositories import sde as sde_repo
 from app.plugins.sde_source import (
@@ -117,6 +117,19 @@ async def test_seed_stations_join_system_name():
         by_station = await sde_repo.search_stations(session, "expert distr", 10)
         assert [s.station_id for s in by_system] == [60012345]
         assert [s.station_id for s in by_station] == [60012345]
+
+
+async def test_seed_if_needed_seeds_then_skips():
+    source = FakeSdeSource(TYPES, GROUPS)
+    # Empty DB → seeds.
+    async with SessionLocal() as session:
+        first = await seed_if_needed(session, source, source_label="test")
+    assert first is not None
+    assert first.type_count == 2
+    # Already complete → cheap no-op (returns None, no re-download).
+    async with SessionLocal() as session:
+        second = await seed_if_needed(session, source, source_label="test")
+    assert second is None
 
 
 async def test_seed_is_idempotent():

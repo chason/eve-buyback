@@ -137,8 +137,8 @@ npm run build                            # typecheck (tsc) + production build
 
 # Deploy — single image serves the built SPA + /api/v1 (ADR-0012). From repo root:
 cp .env.example .env                     # then fill in secrets (SESSION_SECRET, EVE SSO, POSTGRES_PASSWORD)
-docker compose up --build -d             # Postgres + app; entrypoint runs alembic upgrade head on boot
-docker compose exec app python -m app.sde.seed   # one-time: seed SDE reference data
+docker compose up --build -d             # Postgres + app; entrypoint runs migrations + auto-seeds the SDE on first boot
+docker compose exec app python -m app.sde.seed   # force a SDE refresh (auto-seed handles first boot; BUYBACK_AUTO_SEED=0 disables)
 docker build -t buyback .                # build the image alone (e.g. for Coolify + managed Postgres)
 ```
 

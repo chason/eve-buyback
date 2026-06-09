@@ -71,3 +71,15 @@ async def seed_reference_data(
     )
     await session.commit()
     return metadata
+
+
+async def seed_if_needed(
+    session: AsyncSession, source: SdeSource, *, source_label: str
+) -> SdeMetadataRecord | None:
+    """Seed only when the SDE looks incomplete (any reference table empty). Returns
+    the import metadata if it seeded, or `None` if it was already complete and
+    skipped. Lets the container entrypoint auto-seed on first deploy without
+    re-downloading on every restart."""
+    if await sde_repo.is_seeded(session):
+        return None
+    return await seed_reference_data(session, source, source_label=source_label)

@@ -3,7 +3,7 @@
 #
 #   cp .env.example .env   # then fill in the secrets
 #   docker compose up --build -d
-#   # one-time, after the app is healthy, seed SDE reference data:
+#   # SDE reference data auto-seeds on first boot (background). To force a refresh:
 #   docker compose exec app python -m app.sde.seed
 #
 # Coolify can consume this compose file directly, or build the Dockerfile alone

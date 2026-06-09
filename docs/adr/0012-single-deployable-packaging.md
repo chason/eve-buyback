@@ -31,8 +31,10 @@ Configuration (SSO client id/secret, DB URL, hub, session secret) comes from
 - The container entrypoint runs `alembic upgrade head` before starting uvicorn
   (idempotent; safe on every boot). The Postgres DB (ADR-0024) is a separate
   service — bundled in `docker-compose.yml` for self-host, or external/managed when
-  only the image is deployed (e.g. Coolify). The SDE seed
-  (`python -m app.sde.seed`) is a one-time post-deploy step, not run on boot.
+  only the image is deployed (e.g. Coolify). The entrypoint then **auto-seeds the SDE
+  in the background** via `python -m app.sde.seed --if-needed` — a cheap no-op once
+  the data is present, so the app serves immediately and restarts don't re-download
+  (disable with `BUYBACK_AUTO_SEED=0`).
 - Dev and prod differ in how the SPA is served (Vite proxy vs static mount) — keep
   the API base URL configurable (`VITE_API_BASE_URL`) to bridge them.
 
