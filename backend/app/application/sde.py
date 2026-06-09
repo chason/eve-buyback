@@ -48,6 +48,20 @@ async def seed_reference_data(
     ]
     await sde_repo.bulk_upsert_type_materials(session, material_rows)
 
+    # NPC stations for the hub picker (ADR-0028): join each station's system name.
+    system_of = await source.fetch_systems()
+    stations = await source.fetch_stations()
+    station_rows = [
+        {
+            "station_id": s.station_id,
+            "name": s.name,
+            "system_name": system_of.get(s.system_id, ""),
+            "region_id": s.region_id,
+        }
+        for s in stations
+    ]
+    await sde_repo.bulk_upsert_stations(session, station_rows)
+
     metadata = await sde_repo.set_metadata(
         session,
         source=source_label,

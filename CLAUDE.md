@@ -124,7 +124,7 @@ uv run pytest                            # tests
 uv run pytest --cov                      # tests + coverage (greenlet-aware, see pyproject)
 uv run ruff check .                      # lint
 uv run alembic upgrade head              # apply migrations (once models exist)
-uv run python -m app.sde.seed            # seed SDE reference (types, groups, ore reprocess yields) from Fuzzwork (ADR-0009, 0026)
+uv run python -m app.sde.seed            # seed SDE reference (types, groups, ore reprocess yields, NPC stations) from Fuzzwork (ADR-0009, 0026, 0028)
 uv run python -m app.openapi_export      # write frontend/openapi.json for TS type-gen
 
 # Frontend (from frontend/)

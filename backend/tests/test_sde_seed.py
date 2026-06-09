@@ -3,6 +3,7 @@ from app.data.db import SessionLocal
 from app.data.repositories import sde as sde_repo
 from app.plugins.sde_source import (
     SdeMarketGroupRow,
+    SdeStationRow,
     SdeTypeMaterialRow,
     SdeTypeRow,
 )
@@ -35,6 +36,16 @@ MATERIALS = [
     SdeTypeMaterialRow(type_id=34, material_type_id=99, quantity=1),
 ]
 
+STATIONS = [
+    SdeStationRow(
+        station_id=60012345,
+        name="Korsiki VII - Moon 1 - Expert Distribution Warehouse",
+        system_id=30000001,
+        region_id=10000033,
+    ),
+]
+SYSTEMS = {30000001: "Korsiki"}
+
 
 class FakeSdeSource:
     def __init__(self, types, groups):
@@ -52,6 +63,12 @@ class FakeSdeSource:
 
     async def fetch_type_materials(self):
         return MATERIALS
+
+    async def fetch_stations(self):
+        return STATIONS
+
+    async def fetch_systems(self):
+        return SYSTEMS
 
 
 async def test_seed_keeps_only_published_market_types():
@@ -83,6 +100,23 @@ async def test_seed_tags_category_portion_and_ore_materials():
         # Only the ore's materials are seeded; the mineral's row is filtered out.
         mats = await sde_repo.get_type_materials(session, [46680, 34])
         assert mats == {46680: [(34, 333)]}
+
+
+async def test_seed_stations_join_system_name():
+    source = FakeSdeSource(TYPES, GROUPS)
+    async with SessionLocal() as session:
+        await seed_reference_data(session, source, source_label="test")
+
+    async with SessionLocal() as session:
+        station = await sde_repo.get_station(session, 60012345)
+        assert station is not None
+        assert station.system_name == "Korsiki"  # joined from mapSolarSystems
+        assert station.region_id == 10000033
+        # Searchable by system name or station name.
+        by_system = await sde_repo.search_stations(session, "korsiki", 10)
+        by_station = await sde_repo.search_stations(session, "expert distr", 10)
+        assert [s.station_id for s in by_system] == [60012345]
+        assert [s.station_id for s in by_station] == [60012345]
 
 
 async def test_seed_is_idempotent():

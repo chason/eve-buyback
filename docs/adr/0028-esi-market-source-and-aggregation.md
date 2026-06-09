@@ -42,10 +42,12 @@ TTL/graceful-degradation logic are unchanged — only *where* a missed row comes
   **volume** = Σ`volume_remain`, **order_count**. An empty side is an all-zero
   aggregate with `order_count = 0`, which the appraisal's `order_count > 0` gate
   already treats as "no orders" and rejects.
-- **Region resolution at save time** — when a manager sets a non-Fuzzwork station,
-  `update_config` resolves and caches its region id + name via ESI
-  (station→system→constellation→region) once; an unresolvable id is rejected
-  (`MarketHubInvalid` → 422). The hot path never touches the universe endpoints.
+- **Station picker + region resolution from the SDE** — NPC stations
+  (`staStations`, joined to system names) are seeded into `sde_stations`; a manager
+  searches them ("System - Station") rather than typing a raw id. When a station is
+  set, `update_config` resolves its region + label from the seeded SDE (no ESI hop);
+  an unknown station is rejected (`MarketHubInvalid` → 422). The hot path never
+  touches the universe endpoints.
 
 ## Consequences
 

@@ -4,7 +4,11 @@ no unit of work."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.records import SdeMarketGroupRecord, SdeTypeRecord
+from app.data.records import (
+    SdeMarketGroupRecord,
+    SdeStationRecord,
+    SdeTypeRecord,
+)
 from app.data.repositories import sde as sde_repo
 
 
@@ -16,3 +20,9 @@ async def search_types(
 
 async def list_market_groups(session: AsyncSession) -> list[SdeMarketGroupRecord]:
     return await sde_repo.list_market_groups(session)
+
+
+async def search_stations(
+    session: AsyncSession, *, query: str, limit: int
+) -> list[SdeStationRecord]:
+    return await sde_repo.search_stations(session, query, limit)

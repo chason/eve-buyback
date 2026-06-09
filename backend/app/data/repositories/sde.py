@@ -14,12 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.data.models import (
     SdeMarketGroup,
     SdeMetadata,
+    SdeStation,
     SdeType,
     SdeTypeMaterial,
 )
 from app.data.records import (
     SdeMarketGroupRecord,
     SdeMetadataRecord,
+    SdeStationRecord,
     SdeTypeRecord,
 )
 
@@ -92,6 +94,51 @@ async def list_market_groups(session: AsyncSession) -> list[SdeMarketGroupRecord
     stmt = select(SdeMarketGroup).order_by(SdeMarketGroup.market_group_id)
     rows = (await session.execute(stmt)).scalars().all()
     return [SdeMarketGroupRecord.model_validate(r) for r in rows]
+
+
+async def get_station(
+    session: AsyncSession, station_id: int
+) -> SdeStationRecord | None:
+    row = await session.get(SdeStation, station_id)
+    return SdeStationRecord.model_validate(row) if row is not None else None
+
+
+async def search_stations(
+    session: AsyncSession, query: str, limit: int
+) -> list[SdeStationRecord]:
+    """Case-insensitive substring match on the system *or* station name, so typing a
+    system ("Korsiki") or a station name both find it. Ordered by system then name."""
+    pattern = f"%{query.lower()}%"
+    stmt = (
+        select(SdeStation)
+        .where(
+            func.lower(SdeStation.system_name).like(pattern)
+            | func.lower(SdeStation.name).like(pattern)
+        )
+        .order_by(SdeStation.system_name, SdeStation.name)
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return [SdeStationRecord.model_validate(r) for r in rows]
+
+
+async def bulk_upsert_stations(
+    session: AsyncSession, rows: Sequence[dict]
+) -> int:
+    """Insert-or-update SdeStation rows keyed by `station_id`. Returns the row count."""
+    for start in range(0, len(rows), _BATCH):
+        batch = rows[start : start + _BATCH]
+        stmt = pg_insert(SdeStation).values(list(batch))
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[SdeStation.station_id],
+            set_={
+                "name": stmt.excluded.name,
+                "system_name": stmt.excluded.system_name,
+                "region_id": stmt.excluded.region_id,
+            },
+        )
+        await session.execute(stmt)
+    return len(rows)
 
 
 async def bulk_upsert_types(

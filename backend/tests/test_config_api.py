@@ -5,6 +5,7 @@ import pytest
 from app.data.db import SessionLocal
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import sde as sde_repo
 from app.main import app
 from tests.helpers import CORP_ID, CeoEsi, MemberEsi, login, make_client
 
@@ -149,8 +150,22 @@ async def test_config_rejects_bad_basis():
         assert resp.status_code == 422  # Literal rejects the bad enum
 
 
-async def test_non_fuzzwork_station_resolves_region_via_esi():
-    # A station that isn't one of the 5 Fuzzwork hubs is resolved + cached (ADR-0028).
+async def test_non_fuzzwork_station_resolves_region_from_sde():
+    # A non-Fuzzwork station is resolved from the seeded SDE (region + label).
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_stations(
+            session,
+            [
+                {
+                    "station_id": 60012345,
+                    "name": "Korsiki VII - Moon 1 - Expert Distribution Warehouse",
+                    "system_name": "Korsiki",
+                    "region_id": 10000033,
+                }
+            ],
+        )
+        await session.commit()
+
     async with make_client(CeoEsi()) as http:
         await login(http)
         await http.post("/api/v1/corporations")
@@ -166,8 +181,27 @@ async def test_non_fuzzwork_station_resolves_region_via_esi():
         assert resp.status_code == 200
         body = resp.json()
         assert body["market_hub_kind"] == "npc_station"
-        assert body["market_region_id"] == 10000002  # from FakeEsiMarket
-        assert body["market_hub_name"] == "Station 60012345"
+        assert body["market_region_id"] == 10000033
+        assert (
+            body["market_hub_name"]
+            == "Korsiki - Korsiki VII - Moon 1 - Expert Distribution Warehouse"
+        )
+
+
+async def test_unknown_station_rejected():
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": 69999999,  # not seeded
+                "default_basis": "buy",
+                "default_percentage": "90",
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 422  # MarketHubInvalid: unknown station
 
 
 async def test_structure_hub_rejected_for_now():

@@ -21,6 +21,8 @@ INV_TYPES_URL = f"{FUZZWORK_DUMP_BASE}/invTypes.csv"
 INV_MARKET_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invMarketGroups.csv"
 INV_GROUPS_URL = f"{FUZZWORK_DUMP_BASE}/invGroups.csv"
 INV_TYPE_MATERIALS_URL = f"{FUZZWORK_DUMP_BASE}/invTypeMaterials.csv"
+STA_STATIONS_URL = f"{FUZZWORK_DUMP_BASE}/staStations.csv"
+MAP_SOLAR_SYSTEMS_URL = f"{FUZZWORK_DUMP_BASE}/mapSolarSystems.csv"
 
 
 class SdeTypeRow(BaseModel):
@@ -43,6 +45,13 @@ class SdeTypeMaterialRow(BaseModel):
     type_id: int
     material_type_id: int
     quantity: int
+
+
+class SdeStationRow(BaseModel):
+    station_id: int
+    name: str
+    system_id: int
+    region_id: int
 
 
 def _int_or_none(value: str | None) -> int | None:
@@ -111,3 +120,24 @@ class SdeSource:
             )
             for row in reader
         ]
+
+    async def fetch_stations(self) -> list[SdeStationRow]:
+        """NPC stations from staStations (id, name, system id, region id)."""
+        reader = await self._fetch_csv(STA_STATIONS_URL)
+        return [
+            SdeStationRow(
+                station_id=int(row["stationID"]),
+                name=row["stationName"],
+                system_id=int(row["solarSystemID"]),
+                region_id=int(row["regionID"]),
+            )
+            for row in reader
+        ]
+
+    async def fetch_systems(self) -> dict[int, str]:
+        """Map `solar_system_id -> system_name` (from mapSolarSystems), to label
+        stations as 'System - Station'."""
+        reader = await self._fetch_csv(MAP_SOLAR_SYSTEMS_URL)
+        return {
+            int(row["solarSystemID"]): row["solarSystemName"] for row in reader
+        }
