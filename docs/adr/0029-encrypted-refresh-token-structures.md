@@ -7,7 +7,7 @@
 ## Context
 
 Pricing at a **player-owned Upwell structure** needs `GET markets/structures/{id}/`,
-an **authenticated** ESI endpoint requiring the `esi-markets.structure_markets.read_v1`
+an **authenticated** ESI endpoint requiring the `esi-markets.structure_markets.v1`
 scope and a character with **docking access** to that structure (ADR-0028 left this to
 a later phase). Unlike public NPC-station orders, this can't be served by a one-shot
 token at login: appraisals happen long after, on the backend's own schedule, so we

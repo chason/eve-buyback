@@ -23,7 +23,7 @@ by `docker-compose.coolify.yml`.
   *Manage Applications* → *Create New Application*.
   - Connection type: **Authentication Only**.
   - Scopes: `publicData` and `esi-characters.read_corporation_roles.v1`. **Add
-    `esi-markets.structure_markets.read_v1` only if you'll price at player
+    `esi-markets.structure_markets.v1` only if you'll price at player
     structures** (ADR-0029); NPC-station hubs need nothing more.
   - **Callback URL:** `https://<your-domain>/auth/callback` (exact match; set it
     after you've fixed the domain in step 3). Note the **Client ID** and **Secret**.
