@@ -36,5 +36,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0024](0024-postgresql-database.md) | PostgreSQL as the sole database | Accepted |
 | [0025](0025-uuid-primary-keys.md) | UUID primary keys for app entities; EVE ids as unique columns | Accepted |
 | [0026](0026-ore-reprocess-pricing.md) | Ore reprocess pricing as a pricing-rule option | Accepted |
+| [0027](0027-deploy-coolify.md) | Deploy on Coolify with a managed PostgreSQL | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

@@ -60,9 +60,12 @@ buyback/
 ├── docs/                 # architecture.md + adr/
 ├── Dockerfile            # single-deployable image: builds SPA, serves it + /api/v1 (ADR-0012)
 ├── docker-compose.yml    # self-host stack: Postgres + app
+├── docker-compose.coolify.yml  # Coolify deploy: app only, managed Postgres, Traefik (ADR-0027)
 ├── .env.example          # compose config template (copy to .env)
 └── .github/workflows/    # CI
 ```
+
+> Deploying to the Coolify host? Follow [`docs/deploy-coolify.md`](docs/deploy-coolify.md).
 
 ## Backend architecture (layers)
 
