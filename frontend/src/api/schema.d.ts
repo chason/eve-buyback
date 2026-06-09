@@ -227,6 +227,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/structure-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_v1_corporations_me_structure_token_get"];
+        put?: never;
+        post?: never;
+        /** Revoke */
+        delete: operations["revoke_api_v1_corporations_me_structure_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/structure-token/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize
+         * @description Begin the structure-access grant: mint state + PKCE and return the SSO URL.
+         */
+        post: operations["authorize_api_v1_corporations_me_structure_token_authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/structure-token/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete
+         * @description Complete the grant: validate state, exchange the code, store the token.
+         */
+        post: operations["complete_api_v1_corporations_me_structure_token_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -668,6 +726,45 @@ export interface components {
             station_id: number;
             /** System Name */
             system_name: string;
+        };
+        /**
+         * StructureAuthorizeRequest
+         * @description The OAuth callback payload completing the structure-access grant.
+         */
+        StructureAuthorizeRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /**
+         * StructureAuthorizeResponse
+         * @description The SSO URL the SPA redirects to, to grant structure-market access.
+         */
+        StructureAuthorizeResponse: {
+            /** Authorization Url */
+            authorization_url: string;
+            /** State */
+            state: string;
+        };
+        /**
+         * StructureTokenStatus
+         * @description The corp's structure-market authorization status (never the token itself).
+         */
+        StructureTokenStatus: {
+            /** Authorized */
+            authorized: boolean;
+            /** Character Name */
+            character_name?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Expired
+             * @default false
+             */
+            expired: boolean;
+            /** Scopes */
+            scopes?: string | null;
         };
         /** TypeSearchResult */
         TypeSearchResult: {
@@ -1124,6 +1221,97 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_v1_corporations_me_structure_token_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureTokenStatus"];
+                };
+            };
+        };
+    };
+    revoke_api_v1_corporations_me_structure_token_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    authorize_api_v1_corporations_me_structure_token_authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureAuthorizeResponse"];
+                };
+            };
+        };
+    };
+    complete_api_v1_corporations_me_structure_token_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StructureAuthorizeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureTokenStatus"];
+                };
             };
             /** @description Validation Error */
             422: {

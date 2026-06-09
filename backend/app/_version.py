@@ -5,4 +5,4 @@ note in CLAUDE.md). It's served at `GET /api/v1/version` and shown in the UI foo
 and is the FastAPI app version (so it appears in the OpenAPI doc too).
 """
 
-APP_VERSION = "10"
+APP_VERSION = "11"

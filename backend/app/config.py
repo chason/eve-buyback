@@ -7,6 +7,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # development would let anyone forge a session cookie (e.g. role="ceo").
 INSECURE_SESSION_SECRET = "dev-insecure-change-me"
 
+# Placeholder Fernet key for local dev only — a valid key so the cipher constructs,
+# but public, so it must NOT be used to encrypt real refresh tokens in production
+# (ADR-0029). Generate a real one: `python -c "from cryptography.fernet import
+# Fernet; print(Fernet.generate_key().decode())"`.
+INSECURE_TOKEN_KEY = "YnV5YmFjay1kZXYtaW5zZWN1cmUtdG9rZW4ta2V5ISE="
+
 
 class Settings(BaseSettings):
     """Application settings, loaded from environment / .env (prefix BUYBACK_)."""
@@ -47,11 +53,29 @@ class Settings(BaseSettings):
     eve_redirect_uri: str = "http://localhost:5173/auth/callback"
     # Roles scope lets us detect Directors for corp registration (ADR-0015).
     eve_scopes: str = "publicData esi-characters.read_corporation_roles.v1"
+    # Scopes requested by the separate "authorize structure access" flow (ADR-0029).
+    eve_structure_scopes: str = (
+        "publicData esi-markets.structure_markets.read_v1 "
+        "esi-universe.read_structures.v1"
+    )
+
+    # Fernet key encrypting persisted structure-market refresh tokens at rest
+    # (ADR-0029). Required (a real value) to use structure hubs in production.
+    token_encryption_key: str = INSECURE_TOKEN_KEY
 
     @property
     def session_https_only(self) -> bool:
         """Require Secure cookies outside local development."""
         return self.environment != "development"
+
+    @property
+    def structure_tokens_configured(self) -> bool:
+        """Whether a real token-encryption key is set. Structure auth is refused
+        outside development while this is the public placeholder (ADR-0029)."""
+        if self.environment == "development":
+            return True
+        key = self.token_encryption_key.strip()
+        return bool(key) and key != INSECURE_TOKEN_KEY
 
     @model_validator(mode="after")
     def _require_secure_session_secret(self) -> "Settings":

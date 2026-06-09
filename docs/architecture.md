@@ -44,6 +44,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 26 | **Ore reprocess pricing** as a per-rule flag (price ore by refined minerals, 0.9063 yield) | [0026](adr/0026-ore-reprocess-pricing.md) |
 | 27 | **Deploy on Coolify** (Docker Compose app + managed PostgreSQL, Traefik TLS) | [0027](adr/0027-deploy-coolify.md) |
 | 28 | **ESI market source** for non-Fuzzwork hubs (region orders + in-house aggregation) | [0028](adr/0028-esi-market-source-and-aggregation.md) |
+| 29 | **Encrypted refresh token** for structure-market access (amends 0004) | [0029](adr/0029-encrypted-refresh-token-structures.md) |
 
 ## 3. System context
 

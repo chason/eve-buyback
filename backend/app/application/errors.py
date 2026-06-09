@@ -60,3 +60,21 @@ class AppraisalTooLarge(ApplicationError):
 
 class MarketHubInvalid(ApplicationError):
     default_detail = "Market hub could not be resolved"
+
+
+class NotAuthorizedToAuthorizeStructure(ApplicationError):
+    default_detail = "Only a Buyback Manager can authorize structure access"
+
+
+class StructureEncryptionNotConfigured(ApplicationError):
+    default_detail = (
+        "Structure-market encryption key (BUYBACK_TOKEN_ENCRYPTION_KEY) is not set"
+    )
+
+
+class StructureTokenMissing(ApplicationError):
+    default_detail = "Structure access has not been authorized"
+
+
+class StructureTokenExpired(ApplicationError):
+    default_detail = "Structure access has expired; please re-authorize"

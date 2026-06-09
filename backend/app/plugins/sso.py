@@ -37,12 +37,16 @@ class EveSsoClient:
     def configured(self) -> bool:
         return bool(self._settings.eve_client_id and self._settings.eve_client_secret)
 
-    def build_authorize_url(self, *, state: str, code_challenge: str) -> str:
+    def build_authorize_url(
+        self, *, state: str, code_challenge: str, scopes: str | None = None
+    ) -> str:
+        """Build the SSO authorize URL. `scopes` overrides the default login scopes —
+        used by the separate structure-access flow (ADR-0029)."""
         params = {
             "response_type": "code",
             "redirect_uri": self._settings.eve_redirect_uri,
             "client_id": self._settings.eve_client_id,
-            "scope": self._settings.eve_scopes,
+            "scope": scopes or self._settings.eve_scopes,
             "state": state,
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
@@ -64,6 +68,24 @@ class EveSsoClient:
         data = resp.json()
         return OAuthToken(
             access_token=data["access_token"], refresh_token=data.get("refresh_token")
+        )
+
+    async def refresh_access_token(self, refresh_token: str) -> OAuthToken:
+        """Exchange a refresh token for a fresh access token (ADR-0029). EVE may
+        rotate the refresh token, so the response's `refresh_token` (when present)
+        should be re-persisted by the caller. A revoked grant returns HTTP 400
+        (`invalid_grant`) → `raise_for_status` raises `HTTPStatusError`."""
+        resp = await self._client.post(
+            EVE_TOKEN_URL,
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            auth=(self._settings.eve_client_id, self._settings.eve_client_secret),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return OAuthToken(
+            access_token=data["access_token"],
+            refresh_token=data.get("refresh_token"),
         )
 
     async def verify_token(self, access_token: str) -> VerifiedCharacter:

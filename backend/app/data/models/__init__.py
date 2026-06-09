@@ -12,6 +12,7 @@ from app.data.models.sde_metadata import SdeMetadata
 from app.data.models.sde_station import SdeStation
 from app.data.models.sde_type import SdeType
 from app.data.models.sde_type_material import SdeTypeMaterial
+from app.data.models.structure_market_token import StructureMarketToken
 
 __all__ = [
     "Appraisal",
@@ -27,4 +28,5 @@ __all__ = [
     "SdeStation",
     "SdeType",
     "SdeTypeMaterial",
+    "StructureMarketToken",
 ]

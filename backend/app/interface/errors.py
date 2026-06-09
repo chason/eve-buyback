@@ -16,9 +16,13 @@ from app.application.errors import (
     ManagerNotFound,
     MarketHubInvalid,
     NotAuthorized,
+    NotAuthorizedToAuthorizeStructure,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
     SsoNotConfigured,
+    StructureEncryptionNotConfigured,
+    StructureTokenExpired,
+    StructureTokenMissing,
 )
 
 _STATUS: dict[type[ApplicationError], int] = {
@@ -35,6 +39,10 @@ _STATUS: dict[type[ApplicationError], int] = {
     EmptyAppraisal: 400,
     AppraisalTooLarge: 422,
     MarketHubInvalid: 422,
+    NotAuthorizedToAuthorizeStructure: 403,
+    StructureEncryptionNotConfigured: 503,
+    StructureTokenMissing: 409,
+    StructureTokenExpired: 409,
 }
 
 

@@ -7,6 +7,7 @@ from app.interface.v1 import (
     health,
     pricing,
     sde,
+    structures,
 )
 
 api_router = APIRouter()
@@ -16,3 +17,4 @@ api_router.include_router(corporations.router)
 api_router.include_router(pricing.router)
 api_router.include_router(appraisals.router)
 api_router.include_router(sde.router)
+api_router.include_router(structures.router)

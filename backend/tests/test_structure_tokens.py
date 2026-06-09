@@ -1,0 +1,205 @@
+"""Structure-market token infrastructure (ADR-0029): cipher, the manager-gated
+authorize flow, and server-side refresh (rotation + expiry)."""
+
+import uuid
+
+import httpx
+import pytest
+from cryptography.fernet import Fernet, InvalidToken
+
+from app.application import structure_tokens as structures_app
+from app.application.auth import AuthenticatedUser
+from app.application.errors import (
+    NotAuthorizedToAuthorizeStructure,
+    StructureTokenExpired,
+    StructureTokenMissing,
+)
+from app.data.db import SessionLocal
+from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import structure_tokens as tokens_repo
+from app.domain.roles import Role
+from app.plugins.sso import OAuthToken, VerifiedCharacter
+from app.plugins.token_cipher import TokenCipher
+from tests.helpers import CeoEsi, MemberEsi, login, make_client
+
+CORP_EVE_ID = 98000001
+CHAR_ID = 12345
+CIPHER = TokenCipher(Fernet.generate_key().decode())
+
+
+def _user(role: Role) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        character_id=CHAR_ID,
+        character_name="Boss",
+        corporation_id=CORP_EVE_ID,
+        corporation_name="Test Corp",
+        role=role,
+        corporation_registered=True,
+    )
+
+
+async def _register_corp(ceo: int = 99999) -> uuid.UUID:
+    async with SessionLocal() as session:
+        corp = await corporations_repo.create_corporation(
+            session,
+            eve_corporation_id=CORP_EVE_ID,
+            name="Test Corp",
+            ceo_character_id=ceo,
+            registered_by_character_id=ceo,
+        )
+        await session.commit()
+        return corp.id
+
+
+class FakeSso:
+    configured = True
+
+    def __init__(self, *, refresh="refresh-1", new_access="access-new",
+                 new_refresh=None, refresh_error=None):
+        self._refresh = refresh
+        self._new_access = new_access
+        self._new_refresh = new_refresh
+        self._refresh_error = refresh_error
+
+    def build_authorize_url(self, *, state, code_challenge, scopes=None):
+        return f"https://login.eveonline.com/authorize?state={state}"
+
+    async def exchange_code(self, code, code_verifier):
+        return OAuthToken(access_token="access-initial", refresh_token=self._refresh)
+
+    async def verify_token(self, access_token):
+        return VerifiedCharacter(character_id=CHAR_ID, name="Boss")
+
+    async def refresh_access_token(self, refresh_token):
+        if self._refresh_error is not None:
+            raise self._refresh_error
+        return OAuthToken(
+            access_token=self._new_access, refresh_token=self._new_refresh
+        )
+
+
+# --- TokenCipher ---
+
+
+def test_cipher_round_trip():
+    cipher = TokenCipher(Fernet.generate_key().decode())
+    ciphertext = cipher.encrypt("refresh-abc")
+    assert isinstance(ciphertext, bytes) and ciphertext != b"refresh-abc"
+    assert cipher.decrypt(ciphertext) == "refresh-abc"
+
+
+def test_cipher_wrong_key_fails():
+    a = TokenCipher(Fernet.generate_key().decode())
+    b = TokenCipher(Fernet.generate_key().decode())
+    with pytest.raises(InvalidToken):
+        b.decrypt(a.encrypt("secret"))
+
+
+# --- authorize (manager-gated, encrypts) ---
+
+
+async def test_member_cannot_authorize():
+    await _register_corp()
+    async with SessionLocal() as session:
+        with pytest.raises(NotAuthorizedToAuthorizeStructure):
+            await structures_app.complete_structure_authorize(
+                session, FakeSso(), code="c", verifier="v",
+                user=_user("member"), cipher=CIPHER,
+            )
+
+
+async def test_manager_authorize_stores_encrypted_token():
+    corp_uuid = await _register_corp()
+    async with SessionLocal() as session:
+        record = await structures_app.complete_structure_authorize(
+            session, FakeSso(refresh="refresh-secret"), code="c", verifier="v",
+            user=_user("manager"), cipher=CIPHER,
+        )
+    assert record.character_name == "Boss"
+    async with SessionLocal() as session:
+        stored = await tokens_repo.get_for_corp(session, corp_uuid)
+    assert stored is not None
+    assert stored.encrypted_refresh_token != b"refresh-secret"  # encrypted at rest
+    assert CIPHER.decrypt(stored.encrypted_refresh_token) == "refresh-secret"
+
+
+# --- get_structure_access_token (refresh / rotation / expiry / missing) ---
+
+
+async def _authorize(corp_refresh: str = "r1") -> uuid.UUID:
+    corp_uuid = await _register_corp()
+    async with SessionLocal() as session:
+        await structures_app.complete_structure_authorize(
+            session, FakeSso(refresh=corp_refresh), code="c", verifier="v",
+            user=_user("manager"), cipher=CIPHER,
+        )
+    return corp_uuid
+
+
+async def test_get_access_token_refreshes():
+    corp_uuid = await _authorize()
+    async with SessionLocal() as session:
+        access = await structures_app.get_structure_access_token(
+            session, FakeSso(new_access="fresh-access"),
+            corporation_uuid=corp_uuid, cipher=CIPHER,
+        )
+    assert access == "fresh-access"
+
+
+async def test_refresh_rotation_persists_new_token():
+    corp_uuid = await _authorize("r1")
+    async with SessionLocal() as session:
+        await structures_app.get_structure_access_token(
+            session, FakeSso(new_refresh="r2-rotated"),
+            corporation_uuid=corp_uuid, cipher=CIPHER,
+        )
+    async with SessionLocal() as session:
+        stored = await tokens_repo.get_for_corp(session, corp_uuid)
+    assert CIPHER.decrypt(stored.encrypted_refresh_token) == "r2-rotated"
+
+
+async def test_invalid_grant_marks_expired_and_raises():
+    corp_uuid = await _authorize()
+    err = httpx.HTTPStatusError(
+        "invalid_grant",
+        request=httpx.Request("POST", "http://x"),
+        response=httpx.Response(400),
+    )
+    async with SessionLocal() as session:
+        with pytest.raises(StructureTokenExpired):
+            await structures_app.get_structure_access_token(
+                session, FakeSso(refresh_error=err),
+                corporation_uuid=corp_uuid, cipher=CIPHER,
+            )
+    async with SessionLocal() as session:
+        stored = await tokens_repo.get_for_corp(session, corp_uuid)
+    assert stored.last_refresh_failed_at is not None
+
+
+async def test_missing_token_raises():
+    corp_uuid = await _register_corp()
+    async with SessionLocal() as session:
+        with pytest.raises(StructureTokenMissing):
+            await structures_app.get_structure_access_token(
+                session, FakeSso(), corporation_uuid=corp_uuid, cipher=CIPHER,
+            )
+
+
+# --- API wiring (manager-gated status) ---
+
+
+async def test_status_endpoint_authorized_false_for_manager():
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.get("/api/v1/corporations/me/structure-token")
+    assert resp.status_code == 200
+    assert resp.json()["authorized"] is False
+
+
+async def test_status_endpoint_forbidden_for_member():
+    await _register_corp()
+    async with make_client(MemberEsi()) as http:
+        await login(http)
+        resp = await http.get("/api/v1/corporations/me/structure-token")
+    assert resp.status_code == 403
