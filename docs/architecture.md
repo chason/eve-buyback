@@ -42,6 +42,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 23 | **Frontend: Pico.css** + OpenAPI-generated TS types | [0023](adr/0023-frontend-styling-and-typegen.md) |
 | 25 | **UUID PKs for app entities**; EVE ids demoted to unique `eve_id` columns, internal FKs via UUID | [0025](adr/0025-uuid-primary-keys.md) |
 | 26 | **Ore reprocess pricing** as a per-rule flag (price ore by refined minerals, 0.9063 yield) | [0026](adr/0026-ore-reprocess-pricing.md) |
+| 27 | **Deploy on Coolify** (Docker Compose app + managed PostgreSQL, Traefik TLS) | [0027](adr/0027-deploy-coolify.md) |
 
 ## 3. System context
 
@@ -277,6 +278,9 @@ Fuzzwork usage, image/link helpers, and caching.
      `index.html`) alongside `/api/v1`; the entrypoint runs `alembic upgrade head`
      on boot; `docker-compose.yml` bundles Postgres + the app. The SDE seed
      (`python -m app.sde.seed`) is a one-time post-deploy step ([ADR-0012](adr/0012-single-deployable-packaging.md)).
+     Production hosting targets **Coolify** (Docker Compose app + managed PostgreSQL
+     behind Traefik) via `docker-compose.coolify.yml` — runbook in
+     [`deploy-coolify.md`](deploy-coolify.md), decision in [ADR-0027](adr/0027-deploy-coolify.md).
 
 ## 13. Out of scope (MVP) / future
 

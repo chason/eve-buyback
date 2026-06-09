@@ -1,0 +1,46 @@
+# Coolify deployment of the buyback app (ADR-0027). Step-by-step: docs/deploy-coolify.md.
+#
+# Differs from the self-host docker-compose.yml: no bundled Postgres (Coolify
+# manages it as a separate resource) and no published host ports — Coolify's
+# Traefik proxy fronts the app on 80/443 via the SERVICE_FQDN_* magic variable.
+#
+# In Coolify: create a "Docker Compose" application from the GitHub repo and set
+# the compose location to /docker-compose.coolify.yml. Provide the env vars below
+# (secrets) in the application's Environment Variables.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Coolify generates the public FQDN and wires Traefik + Let's Encrypt TLS to
+    # container port 8000. Set the actual domain in the Coolify UI (Domains).
+    expose:
+      - "8000"
+    environment:
+      - SERVICE_FQDN_APP_8000
+      - BUYBACK_ENVIRONMENT=production
+      # --- Set these in the Coolify UI → Environment Variables ---
+      # Internal connection string of the managed Postgres resource, rewritten to
+      # the asyncpg driver: postgresql+asyncpg://USER:PASS@DB-HOST:5432/DBNAME
+      - BUYBACK_DATABASE_URL=${BUYBACK_DATABASE_URL}
+      # Strong random value: python -c "import secrets; print(secrets.token_urlsafe(48))"
+      - BUYBACK_SESSION_SECRET=${BUYBACK_SESSION_SECRET}
+      # EVE SSO app (https://developers.eveonline.com/); redirect must equal the
+      # app's public URL + /auth/callback and match the EVE app registration.
+      - BUYBACK_EVE_CLIENT_ID=${BUYBACK_EVE_CLIENT_ID}
+      - BUYBACK_EVE_CLIENT_SECRET=${BUYBACK_EVE_CLIENT_SECRET}
+      - BUYBACK_EVE_REDIRECT_URI=${BUYBACK_EVE_REDIRECT_URI}
+      - BUYBACK_MARKET_HUB_ID=${BUYBACK_MARKET_HUB_ID:-60003760}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request, sys;
+          sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status == 200 else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
