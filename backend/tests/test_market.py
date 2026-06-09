@@ -10,10 +10,11 @@ from app.domain.aggregates import OrderBookAggregate, SideAggregate
 from app.domain.market import HubDescriptor
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide
 
-HUB = 60003760  # Jita — a Fuzzwork hub
+HUB = "60003760"  # Jita — a Fuzzwork hub
 FUZ_HUB = HubDescriptor(hub_id=HUB, kind="npc_station")
 # A non-Fuzzwork NPC station (priced via ESI region orders), with its region cached.
-ESI_HUB = HubDescriptor(hub_id=60012345, kind="npc_station", region_id=10000002)
+ESI_HUB = HubDescriptor(hub_id="60012345", kind="npc_station", region_id=10000002)
+STRUCT_HUB = HubDescriptor(hub_id="1035000000001", kind="structure")
 NOW = datetime(2026, 6, 7, 12, 0, 0, tzinfo=UTC)
 
 
@@ -75,6 +76,7 @@ class FakeEsiMarket:
         self.response = response or {}
         self.error = error
         self.region_calls = 0
+        self.structure_calls = 0
 
     async def get_region_aggregates(self, *, region_id, station_id, type_ids):
         self.region_calls += 1
@@ -82,8 +84,14 @@ class FakeEsiMarket:
             raise self.error
         return {tid: self.response[tid] for tid in type_ids if tid in self.response}
 
+    async def get_structure_aggregates(self, *, structure_id, type_ids, access_token):
+        self.structure_calls += 1
+        if self.error is not None:
+            raise self.error
+        return {tid: self.response[tid] for tid in type_ids if tid in self.response}
 
-async def _seed_cache(rows: list[dict], hub_id: int = HUB) -> None:
+
+async def _seed_cache(rows: list[dict], hub_id: str = HUB) -> None:
     async with SessionLocal() as session:
         await prices_repo.upsert_prices(session, hub_id=hub_id, rows=rows)
         await session.commit()
@@ -166,6 +174,41 @@ async def test_non_fuzzwork_hub_prices_from_esi_region_orders():
             session, hub_id=ESI_HUB.hub_id, type_ids=[34]
         )
     assert cached and cached[0].buy_weighted_average == Decimal("5.0")
+
+
+async def test_structure_hub_prices_via_provider_token():
+    esi = FakeEsiMarket(response={34: _esi_book(buy="3.0", sell="4.0")})
+    calls = {"token": 0}
+
+    async def provider() -> str:
+        calls["token"] += 1
+        return "fresh-access-token"
+
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, FakeFuzzwork(), esi, hub=STRUCT_HUB, type_ids=[34], now=NOW,
+            structure_token_provider=provider,
+        )
+    assert calls["token"] == 1
+    assert esi.structure_calls == 1
+    assert result[0].buy_percentile == Decimal("3.0")
+
+
+async def test_structure_missing_token_degrades_to_unpriced():
+    from app.application.errors import StructureTokenMissing
+
+    esi = FakeEsiMarket(response={34: _esi_book(buy="3.0", sell="4.0")})
+
+    async def provider() -> str:
+        raise StructureTokenMissing()
+
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, FakeFuzzwork(), esi, hub=STRUCT_HUB, type_ids=[34], now=NOW,
+            structure_token_provider=provider,
+        )
+    # No token + no cache → the type is simply omitted; the appraisal never errors.
+    assert result == []
 
 
 async def test_esi_outage_serves_stale_cache():

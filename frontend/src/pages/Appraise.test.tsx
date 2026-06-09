@@ -36,7 +36,7 @@ describe("Appraise", () => {
       public_id: "xyz",
       created_by_character_id: 1,
       created_at: "2026-06-07T00:00:00Z",
-      market_hub_id: 60003760,
+      market_hub_id: "60003760",
       accepted_total: "0",
       rejected_count: 0,
       lines: [],

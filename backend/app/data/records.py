@@ -70,7 +70,7 @@ class SdeMarketGroupRecord(BaseModel):
 class MarketPriceRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    hub_id: int
+    hub_id: str
     type_id: int
 
     buy_weighted_average: Decimal
@@ -115,7 +115,7 @@ class BuybackConfigRecord(BaseModel):
     # interface sets the API's EVE corp id from the session.
     model_config = ConfigDict(from_attributes=True)
 
-    market_hub_id: int
+    market_hub_id: str
     # Hub source descriptor (ADR-0028): kind + ESI region + cached display name.
     market_hub_kind: HubKind = "npc_station"
     market_region_id: int | None = None
@@ -173,7 +173,7 @@ class AppraisalRecord(BaseModel):
     created_by_character_id: int
     created_by_character_name: str | None = None
     created_at: datetime
-    market_hub_id: int
+    market_hub_id: str
     accepted_total: Decimal
     rejected_count: int
     lines: list[AppraisalLineRecord]
@@ -188,7 +188,7 @@ class AppraisalSummaryRecord(BaseModel):
     created_by_character_id: int
     created_by_character_name: str | None = None
     created_at: datetime
-    market_hub_id: int
+    market_hub_id: str
     accepted_total: Decimal
     rejected_count: int
 

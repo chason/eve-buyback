@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { login } from "../api/auth"
+import {
+  completeStructureAuthorize,
+  STRUCTURE_AUTH_FLAG,
+} from "../api/structures"
 
 export default function Callback() {
   const [params] = useSearchParams()
@@ -10,6 +14,8 @@ export default function Callback() {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const handled = useRef(false)
+  // The same SSO callback completes either a login or a structure-access grant.
+  const isStructure = sessionStorage.getItem(STRUCTURE_AUTH_FLAG) === "1"
 
   useEffect(() => {
     if (handled.current) return
@@ -22,18 +28,30 @@ export default function Callback() {
       return
     }
 
+    if (isStructure) {
+      sessionStorage.removeItem(STRUCTURE_AUTH_FLAG)
+      completeStructureAuthorize(code, state)
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ["structureStatus"] }),
+        )
+        .then(() => navigate("/config", { replace: true }))
+        .catch((e) => setError((e as Error).message))
+      return
+    }
+
     login(code, state)
       .then(() => queryClient.invalidateQueries({ queryKey: ["me"] }))
       .then(() => navigate("/", { replace: true }))
       .catch((e) => setError((e as Error).message))
-  }, [params, navigate, queryClient])
+  }, [params, navigate, queryClient, isStructure])
 
+  const verb = isStructure ? "Authorizing structure access" : "Signing you in"
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
       {error ? (
-        <p style={{ color: "crimson" }}>Login failed: {error}</p>
+        <p style={{ color: "crimson" }}>{verb} failed: {error}</p>
       ) : (
-        <p>Signing you in…</p>
+        <p>{verb}…</p>
       )}
     </main>
   )

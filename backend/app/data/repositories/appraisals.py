@@ -23,7 +23,7 @@ async def create_appraisal(
     corporation_id: uuid.UUID,
     created_by_character_id: int,
     created_by_character_name: str | None = None,
-    market_hub_id: int,
+    market_hub_id: str,
     accepted_total: Decimal,
     rejected_count: int,
     request_json: dict,

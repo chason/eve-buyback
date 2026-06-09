@@ -4,11 +4,18 @@ import { useEffect, useState } from "react"
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
 import { searchStations } from "../api/sde"
+import {
+  beginStructureAuthorize,
+  getStructureStatus,
+  revokeStructure,
+  STRUCTURE_AUTH_FLAG,
+} from "../api/structures"
 import type { AggregateField, Basis } from "../api/types"
 import { FUZZWORK_HUBS, hubName, isFuzzworkHub } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
-const CUSTOM = "custom" // sentinel select value for "other NPC station"
+const CUSTOM = "custom" // "other NPC station" (searchable)
+const STRUCTURE = "structure" // player structure (authenticated ESI)
 const BASES: Basis[] = ["buy", "sell", "split"]
 const AGGREGATES: AggregateField[] = [
   "percentile",
@@ -28,13 +35,13 @@ export default function Config() {
   const [percentage, setPercentage] = useState("90")
   const [aggregate, setAggregate] = useState<AggregateField>("percentile")
   const [defaultAccepted, setDefaultAccepted] = useState(true)
-  // Hub picker: a Fuzzwork preset id (as a string) or CUSTOM for any other NPC
-  // station, chosen from a searchable list (priced via ESI).
-  const [hubChoice, setHubChoice] = useState<string>(String(FUZZWORK_HUBS[0].id))
+  // Hub picker: a Fuzzwork preset id, CUSTOM (search an NPC station), or STRUCTURE.
+  const [hubChoice, setHubChoice] = useState<string>(FUZZWORK_HUBS[0].id)
   const [stationQuery, setStationQuery] = useState("")
-  const [station, setStation] = useState<{ id: number; label: string } | null>(
+  const [station, setStation] = useState<{ id: string; label: string } | null>(
     null,
   )
+  const [structureId, setStructureId] = useState("")
 
   // Seed the form once the config loads (and after a save refetch).
   useEffect(() => {
@@ -44,14 +51,14 @@ export default function Config() {
       setAggregate(config.data.aggregate_field)
       setDefaultAccepted(config.data.default_accepted)
       const hub = config.data.market_hub_id
-      if (isFuzzworkHub(hub)) {
-        setHubChoice(String(hub))
+      if (config.data.market_hub_kind === "structure") {
+        setHubChoice(STRUCTURE)
+        setStructureId(hub)
+      } else if (isFuzzworkHub(hub)) {
+        setHubChoice(hub)
       } else {
         setHubChoice(CUSTOM)
-        setStation({
-          id: hub,
-          label: config.data.market_hub_name ?? `Station ${hub}`,
-        })
+        setStation({ id: hub, label: config.data.market_hub_name ?? `Station ${hub}` })
       }
     }
   }, [config.data])
@@ -62,15 +69,28 @@ export default function Config() {
     queryFn: () => searchStations(query),
     enabled: hubChoice === CUSTOM && query.length >= 2,
   })
+  const structureStatus = useQuery({
+    queryKey: ["structureStatus"],
+    queryFn: getStructureStatus,
+    enabled: hubChoice === STRUCTURE,
+  })
 
-  const hubId = hubChoice === CUSTOM ? (station?.id ?? 0) : Number(hubChoice)
-  const hubInvalid = hubChoice === CUSTOM && station === null
+  const hubKind = hubChoice === STRUCTURE ? "structure" : "npc_station"
+  const hubId =
+    hubChoice === STRUCTURE
+      ? structureId.trim()
+      : hubChoice === CUSTOM
+        ? (station?.id ?? "")
+        : hubChoice
+  // A structure id must be numeric (the server validates too — defence in depth).
+  const hubInvalid =
+    hubId === "" || (hubChoice === STRUCTURE && !/^\d+$/.test(hubId))
 
   const save = useMutation({
     mutationFn: () =>
       updateConfig({
         market_hub_id: hubId,
-        market_hub_kind: "npc_station",
+        market_hub_kind: hubKind,
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
@@ -78,6 +98,18 @@ export default function Config() {
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["config"] }),
   })
+
+  const revoke = useMutation({
+    mutationFn: revokeStructure,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["structureStatus"] }),
+  })
+
+  async function startStructureAuthorize() {
+    const { authorization_url } = await beginStructureAuthorize()
+    sessionStorage.setItem(STRUCTURE_AUTH_FLAG, "1")
+    window.location.href = authorization_url
+  }
 
   if (config.isLoading) return <p aria-busy="true">Loading…</p>
   if (config.isError || !config.data) {
@@ -106,13 +138,15 @@ export default function Config() {
             aria-label="Market hub"
           >
             {FUZZWORK_HUBS.map((h) => (
-              <option key={h.id} value={String(h.id)}>
+              <option key={h.id} value={h.id}>
                 {h.name}
               </option>
             ))}
             <option value={CUSTOM}>Other NPC station…</option>
+            <option value={STRUCTURE}>Player structure…</option>
           </select>
         </label>
+
         {hubChoice === CUSTOM && (
           <label>
             Station
@@ -137,7 +171,7 @@ export default function Config() {
                       onClick={(e) => {
                         e.preventDefault()
                         setStation({
-                          id: s.station_id,
+                          id: String(s.station_id),
                           label: `${s.system_name} - ${s.name}`,
                         })
                         setStationQuery("")
@@ -155,6 +189,61 @@ export default function Config() {
             </small>
           </label>
         )}
+
+        {hubChoice === STRUCTURE && (
+          <>
+            <label>
+              Structure ID
+              <input
+                type="text"
+                inputMode="numeric"
+                value={structureId}
+                placeholder="e.g. 1035000000001"
+                aria-label="Structure ID"
+                disabled={!canEdit}
+                onChange={(e) => setStructureId(e.target.value)}
+              />
+            </label>
+            <article>
+              {structureStatus.data?.authorized ? (
+                <p>
+                  Structure access: connected as{" "}
+                  <strong>{structureStatus.data.character_name}</strong>
+                  {structureStatus.data.expired && (
+                    <span className="error"> — expired, please re-authorize</span>
+                  )}
+                  .{" "}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (canEdit) revoke.mutate()
+                    }}
+                  >
+                    Revoke
+                  </a>
+                </p>
+              ) : (
+                <p>Structure access is not authorized yet.</p>
+              )}
+              <button
+                type="button"
+                className="secondary"
+                disabled={!canEdit}
+                onClick={() => void startStructureAuthorize()}
+              >
+                {structureStatus.data?.authorized
+                  ? "Re-authorize structure access"
+                  : "Authorize structure access"}
+              </button>
+              <small className="field-hint">
+                Log in with a character that has docking + market access to the
+                structure. The token is stored encrypted (ADR-0029).
+              </small>
+            </article>
+          </>
+        )}
+
         <small className="field-hint">
           Currently pricing at{" "}
           <strong>

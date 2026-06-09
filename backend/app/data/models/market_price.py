@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric
+from sqlalchemy import DateTime, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
@@ -20,7 +20,9 @@ class MarketPrice(Base):
 
     __tablename__ = "market_prices"
 
-    hub_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    # hub_id is an EVE location id stored as a string — a station id or a 64-bit
+    # player structure id — so it's free of int32/JS-number range concerns (ADR-0029).
+    hub_id: Mapped[str] = mapped_column(String, primary_key=True)
     type_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
 
     buy_weighted_average: Mapped[Decimal] = mapped_column(Numeric)

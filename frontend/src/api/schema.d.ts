@@ -446,7 +446,7 @@ export interface components {
             /** Lines */
             lines: components["schemas"]["AppraisalLineOut"][];
             /** Market Hub Id */
-            market_hub_id: number;
+            market_hub_id: string;
             /** Public Id */
             public_id: string;
             /** Rejected Count */
@@ -466,7 +466,7 @@ export interface components {
             /** Created By Character Name */
             created_by_character_name?: string | null;
             /** Market Hub Id */
-            market_hub_id: number;
+            market_hub_id: string;
             /** Public Id */
             public_id: string;
             /** Rejected Count */
@@ -494,7 +494,7 @@ export interface components {
             /** Default Percentage */
             default_percentage: string;
             /** Market Hub Id */
-            market_hub_id: number;
+            market_hub_id: string;
             /**
              * Market Hub Kind
              * @default npc_station
@@ -526,7 +526,7 @@ export interface components {
             /** Default Percentage */
             default_percentage: number | string;
             /** Market Hub Id */
-            market_hub_id: number;
+            market_hub_id: string;
             /**
              * Market Hub Kind
              * @default npc_station

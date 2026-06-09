@@ -138,7 +138,7 @@ async def test_appraisal_whitelist_mode_rejects_unruled_items():
         await http.post("/api/v1/corporations")
         # Flip the corp to whitelist-only buyback.
         await http.put("/api/v1/corporations/me/config", json={
-            "market_hub_id": 60003760, "default_basis": "buy",
+            "market_hub_id": "60003760", "default_basis": "buy",
             "default_percentage": "90", "aggregate_field": "percentile",
             "default_accepted": False,
         })
@@ -470,7 +470,7 @@ async def test_cross_corp_appraisal_is_404():
                 public_id="otherCorpXyz",
                 corporation_id=other_corp.id,
                 created_by_character_id=1,
-                market_hub_id=60003760,
+                market_hub_id="60003760",
                 accepted_total=Decimal("0"),
                 rejected_count=0,
                 request_json={"items": []},
@@ -504,13 +504,13 @@ async def test_list_scope_member_sees_own_manager_sees_all():
             ceo_character_id=99999, registered_by_character_id=99999,
         )
         await config_repo.upsert_config(
-            session, corporation_id=corp.id, market_hub_id=60003760,
+            session, corporation_id=corp.id, market_hub_id="60003760",
             default_basis="buy", default_percentage=90, aggregate_field="percentile",
         )
         # An appraisal owned by a different character in the same corp.
         await appraisals_repo.create_appraisal(
             session, public_id="teammateAppr", corporation_id=corp.id,
-            created_by_character_id=777, market_hub_id=60003760,
+            created_by_character_id=777, market_hub_id="60003760",
             accepted_total=Decimal("0"), rejected_count=0,
             request_json={"items": []}, lines=[],
         )

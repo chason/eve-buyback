@@ -8,26 +8,16 @@ from typing import Literal
 HubKind = Literal["npc_station", "structure"]
 
 # The five NPC trade hubs Fuzzwork aggregates (ADR-0006). Any other NPC station is
-# priced from ESI region orders instead; structures always come from ESI.
-FUZZWORK_HUBS: frozenset[int] = frozenset(
-    {
-        60003760,  # Jita IV - Moon 4 - Caldari Navy Assembly Plant
-        60008494,  # Amarr VIII (Oris) - Emperor Family Academy
-        60011866,  # Dodixie IX - Moon 20 - Federation Navy Assembly Plant
-        60004588,  # Rens VI - Moon 8 - Brutor Tribe Treasury
-        60005686,  # Hek VIII - Moon 12 - Boundless Creation Factory
-    }
-)
-
-# Display names for the Fuzzwork hubs (used when one is selected, so we don't need an
-# ESI round-trip to label it).
-FUZZWORK_HUB_NAMES: dict[int, str] = {
-    60003760: "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-    60008494: "Amarr VIII (Oris) - Emperor Family Academy",
-    60011866: "Dodixie IX - Moon 20 - Federation Navy Assembly Plant",
-    60004588: "Rens VI - Moon 8 - Brutor Tribe Treasury",
-    60005686: "Hek VIII - Moon 12 - Boundless Creation Factory",
+# priced from ESI region orders instead; structures always come from ESI. Hub ids are
+# strings (ADR-0029) — EVE location ids, free of int32/JS-number range concerns.
+FUZZWORK_HUB_NAMES: dict[str, str] = {
+    "60003760": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
+    "60008494": "Amarr VIII (Oris) - Emperor Family Academy",
+    "60011866": "Dodixie IX - Moon 20 - Federation Navy Assembly Plant",
+    "60004588": "Rens VI - Moon 8 - Brutor Tribe Treasury",
+    "60005686": "Hek VIII - Moon 12 - Boundless Creation Factory",
 }
+FUZZWORK_HUBS: frozenset[str] = frozenset(FUZZWORK_HUB_NAMES)
 
 # Which source fills cache misses for a hub.
 MarketSource = Literal["fuzzwork", "esi_region", "esi_structure"]
@@ -39,7 +29,7 @@ class HubDescriptor:
     `region_id` is required for `esi_region` (NPC station) pricing; unused for the
     Fuzzwork hubs and for structures (whose endpoint is structure-scoped)."""
 
-    hub_id: int  # location_id: NPC station id or structure id
+    hub_id: str  # EVE location id (string): NPC station id or structure id
     kind: HubKind
     region_id: int | None = None
 

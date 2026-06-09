@@ -9,18 +9,23 @@ items it has never priced, rather than failing the whole request.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.errors import StructureTokenExpired, StructureTokenMissing
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
 from app.domain.market import HubDescriptor, is_fresh, resolve_market_source
-from app.plugins.esi_market import EsiMarketClient
+from app.plugins.esi_market import EsiMarketClient, StructureAccessDenied
 from app.plugins.fuzzwork import FuzzworkClient
 
 log = logging.getLogger(__name__)
+
+# Provides a fresh structure-market access token (refreshing server-side, ADR-0029).
+StructureTokenProvider = Callable[[], Awaitable[str]]
 
 
 def _row_from_aggregate(type_id: int, agg, fetched_at) -> dict:
@@ -51,6 +56,7 @@ async def _fetch_aggregates(
     esi_market: EsiMarketClient,
     hub: HubDescriptor,
     type_ids: list[int],
+    structure_token_provider: StructureTokenProvider | None,
 ) -> dict:
     """Fetch buy/sell aggregates for the cache misses from the hub's source. Returns
     `{}` on any outage so the caller falls back to cached prices."""
@@ -65,8 +71,18 @@ async def _fetch_aggregates(
             return await esi_market.get_region_aggregates(
                 region_id=hub.region_id, station_id=hub.hub_id, type_ids=type_ids
             )
-        # esi_structure → a later phase; treat as unpriced for now.
-        log.warning("structure pricing not yet available (hub %s)", hub.hub_id)
+        # esi_structure (ADR-0029): needs a per-corp access token.
+        if structure_token_provider is None:
+            log.warning("no structure token provider for hub %s", hub.hub_id)
+            return {}
+        access_token = await structure_token_provider()
+        return await esi_market.get_structure_aggregates(
+            structure_id=hub.hub_id, type_ids=type_ids, access_token=access_token
+        )
+    except (StructureTokenMissing, StructureTokenExpired, StructureAccessDenied):
+        log.warning(
+            "structure access unavailable for hub %s; serving cache", hub.hub_id
+        )
         return {}
     except httpx.HTTPError:
         log.warning(
@@ -86,6 +102,7 @@ async def get_market_prices(
     hub: HubDescriptor,
     type_ids: list[int],
     now,
+    structure_token_provider: StructureTokenProvider | None = None,
 ) -> list[MarketPriceRecord]:
     if not type_ids:
         return []
@@ -106,7 +123,9 @@ async def get_market_prices(
 
     refreshed: dict[int, MarketPriceRecord] = {}
     if to_fetch:
-        aggregates = await _fetch_aggregates(fuzzwork, esi_market, hub, to_fetch)
+        aggregates = await _fetch_aggregates(
+            fuzzwork, esi_market, hub, to_fetch, structure_token_provider
+        )
         if aggregates:
             rows = [
                 _row_from_aggregate(tid, agg, now)

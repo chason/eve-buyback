@@ -68,7 +68,7 @@ async def register_corporation(
     await config_repo.upsert_config(
         session,
         corporation_id=corp.id,
-        market_hub_id=get_settings().market_hub_id,
+        market_hub_id=str(get_settings().market_hub_id),
         default_basis=DEFAULT_BASIS,
         default_percentage=DEFAULT_PERCENTAGE,
         aggregate_field=DEFAULT_AGGREGATE_FIELD,

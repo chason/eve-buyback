@@ -2,6 +2,7 @@
 at the interface; these enforce existence/uniqueness/target rules and own the commit.
 """
 
+import uuid
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from app.data.records import BuybackConfigRecord, PricingRuleRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
+from app.data.repositories import structure_tokens as structure_tokens_repo
 from app.domain.market import (
     FUZZWORK_HUB_NAMES,
     HubDescriptor,
@@ -44,7 +46,7 @@ async def get_config(
         config = await config_repo.upsert_config(
             session,
             corporation_id=corp.id,
-            market_hub_id=get_settings().market_hub_id,
+            market_hub_id=str(get_settings().market_hub_id),
             default_basis=DEFAULT_BASIS,
             default_percentage=DEFAULT_PERCENTAGE,
             aggregate_field=DEFAULT_AGGREGATE_FIELD,
@@ -57,7 +59,7 @@ async def update_config(
     session: AsyncSession,
     corporation_id: int,
     *,
-    market_hub_id: int,
+    market_hub_id: str,
     default_basis: Basis,
     default_percentage: Decimal,
     aggregate_field: AggregateField,
@@ -66,7 +68,7 @@ async def update_config(
 ) -> BuybackConfigRecord:
     corp = await get_registered_corporation(session, corporation_id)
     region_id, hub_name = await _resolve_hub(
-        session, market_hub_id, market_hub_kind
+        session, corp.id, market_hub_id, market_hub_kind
     )
     config = await config_repo.upsert_config(
         session,
@@ -85,18 +87,35 @@ async def update_config(
 
 
 async def _resolve_hub(
-    session: AsyncSession, hub_id: int, kind: HubKind
+    session: AsyncSession,
+    corporation_uuid: uuid.UUID,
+    hub_id: str,
+    kind: HubKind,
 ) -> tuple[int | None, str | None]:
-    """Resolve a chosen hub to `(region_id, display_name)`, validating it exists
-    (ADR-0028). Fuzzwork hubs need no region; a non-Fuzzwork NPC station is resolved
-    from the seeded SDE (region + 'System - Station' label) so the hot path never
-    touches ESI. Raises `MarketHubInvalid` (422) if the hub can't be resolved."""
+    """Resolve a chosen hub to `(region_id, display_name)`, validating it (ADR-0028,
+    ADR-0029). Fuzzwork hubs need no region; a non-Fuzzwork NPC station is resolved
+    from the seeded SDE; a structure hub requires the corp to have authorized
+    structure access first (region is unused — the structure endpoint is
+    structure-scoped). Raises `MarketHubInvalid` (422) if it can't be resolved."""
     if kind == "structure":
-        raise MarketHubInvalid("Structure hubs are not yet supported")
+        # Numeric-only: the id is interpolated into an authenticated ESI URL when
+        # pricing, so reject anything that could inject a path (e.g. "1/../x").
+        if not hub_id.isdigit():
+            raise MarketHubInvalid(f"Invalid structure id {hub_id!r}")
+        token = await structure_tokens_repo.get_for_corp(session, corporation_uuid)
+        if token is None:
+            raise MarketHubInvalid(
+                "Authorize structure access before selecting a structure hub"
+            )
+        return None, f"Structure {hub_id}"
     source = resolve_market_source(HubDescriptor(hub_id=hub_id, kind=kind))
     if source == "fuzzwork":
         return None, FUZZWORK_HUB_NAMES.get(hub_id)
-    station = await sde_repo.get_station(session, hub_id)
+    try:
+        station_id = int(hub_id)
+    except ValueError as exc:
+        raise MarketHubInvalid(f"Invalid station id {hub_id!r}") from exc
+    station = await sde_repo.get_station(session, station_id)
     if station is None:
         raise MarketHubInvalid(f"Unknown NPC station {hub_id}")
     return station.region_id, f"{station.system_name} - {station.name}"
