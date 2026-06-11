@@ -47,6 +47,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 29 | **Encrypted refresh token** for structure-market access (amends 0004) | [0029](adr/0029-encrypted-refresh-token-structures.md) |
 | 30 | **Accepted drop-off locations** per corp; chosen at appraisal time, snapshotted | [0030](adr/0030-buyback-drop-off-locations.md) |
 | 31 | **Per-rule market-hub override**; appraisals fetch per hub, lines snapshot theirs | [0031](adr/0031-per-rule-market-hub.md) |
+| 32 | **Automated version bump on merge** (CI commits the +1; PRs don't touch it) | [0032](adr/0032-automated-version-bump.md) |
 
 ## 3. System context
 
