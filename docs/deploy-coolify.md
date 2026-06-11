@@ -156,6 +156,10 @@ already-seeded DB is left as-is, so redeploys don't re-download.
   empty or the dev placeholder.
 - **EVE login bounces / "invalid redirect":** `BUYBACK_EVE_REDIRECT_URI` ≠ the EVE
   app's callback URL, or ≠ your actual domain.
+- **Structure authorize fails with "missing or not a valid Fernet key":**
+  `BUYBACK_TOKEN_ENCRYPTION_KEY` must be an actual **Fernet** key (44 chars, ends
+  `=`) — generate it with the command in step 5. A generic random secret (e.g. a
+  `token_urlsafe` value like the session secret) is not a valid Fernet key.
 - **Everything is "Unknown item":** SDE not seeded (step 7).
 - **Coolify dashboard unreachable over Tailscale:** unrelated to this app — see the
   `ufw route` / container-port gotcha in the deploy-server notes.

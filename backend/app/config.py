@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from cryptography.fernet import Fernet
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,6 +13,17 @@ INSECURE_SESSION_SECRET = "dev-insecure-change-me"
 # (ADR-0029). Generate a real one: `python -c "from cryptography.fernet import
 # Fernet; print(Fernet.generate_key().decode())"`.
 INSECURE_TOKEN_KEY = "YnV5YmFjay1kZXYtaW5zZWN1cmUtdG9rZW4ta2V5ISE="
+
+
+def _is_valid_fernet_key(key: str) -> bool:
+    """Whether the string is a structurally valid Fernet key (32 url-safe-base64
+    bytes). A malformed `BUYBACK_TOKEN_ENCRYPTION_KEY` (e.g. a `token_urlsafe`
+    secret) must read as *not configured* rather than blow up at encrypt time."""
+    try:
+        Fernet(key.encode())
+    except (ValueError, TypeError):
+        return False
+    return True
 
 
 class Settings(BaseSettings):
@@ -72,12 +84,15 @@ class Settings(BaseSettings):
 
     @property
     def structure_tokens_configured(self) -> bool:
-        """Whether a real token-encryption key is set. Structure auth is refused
-        outside development while this is the public placeholder (ADR-0029)."""
+        """Whether a *usable* token-encryption key is set: structurally a valid
+        Fernet key, and outside development not the public placeholder (ADR-0029).
+        Structure auth is refused with a clean error while this is False."""
+        key = self.token_encryption_key.strip()
+        if not _is_valid_fernet_key(key):
+            return False
         if self.environment == "development":
             return True
-        key = self.token_encryption_key.strip()
-        return bool(key) and key != INSECURE_TOKEN_KEY
+        return key != INSECURE_TOKEN_KEY
 
     @model_validator(mode="after")
     def _require_secure_session_secret(self) -> "Settings":

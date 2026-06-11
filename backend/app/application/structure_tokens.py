@@ -56,9 +56,13 @@ class StructureAuthorizeResult(BaseModel):
 
 
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
-    """Mint the PKCE/state challenge for the structure-scope authorization."""
+    """Mint the PKCE/state challenge for the structure-scope authorization. Fails
+    fast on a missing/malformed encryption key so the manager isn't sent through the
+    whole EVE round-trip only to have the completion refuse to store the token."""
     if not sso.configured:
         raise SsoNotConfigured()
+    if not get_settings().structure_tokens_configured:
+        raise StructureEncryptionNotConfigured()
     state = STRUCTURE_STATE_PREFIX + auth_rules.generate_state()
     verifier, challenge = auth_rules.generate_pkce()
     url = sso.build_authorize_url(
@@ -159,10 +163,11 @@ async def revoke(
 
 def _decrypt_or_none(cipher: TokenCipher, ciphertext: bytes) -> str | None:
     """Decrypt a stored refresh token, or None if the key can no longer read it
-    (e.g. the encryption key was rotated) — in which case we can't revoke it anyway."""
+    (rotated key → InvalidToken; malformed key → ValueError from Fernet) — in either
+    case we can't revoke the old grant at EVE, so just skip that step."""
     try:
         return cipher.decrypt(ciphertext)
-    except InvalidToken:
+    except (InvalidToken, ValueError):
         log.warning("Could not decrypt a stored structure refresh token to revoke it")
         return None
 
@@ -225,6 +230,10 @@ async def get_structure_access_token(
     server-side. Persists a rotated refresh token (EVE may rotate it); on a revoked
     grant, flags the row and raises `StructureTokenExpired`. Used by the structure
     pricing path (Phase B2)."""
+    if not get_settings().structure_tokens_configured:
+        # The stored ciphertext can't be (safely) decrypted with a missing/malformed
+        # key — refuse cleanly instead of raising from inside Fernet.
+        raise StructureEncryptionNotConfigured()
     token = await tokens_repo.get_for_corp(session, corporation_uuid)
     if token is None:
         raise StructureTokenMissing()
