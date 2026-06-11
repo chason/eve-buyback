@@ -11,9 +11,11 @@ from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.application.errors import (
     NotAuthorizedToAuthorizeStructure,
+    StructureEncryptionNotConfigured,
     StructureTokenExpired,
     StructureTokenMissing,
 )
+from app.config import get_settings
 from app.data.db import SessionLocal
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import structure_tokens as tokens_repo
@@ -90,6 +92,47 @@ def test_begin_authorize_state_is_prefixed():
     # so a structure round-trip can't be misrouted to the login completion (400).
     challenge = structures_app.begin_structure_authorize(FakeSso())
     assert challenge.state.startswith(structures_app.STRUCTURE_STATE_PREFIX)
+
+
+# --- malformed encryption key (must degrade cleanly, never 500) ---
+
+
+def test_malformed_key_reads_as_not_configured():
+    # e.g. a token_urlsafe secret pasted where a Fernet key belongs
+    bad = get_settings().model_copy(
+        update={"token_encryption_key": "QPsd05ueBT0BJ0BJplain-wrong"}
+    )
+    assert bad.structure_tokens_configured is False  # even in development
+
+
+def test_cipher_construction_is_lazy_for_malformed_key():
+    # The cipher is a per-request dependency on appraisal endpoints too, so a bad
+    # key must not raise until something actually encrypts/decrypts.
+    cipher = TokenCipher("not-a-fernet-key")
+    with pytest.raises(ValueError):
+        cipher.encrypt("x")
+
+
+def test_begin_authorize_refuses_malformed_key(monkeypatch):
+    bad = get_settings().model_copy(
+        update={"token_encryption_key": "not-a-fernet-key"}
+    )
+    monkeypatch.setattr(structures_app, "get_settings", lambda: bad)
+    with pytest.raises(StructureEncryptionNotConfigured):
+        structures_app.begin_structure_authorize(FakeSso())
+
+
+async def test_access_token_refuses_malformed_key(monkeypatch):
+    corp_uuid = await _authorize()
+    bad = get_settings().model_copy(
+        update={"token_encryption_key": "not-a-fernet-key"}
+    )
+    monkeypatch.setattr(structures_app, "get_settings", lambda: bad)
+    async with SessionLocal() as session:
+        with pytest.raises(StructureEncryptionNotConfigured):
+            await structures_app.get_structure_access_token(
+                session, FakeSso(), corporation_uuid=corp_uuid, cipher=CIPHER
+            )
 
 
 # --- TokenCipher ---

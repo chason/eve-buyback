@@ -68,7 +68,9 @@ class NotAuthorizedToAuthorizeStructure(ApplicationError):
 
 class StructureEncryptionNotConfigured(ApplicationError):
     default_detail = (
-        "Structure-market encryption key (BUYBACK_TOKEN_ENCRYPTION_KEY) is not set"
+        "Structure-market encryption key (BUYBACK_TOKEN_ENCRYPTION_KEY) is missing "
+        "or not a valid Fernet key — generate one with: python -c \"from "
+        "cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
     )
 
 

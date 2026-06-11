@@ -14,7 +14,11 @@ from collections.abc import Awaitable, Callable
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.errors import StructureTokenExpired, StructureTokenMissing
+from app.application.errors import (
+    StructureEncryptionNotConfigured,
+    StructureTokenExpired,
+    StructureTokenMissing,
+)
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
@@ -79,7 +83,12 @@ async def _fetch_aggregates(
         return await esi_market.get_structure_aggregates(
             structure_id=hub.hub_id, type_ids=type_ids, access_token=access_token
         )
-    except (StructureTokenMissing, StructureTokenExpired, StructureAccessDenied):
+    except (
+        StructureTokenMissing,
+        StructureTokenExpired,
+        StructureAccessDenied,
+        StructureEncryptionNotConfigured,
+    ):
         log.warning(
             "structure access unavailable for hub %s; serving cache", hub.hub_id
         )
