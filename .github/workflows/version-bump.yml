@@ -1,0 +1,47 @@
+# Every merged PR is one version (ADR-0032): each push to main gets a bot commit
+# incrementing backend/app/_version.py. PRs must NOT bump the version themselves —
+# with parallel PRs both would claim the same number.
+#
+# The push authenticates with the VERSION_BUMP_KEY deploy key, which is a bypass
+# actor on the "main protection" ruleset (Actions' default token can't bypass
+# protection on a personal repo). The bump commit carries [skip ci], so it neither
+# re-triggers this workflow (no loop) nor burns CI on a one-line change.
+name: Version bump
+
+on:
+  push:
+    branches: [main]
+
+# Serialize rapid merges so concurrent runs can't race the increment; each run
+# re-reads the branch head, so N merges always net exactly +N.
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The branch head, not the pushed SHA — a later merge (or a prior bump)
+          # may already have moved main, and the increment must build on it.
+          ref: main
+          ssh-key: ${{ secrets.VERSION_BUMP_KEY }}
+
+      - name: Increment APP_VERSION
+        id: bump
+        run: |
+          file=backend/app/_version.py
+          current=$(grep -oP '(?<=APP_VERSION = ")[0-9]+' "$file")
+          next=$((current + 1))
+          sed -i "s/APP_VERSION = \"$current\"/APP_VERSION = \"$next\"/" "$file"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/app/_version.py
+          git commit -m "chore: v${{ steps.bump.outputs.next }} [skip ci]"
+          git push origin main
