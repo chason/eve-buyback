@@ -337,7 +337,28 @@ async def test_status_endpoint_authorized_false_for_manager():
         await http.post("/api/v1/corporations")
         resp = await http.get("/api/v1/corporations/me/structure-token")
     assert resp.status_code == 200
-    assert resp.json()["authorized"] is False
+    body = resp.json()
+    assert body["authorized"] is False
+    assert body["configured"] is True  # dev placeholder counts as configured
+
+
+async def test_status_reports_unconfigured_server(monkeypatch):
+    # Placeholder key outside development → the UI disables structure options.
+    from app.interface.v1 import structures as structures_iface
+
+    monkeypatch.setattr(
+        structures_iface,
+        "get_settings",
+        lambda: get_settings().model_copy(update={"environment": "production"}),
+    )
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.get("/api/v1/corporations/me/structure-token")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["configured"] is False
+    assert body["authorized"] is False
 
 
 async def test_status_endpoint_forbidden_for_member():

@@ -867,6 +867,11 @@ export interface components {
             authorized: boolean;
             /** Character Name */
             character_name?: string | null;
+            /**
+             * Configured
+             * @default true
+             */
+            configured: boolean;
             /** Created At */
             created_at?: string | null;
             /**

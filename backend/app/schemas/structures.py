@@ -20,6 +20,10 @@ class StructureAuthorizeRequest(BaseModel):
 class StructureTokenStatus(BaseModel):
     """The corp's structure-market authorization status (never the token itself)."""
 
+    # Whether this server can use structure markets at all: False while the
+    # token-encryption key is the public placeholder (ADR-0029). The UI disables
+    # the structure options entirely when this is False.
+    configured: bool = True
     authorized: bool
     character_name: str | None = None
     scopes: str | None = None

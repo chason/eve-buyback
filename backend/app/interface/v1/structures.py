@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
+from app.config import get_settings
 from app.data.records import StructureMarketTokenRecord
 from app.interface.deps import SessionDep
 from app.interface.security import require_role
@@ -38,9 +39,11 @@ def _status(
     *,
     replaced_character_name: str | None = None,
 ) -> StructureTokenStatus:
+    configured = get_settings().structure_tokens_configured
     if record is None:
-        return StructureTokenStatus(authorized=False)
+        return StructureTokenStatus(configured=configured, authorized=False)
     return StructureTokenStatus(
+        configured=configured,
         authorized=True,
         character_name=record.character_name,
         scopes=record.scopes,

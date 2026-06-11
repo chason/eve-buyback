@@ -30,6 +30,7 @@ export default function Locations() {
     queryFn: getStructureStatus,
     enabled: canEdit,
   })
+  const structuresAvailable = structureStatus.data?.configured !== false
   const authorized = !!structureStatus.data?.authorized
   const stQuery = structureQuery.trim()
   const structureResults = useQuery({
@@ -155,7 +156,12 @@ export default function Locations() {
 
           <label>
             Player structure
-            {authorized ? (
+            {!structuresAvailable ? (
+              <small className="field-hint">
+                Not available on this server — the operator hasn&apos;t configured
+                the token-encryption key (BUYBACK_TOKEN_ENCRYPTION_KEY).
+              </small>
+            ) : authorized ? (
               <>
                 <input
                   type="search"
