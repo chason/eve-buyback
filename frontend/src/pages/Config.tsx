@@ -59,22 +59,31 @@ export default function Config() {
   // seeds itself from `initial` (keyed below); this mirrors the saved hub into
   // `selection` — except in the just-authorized case, where the picker opens on
   // "Player structure" with nothing picked yet.
+  //
+  // Guarded by content: a background refetch (e.g. on window refocus) returns a new
+  // object with the same data, and re-seeding then would clobber in-progress edits —
+  // and desync `selection` from the picker, which only remounts when the saved hub
+  // actually changes. Only genuinely new saved data re-seeds.
+  const seededConfig = useRef<string | null>(null)
   useEffect(() => {
-    if (config.data) {
-      setBasis(config.data.default_basis)
-      setPercentage(config.data.default_percentage)
-      setAggregate(config.data.aggregate_field)
-      setDefaultAccepted(config.data.default_accepted)
-      if (justAuthorized.current && config.data.market_hub_kind !== "structure") {
-        setSelection({ state: "incomplete" })
-      } else {
-        setSelection({
-          state: "hub",
-          hubId: config.data.market_hub_id,
-          kind: config.data.market_hub_kind,
-          name: config.data.market_hub_name ?? null,
-        })
-      }
+    if (!config.data) return
+    const signature = JSON.stringify(config.data)
+    if (seededConfig.current === signature) return
+    seededConfig.current = signature
+
+    setBasis(config.data.default_basis)
+    setPercentage(config.data.default_percentage)
+    setAggregate(config.data.aggregate_field)
+    setDefaultAccepted(config.data.default_accepted)
+    if (justAuthorized.current && config.data.market_hub_kind !== "structure") {
+      setSelection({ state: "incomplete" })
+    } else {
+      setSelection({
+        state: "hub",
+        hubId: config.data.market_hub_id,
+        kind: config.data.market_hub_kind,
+        name: config.data.market_hub_name ?? null,
+      })
     }
   }, [config.data])
 

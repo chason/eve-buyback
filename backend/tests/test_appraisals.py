@@ -6,6 +6,7 @@ from app.data.db import SessionLocal
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
 from app.main import app
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide, get_fuzzwork_client
@@ -524,6 +525,48 @@ async def test_rule_hub_reprocess_prices_minerals_at_override_hub():
         assert line["market_hub_id"] == AMARR
         # Everything (ore + minerals) was fetched from the override hub only.
         assert set(fake.stations) == {AMARR}
+
+
+async def test_same_hub_under_drifted_descriptors_merges_price_maps():
+    # Two rules can reference the same hub through descriptors that differ only in
+    # the save-time-cached region_id (SDE drift between saves). They bucket
+    # separately but their fetches must MERGE into one price map — an overwrite
+    # would wrongly reject the first bucket's lines as "No market data".
+    await _seed_sde()
+    _use_fuzzwork_by_station({
+        AMARR: {
+            34: FuzzworkAggregate(buy=_side("10.00"), sell=_side("10.00")),
+            35: FuzzworkAggregate(buy=_side("4.00"), sell=_side("4.00")),
+        },
+    })
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        # Write the drifted rows directly — the API resolves both identically.
+        async with SessionLocal() as session:
+            corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+            for tid, region in ((34, 10000043), (35, 99999999)):
+                await rules_repo.upsert_rule(
+                    session, corporation_id=corp.id, target_kind="type",
+                    target_id=tid, basis=None, percentage=Decimal("90"),
+                    enabled=True, reprocess=False, compressed_only=False,
+                    accepted=True, market_hub_id=AMARR,
+                    market_hub_kind="npc_station", market_region_id=region,
+                    market_hub_name="Amarr",
+                )
+            await session.commit()
+
+        resp = await http.post(
+            "/api/v1/appraisals",
+            json={"items": [
+                {"type_id": 34, "quantity": 10},
+                {"type_id": 35, "quantity": 10},
+            ]},
+        )
+        assert resp.status_code == 201
+        lines = {ln["type_id"]: ln for ln in resp.json()["lines"]}
+        assert lines[34]["status"] == "accepted"
+        assert lines[35]["status"] == "accepted"
 
 
 async def test_rule_hub_without_data_rejects_only_those_lines():

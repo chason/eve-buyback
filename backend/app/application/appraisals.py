@@ -197,6 +197,9 @@ async def create_appraisal(
 
     # One read-through-cached fetch per hub; a failing hub degrades to its own cache
     # (its unpriced lines reject as "No market data") without affecting the others.
+    # Merged (not assigned) per hub_id: two rules can reference the same hub through
+    # descriptors that differ only in their save-time-cached region_id (SDE drift
+    # between saves) — they bucket separately but must land in one price map.
     price_maps: dict[str, dict[int, MarketPriceRecord]] = {}
     for bucket_hub, ids in ids_by_hub.items():
         prices = await market.get_market_prices(
@@ -208,7 +211,9 @@ async def create_appraisal(
             now=now,
             structure_token_provider=structure_token_provider,
         )
-        price_maps[bucket_hub.hub_id] = {p.type_id: p for p in prices}
+        price_maps.setdefault(bucket_hub.hub_id, {}).update(
+            {p.type_id: p for p in prices}
+        )
 
     lines: list[dict] = []
     accepted_total = Decimal("0")
