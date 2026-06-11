@@ -94,40 +94,26 @@ def test_begin_authorize_state_is_prefixed():
     assert challenge.state.startswith(structures_app.STRUCTURE_STATE_PREFIX)
 
 
-# --- malformed encryption key (must degrade cleanly, never 500) ---
+# --- unconfigured (placeholder) encryption key: refused before any EVE round-trip.
+# Key *validity* is enforced at boot (see test_config.py); these cover the
+# valid-but-placeholder key outside development.
 
 
-def test_malformed_key_reads_as_not_configured():
-    # e.g. a token_urlsafe secret pasted where a Fernet key belongs
-    bad = get_settings().model_copy(
-        update={"token_encryption_key": "QPsd05ueBT0BJ0BJplain-wrong"}
-    )
-    assert bad.structure_tokens_configured is False  # even in development
+def _unconfigured_settings():
+    # model_copy skips validators, which is exactly what we want here: a settings
+    # object whose structure_tokens_configured is False (prod + placeholder key).
+    return get_settings().model_copy(update={"environment": "production"})
 
 
-def test_cipher_construction_is_lazy_for_malformed_key():
-    # The cipher is a per-request dependency on appraisal endpoints too, so a bad
-    # key must not raise until something actually encrypts/decrypts.
-    cipher = TokenCipher("not-a-fernet-key")
-    with pytest.raises(ValueError):
-        cipher.encrypt("x")
-
-
-def test_begin_authorize_refuses_malformed_key(monkeypatch):
-    bad = get_settings().model_copy(
-        update={"token_encryption_key": "not-a-fernet-key"}
-    )
-    monkeypatch.setattr(structures_app, "get_settings", lambda: bad)
+def test_begin_authorize_refuses_unconfigured_key(monkeypatch):
+    monkeypatch.setattr(structures_app, "get_settings", _unconfigured_settings)
     with pytest.raises(StructureEncryptionNotConfigured):
         structures_app.begin_structure_authorize(FakeSso())
 
 
-async def test_access_token_refuses_malformed_key(monkeypatch):
+async def test_access_token_refuses_unconfigured_key(monkeypatch):
     corp_uuid = await _authorize()
-    bad = get_settings().model_copy(
-        update={"token_encryption_key": "not-a-fernet-key"}
-    )
-    monkeypatch.setattr(structures_app, "get_settings", lambda: bad)
+    monkeypatch.setattr(structures_app, "get_settings", _unconfigured_settings)
     async with SessionLocal() as session:
         with pytest.raises(StructureEncryptionNotConfigured):
             await structures_app.get_structure_access_token(
