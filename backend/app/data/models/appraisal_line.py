@@ -43,3 +43,8 @@ class AppraisalLine(Base):
     # Snapshot of the reprocessed-mineral breakdown for an ore priced by reprocess
     # (ADR-0026); null for direct/rejected lines. Money/quantities are Decimal strings.
     reprocess: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Hub override snapshot (ADR-0031): set only when a rule priced this line at a
+    # hub other than the appraisal's default (null = the header's market_hub_id).
+    # The name is frozen here because structures aren't in the SDE.
+    market_hub_id: Mapped[str | None] = mapped_column(default=None)
+    market_hub_name: Mapped[str | None] = mapped_column(default=None)

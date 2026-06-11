@@ -1,11 +1,12 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, UniqueConstraint, Uuid, text
+from sqlalchemy import ForeignKey, Numeric, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.data.db import Base
 from app.data.models.enums import check_enum
+from app.domain.market import HubKind
 from app.domain.pricing import Basis, TargetKind
 
 
@@ -47,3 +48,14 @@ class PricingRule(Base):
     accepted: Mapped[bool] = mapped_column(
         default=True, server_default=text("true")
     )
+
+    # Per-rule market-hub override (ADR-0031): matched items price here instead of
+    # the corp's default hub. All null → inherit the default. Mirrors the config's
+    # hub quartet: string EVE id (station or 64-bit structure, ADR-0029), kind,
+    # ESI region + display name cached at save time.
+    market_hub_id: Mapped[str | None] = mapped_column(String, default=None)
+    market_hub_kind: Mapped[HubKind | None] = mapped_column(
+        check_enum(HubKind, name="market_hub_kind"), nullable=True, default=None
+    )
+    market_region_id: Mapped[int | None] = mapped_column(default=None)
+    market_hub_name: Mapped[str | None] = mapped_column(default=None)

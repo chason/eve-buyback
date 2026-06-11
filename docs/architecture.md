@@ -46,6 +46,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 28 | **ESI market source** for non-Fuzzwork hubs (region orders + in-house aggregation) | [0028](adr/0028-esi-market-source-and-aggregation.md) |
 | 29 | **Encrypted refresh token** for structure-market access (amends 0004) | [0029](adr/0029-encrypted-refresh-token-structures.md) |
 | 30 | **Accepted drop-off locations** per corp; chosen at appraisal time, snapshotted | [0030](adr/0030-buyback-drop-off-locations.md) |
+| 31 | **Per-rule market-hub override**; appraisals fetch per hub, lines snapshot theirs | [0031](adr/0031-per-rule-market-hub.md) |
 
 ## 3. System context
 
@@ -77,7 +78,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | `Character` | `id` (UUID, PK), `eve_id` (EVE char id, unique), `name`, `last_login_at` | Persisted only because managers must be referenceable. |
 | `ManagerAssignment` | `id` (UUID, PK), `corporation_id`→corp, `character_id`→char (UUID FKs), `granted_by`, `granted_at` | Grants the Buyback Manager role. CEO is implicit (not stored here). |
 | `BuybackConfig` | `id` (UUID, PK), `corporation_id`→corp (UUID FK, unique), `market_hub_id`, `default_basis`, `default_percentage`, `aggregate_field`, `default_accepted`, data-quality thresholds | Per-corp defaults = the "global" rule; `default_accepted=false` → whitelist-only buyback ([ADR-0007](adr/0007-pricing-rule-taxonomy.md)). |
-| `PricingRule` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `target_kind` (`market_group`\|`type`), `target_id` (EVE id), `basis?`, `percentage`, `enabled`, `accepted`, `reprocess`, `compressed_only` | Overrides for a market group or a single type. `accepted=false` rejects matching items (blacklist, [ADR-0007](adr/0007-pricing-rule-taxonomy.md)); `reprocess`/`compressed_only` are ore flags ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
+| `PricingRule` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `target_kind` (`market_group`\|`type`), `target_id` (EVE id), `basis?`, `percentage`, `enabled`, `accepted`, `reprocess`, `compressed_only`, `market_hub_id?`+kind/region/name | Overrides for a market group or a single type. `accepted=false` rejects matching items (blacklist, [ADR-0007](adr/0007-pricing-rule-taxonomy.md)); `reprocess`/`compressed_only` are ore flags ([ADR-0026](adr/0026-ore-reprocess-pricing.md)); the optional hub quartet prices matches at a different hub ([ADR-0031](adr/0031-per-rule-market-hub.md)). |
 | `MarketPrice` (cache) | `hub_id`, `type_id`, buy/sell aggregates, `volume`, `order_count`, `fetched_at` | Fuzzwork snapshot; EVE-keyed cache, TTL-expired. See [ADR-0006](adr/0006-market-data-fuzzwork.md). |
 | `SdeType` (ref) | `type_id` (EVE id, PK), `name`, `group_id`, `category_id`, `market_group_id`, `volume`, `portion_size`, `published` | Seeded from SDE; EVE-keyed. `category_id` 25 = ore; `portion_size` = refine batch ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |
 | `SdeTypeMaterial` (ref) | `type_id`, `material_type_id`, `quantity` (EVE-keyed) | Perfect-refine (100% base) yield per batch; seeded for ore types only ([ADR-0026](adr/0026-ore-reprocess-pricing.md)). |

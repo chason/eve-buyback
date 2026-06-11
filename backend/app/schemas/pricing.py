@@ -54,11 +54,16 @@ class RuleOut(BaseModel):
     compressed_only: bool = False
     # False → the buyback rejects matching items (a blacklist rule).
     accepted: bool = True
+    # Per-rule market-hub override (ADR-0031); all null → the corp's default hub.
+    market_hub_id: str | None = None
+    market_hub_kind: HubKind | None = None
+    market_hub_name: str | None = None
 
 
 class RulePutRequest(BaseModel):
     """The full rule state for a target (the target comes from the URL). `PUT` is an
-    idempotent create-or-replace, so this is the complete representation."""
+    idempotent create-or-replace, so this is the complete representation — omitting
+    the hub fields clears any hub override (ADR-0031)."""
 
     basis: Basis | None = None
     percentage: Decimal = Field(ge=0)
@@ -66,3 +71,8 @@ class RulePutRequest(BaseModel):
     reprocess: bool = False
     compressed_only: bool = False
     accepted: bool = True
+    # Hub override: id + kind, plus the friendly name for structures (no SDE to
+    # resolve against — same posture as ConfigUpdateRequest).
+    market_hub_id: str | None = None
+    market_hub_kind: HubKind | None = None
+    market_hub_name: str | None = None

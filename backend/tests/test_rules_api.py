@@ -188,3 +188,63 @@ async def test_member_cannot_mutate_rules_but_can_list():
             "/api/v1/corporations/me/rules/type/34", json={"percentage": "95"}
         )
         assert resp.status_code == 403
+
+
+# --- per-rule market-hub override (ADR-0031) ---
+
+
+async def test_rule_hub_round_trips_and_clears():
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+
+        # A Fuzzwork hub resolves its display name server-side.
+        created = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "market_hub_id": "60008494"},
+        )
+        assert created.status_code == 201
+        body = created.json()
+        assert body["market_hub_id"] == "60008494"
+        assert body["market_hub_kind"] == "npc_station"
+        assert body["market_hub_name"] == "Amarr VIII (Oris) - Emperor Family Academy"
+
+        # PUT is full-replacement: a request without hub fields clears the override.
+        replaced = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "90"}
+        )
+        assert replaced.status_code == 200
+        body = replaced.json()
+        assert body["market_hub_id"] is None
+        assert body["market_hub_kind"] is None
+        assert body["market_hub_name"] is None
+
+
+async def test_rule_hub_unknown_station_rejected():
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "market_hub_id": "60099999"},
+        )
+        assert resp.status_code == 422
+
+
+async def test_rule_structure_hub_requires_authorization():
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={
+                "percentage": "90",
+                "market_hub_id": "1035000000001",
+                "market_hub_kind": "structure",
+                "market_hub_name": "1DQ - Palace",
+            },
+        )
+        assert resp.status_code == 422  # no structure token authorized

@@ -79,7 +79,7 @@ async def create_appraisal(
     corp = await get_registered_corporation(session, user.corporation_id)  # 404 if not
     config = await get_config(session, user.corporation_id)
     hub_id = config.market_hub_id
-    hub = HubDescriptor(
+    default_hub = HubDescriptor(
         hub_id=hub_id,
         kind=config.market_hub_kind,
         region_id=config.market_region_id,
@@ -89,15 +89,6 @@ async def create_appraisal(
     # must pick from the corp's accepted list, or — if the corp configured none — the
     # appraisal defaults to the market-hub station (ADR-0030).
     delivery = await _resolve_delivery(session, corp, config, delivery_location_id)
-
-    # For a structure hub, supply a fresh access token (refreshed server-side) to the
-    # market layer; an unauthorized/expired token degrades to cached prices (ADR-0029).
-    structure_token_provider = None
-    if hub.kind == "structure":
-        async def structure_token_provider() -> str:
-            return await structure_tokens_app.get_structure_access_token(
-                session, sso, corporation_uuid=corp.id, cipher=cipher
-            )
 
     work = await _gather_items(session, items, paste)
     if not work:
@@ -113,20 +104,45 @@ async def create_appraisal(
         for g in await sde_repo.list_market_groups(session)
     }
     rules = await rules_repo.list_rules(session, corp.id)
+
+    def rule_hub(r) -> HubDescriptor | None:
+        """A rule's hub override (ADR-0031), normalized to None when it matches the
+        corp default — dedupes the fetch and keeps the line annotation quiet."""
+        if r.market_hub_id is None:
+            return None
+        if (
+            r.market_hub_id == default_hub.hub_id
+            and r.market_hub_kind == default_hub.kind
+        ):
+            return None
+        return HubDescriptor(
+            hub_id=r.market_hub_id,
+            kind=r.market_hub_kind,
+            region_id=r.market_region_id,
+        )
+
     type_rules = {
         r.target_id: pricing_domain.RuleSpec(
-            r.basis, r.percentage, r.reprocess, r.compressed_only, r.accepted
+            r.basis, r.percentage, r.reprocess, r.compressed_only, r.accepted,
+            hub=rule_hub(r),
         )
         for r in rules
         if r.enabled and r.target_kind == "type"
     }
     group_rules = {
         r.target_id: pricing_domain.RuleSpec(
-            r.basis, r.percentage, r.reprocess, r.compressed_only, r.accepted
+            r.basis, r.percentage, r.reprocess, r.compressed_only, r.accepted,
+            hub=rule_hub(r),
         )
         for r in rules
         if r.enabled and r.target_kind == "market_group"
     }
+    # Display names for override hubs on appraisal lines (structures aren't in the
+    # SDE, so the cached rule name is the source of truth).
+    hub_names: dict[str, str] = dict(FUZZWORK_HUB_NAMES)
+    for r in rules:
+        if r.market_hub_id and r.market_hub_name:
+            hub_names[r.market_hub_id] = r.market_hub_name
 
     def resolve(type_id: int) -> pricing_domain.ResolvedRule:
         sde_type = types.get(type_id)
@@ -141,8 +157,18 @@ async def create_appraisal(
             default_accepted=config.default_accepted,
         )
 
+    # Group the ids to price by the hub their resolved rule points at (ADR-0031);
+    # most appraisals stay single-hub and this degenerates to one fetch.
+    def hub_for(type_id: int) -> HubDescriptor:
+        return resolve(type_id).hub or default_hub
+
+    ids_by_hub: dict[HubDescriptor, set[int]] = {}
+    for tid in type_ids:
+        ids_by_hub.setdefault(hub_for(tid), set()).add(tid)
+
     # Ore lines whose resolved rule says "reprocess" are priced by their refined
-    # minerals (ADR-0026); gather those minerals so they're priced in the same fetch.
+    # minerals (ADR-0026); the minerals join the **ore's** hub bucket so they're
+    # valued where the ore prices.
     reprocess_ore_ids = [
         tid
         for tid in type_ids
@@ -151,28 +177,52 @@ async def create_appraisal(
         and resolve(tid).reprocess
     ]
     materials_by_type = await sde_repo.get_type_materials(session, reprocess_ore_ids)
-    mineral_ids = {
-        mid for mats in materials_by_type.values() for (mid, _) in mats
-    }
+    mineral_ids: set[int] = set()
+    for ore_id, mats in materials_by_type.items():
+        ore_hub = hub_for(ore_id)
+        for mid, _ in mats:
+            ids_by_hub.setdefault(ore_hub, set()).add(mid)
+            mineral_ids.add(mid)
     if mineral_ids:  # mineral names for the per-line breakdown
         types = {**types, **await sde_repo.get_types(session, list(mineral_ids))}
 
-    prices = await market.get_market_prices(
-        session,
-        fuzzwork,
-        esi_market,
-        hub=hub,
-        type_ids=list(set(type_ids) | mineral_ids),
-        now=now,
-        structure_token_provider=structure_token_provider,
-    )
-    price_by_id = {p.type_id: p for p in prices}
+    # One corp-level structure token covers every structure hub (ADR-0029); the
+    # provider is only invoked for esi_structure fetches, so pass it to all of them.
+    structure_token_provider = None
+    if any(h.kind == "structure" for h in ids_by_hub):
+        async def structure_token_provider() -> str:
+            return await structure_tokens_app.get_structure_access_token(
+                session, sso, corporation_uuid=corp.id, cipher=cipher
+            )
+
+    # One read-through-cached fetch per hub; a failing hub degrades to its own cache
+    # (its unpriced lines reject as "No market data") without affecting the others.
+    # Merged (not assigned) per hub_id: two rules can reference the same hub through
+    # descriptors that differ only in their save-time-cached region_id (SDE drift
+    # between saves) — they bucket separately but must land in one price map.
+    price_maps: dict[str, dict[int, MarketPriceRecord]] = {}
+    for bucket_hub, ids in ids_by_hub.items():
+        prices = await market.get_market_prices(
+            session,
+            fuzzwork,
+            esi_market,
+            hub=bucket_hub,
+            type_ids=sorted(ids),
+            now=now,
+            structure_token_provider=structure_token_provider,
+        )
+        price_maps.setdefault(bucket_hub.hub_id, {}).update(
+            {p.type_id: p for p in prices}
+        )
 
     lines: list[dict] = []
     accepted_total = Decimal("0")
     rejected_count = 0
     for w in work:
-        line = _compute_line(w, config, types, price_by_id, resolve, materials_by_type)
+        line = _compute_line(
+            w, config, types, price_maps, default_hub, hub_names, resolve,
+            materials_by_type,
+        )
         lines.append(line)
         if line["status"] == "accepted":
             accepted_total += line["line_total"]
@@ -312,7 +362,9 @@ def _compute_line(
     w: _WorkItem,
     config: BuybackConfigRecord,
     types: dict[int, SdeTypeRecord],
-    price_by_id: dict[int, MarketPriceRecord],
+    price_maps: dict[str, dict[int, MarketPriceRecord]],
+    default_hub: HubDescriptor,
+    hub_names: dict[str, str],
     resolve: Callable[[int], pricing_domain.ResolvedRule],
     materials_by_type: dict[int, list[tuple[int, int]]],
 ) -> dict:
@@ -327,9 +379,25 @@ def _compute_line(
 
     resolved = resolve(w.type_id)
 
+    # The hub this line prices at (ADR-0031); the snapshot is set only on overridden
+    # lines so null keeps meaning "the appraisal's default hub".
+    hub = resolved.hub or default_hub
+    price_by_id = price_maps.get(hub.hub_id, {})
+    hub_snapshot: dict = (
+        {
+            "market_hub_id": hub.hub_id,
+            "market_hub_name": hub_names.get(hub.hub_id, f"Hub {hub.hub_id}"),
+        }
+        if resolved.hub is not None
+        else {}
+    )
+
+    def rejected(reason: str) -> dict:
+        return _rejected(w.type_id, sde_type.name, w.quantity, reason) | hub_snapshot
+
     # A blacklist rule (accepted=False) rejects the item outright (ADR-0007).
     if not resolved.accepted:
-        return _rejected(w.type_id, sde_type.name, w.quantity, "Not accepted")
+        return rejected("Not accepted")
 
     is_ore = sde_type.category_id == pricing_domain.ORE_CATEGORY_ID
 
@@ -339,9 +407,7 @@ def _compute_line(
         and is_ore
         and not pricing_domain.is_compressed_ore(sde_type.name)
     ):
-        return _rejected(
-            w.type_id, sde_type.name, w.quantity, "Compressed only"
-        )
+        return rejected("Compressed only")
 
     agg = config.aggregate_field
     materials = materials_by_type.get(w.type_id)
@@ -349,7 +415,7 @@ def _compute_line(
 
     if resolved.reprocess and materials:
         # Reprocess pricing (ADR-0026): value whole refine batches by their minerals
-        # and any sub-batch leftover at the ore's own price.
+        # and any sub-batch leftover at the ore's own price — all at the line's hub.
         mineral_value = {
             mid: _basis_value(price_by_id.get(mid), agg, resolved.basis)
             for mid, _ in materials
@@ -359,18 +425,16 @@ def _compute_line(
             w.quantity, sde_type.portion_size, materials, mineral_value, ore_unit
         )
         if result is None:
-            return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
+            return rejected("No market data")
         unit_value = result.total / Decimal(w.quantity)
         breakdown = _reprocess_breakdown(result, types)
     else:
         price = price_by_id.get(w.type_id)
         if price is None:
-            return _rejected(w.type_id, sde_type.name, w.quantity, "No market data")
+            return rejected("No market data")
         unit_value = _basis_value(price, agg, resolved.basis)
         if unit_value is None or unit_value <= 0:
-            return _rejected(
-                w.type_id, sde_type.name, w.quantity, f"No {resolved.basis} orders"
-            )
+            return rejected(f"No {resolved.basis} orders")
 
     up = pricing_domain.unit_price(unit_value, resolved.percentage)
     lt = pricing_domain.line_total(up, w.quantity)
@@ -386,7 +450,7 @@ def _compute_line(
         "line_total": lt,
         "reason": None,
         "reprocess": breakdown,
-    }
+    } | hub_snapshot
 
 
 def _reprocess_breakdown(
@@ -425,6 +489,8 @@ def _rejected(
         "unit_value": None,
         "unit_price": None,
         "line_total": Decimal("0"),
+        "market_hub_id": None,
+        "market_hub_name": None,
         "reason": reason,
         "reprocess": None,
     }

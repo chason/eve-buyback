@@ -147,6 +147,11 @@ class PricingRuleRecord(BaseModel):
     compressed_only: bool = False
     # False → the buyback rejects matching items (a blacklist rule).
     accepted: bool = True
+    # Per-rule market-hub override (ADR-0031); all None → corp default hub.
+    market_hub_id: str | None = None
+    market_hub_kind: HubKind | None = None
+    market_region_id: int | None = None
+    market_hub_name: str | None = None
 
 
 class AppraisalLineRecord(BaseModel):
@@ -164,6 +169,9 @@ class AppraisalLineRecord(BaseModel):
     reason: str | None
     # Reprocessed-mineral breakdown snapshot (ADR-0026); None for direct/rejected lines.
     reprocess: dict | None = None
+    # Hub override snapshot (ADR-0031); None → priced at the appraisal's default hub.
+    market_hub_id: str | None = None
+    market_hub_name: str | None = None
 
 
 class BuybackLocationRecord(BaseModel):

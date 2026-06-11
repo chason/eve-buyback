@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import PricingRule
 from app.data.records import PricingRuleRecord
+from app.domain.market import HubKind
 from app.domain.pricing import Basis, TargetKind
 
 
@@ -38,6 +39,10 @@ async def upsert_rule(
     reprocess: bool,
     compressed_only: bool,
     accepted: bool,
+    market_hub_id: str | None = None,
+    market_hub_kind: HubKind | None = None,
+    market_region_id: int | None = None,
+    market_hub_name: str | None = None,
 ) -> tuple[PricingRuleRecord, bool]:
     """Create or replace the corp's rule for a target. Returns `(record, created)`.
 
@@ -64,6 +69,11 @@ async def upsert_rule(
     row.reprocess = reprocess
     row.compressed_only = compressed_only
     row.accepted = accepted
+    # PUT is full-replacement: a request without a hub clears the override.
+    row.market_hub_id = market_hub_id
+    row.market_hub_kind = market_hub_kind
+    row.market_region_id = market_region_id
+    row.market_hub_name = market_hub_name
     await session.flush()
     await session.refresh(row)
     return PricingRuleRecord.model_validate(row), created

@@ -5,6 +5,8 @@ import { getMe } from "../api/auth"
 import { deleteRule, listRules, putRule } from "../api/pricing"
 import { listMarketGroups, searchTypes } from "../api/sde"
 import type { Basis, RuleOut, TargetKind } from "../api/types"
+import HubPicker, { type HubSelection } from "../components/HubPicker"
+import { hubName } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
 const BASES: Basis[] = ["buy", "sell", "split"]
@@ -104,6 +106,7 @@ export default function Rules() {
               <th>Accept</th>
               <th>Basis</th>
               <th>%</th>
+              <th>Hub</th>
               <th>Reprocess</th>
               <th>Compressed</th>
               <th>Enabled</th>
@@ -125,6 +128,11 @@ export default function Rules() {
                 <td>{rule.accepted ? "yes" : "no"}</td>
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
+                <td>
+                  {rule.market_hub_id
+                    ? (rule.market_hub_name ?? hubName(rule.market_hub_id))
+                    : "(default)"}
+                </td>
                 <td>{rule.reprocess ? "yes" : "–"}</td>
                 <td>{rule.compressed_only ? "yes" : "–"}</td>
                 <td>{rule.enabled ? "yes" : "no"}</td>
@@ -184,6 +192,8 @@ function AddRule({
   const [accepted, setAccepted] = useState(true)
   const [reprocess, setReprocess] = useState(false)
   const [compressedOnly, setCompressedOnly] = useState(false)
+  // Optional per-rule hub override (ADR-0031); "default" → corp default hub.
+  const [hubSel, setHubSel] = useState<HubSelection>({ state: "default" })
 
   // Reprocess only applies to ores: a market-group target in an ore branch, or a
   // type whose market group is in one (ADR-0026). Hidden/ignored otherwise.
@@ -234,6 +244,17 @@ function AddRule({
         accepted,
         reprocess: reprocessEligible && reprocess,
         compressed_only: reprocessEligible && compressedOnly,
+        // Hub override rides only when a concrete hub is picked; "(corp default)"
+        // sends nothing, which clears any previous override (PUT replaces).
+        ...(accepted && hubSel.state === "hub"
+          ? {
+              market_hub_id: hubSel.hubId,
+              market_hub_kind: hubSel.kind,
+              // Name only matters for structures (no SDE to resolve against).
+              market_hub_name:
+                hubSel.kind === "structure" ? hubSel.name : null,
+            }
+          : {}),
       }),
     onSuccess: () => {
       setTarget(null)
@@ -393,6 +414,10 @@ function AddRule({
                 />
               </label>
             </div>
+            <HubPicker
+              defaultOption="(corp default hub)"
+              onChange={setHubSel}
+            />
             {reprocessEligible && (
               <div className="rule-flags">
                 <label>
@@ -420,7 +445,11 @@ function AddRule({
           </p>
         )}
 
-        <button type="submit" disabled={!target} aria-busy={save.isPending}>
+        <button
+          type="submit"
+          disabled={!target || (accepted && hubSel.state === "incomplete")}
+          aria-busy={save.isPending}
+        >
           Save rule
         </button>
         {save.isError && (

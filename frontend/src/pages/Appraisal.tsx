@@ -153,7 +153,17 @@ export default function Appraisal() {
               <tr className={line.status === "rejected" ? "rejected" : undefined}>
                 <td>{line.type_name}</td>
                 <td className="num">{line.quantity.toLocaleString()}</td>
-                <td>{line.basis ?? "—"}</td>
+                <td>
+                  {line.basis ?? "—"}
+                  {line.market_hub_id && (
+                    <>
+                      {" "}
+                      <small>
+                        @ {line.market_hub_name ?? hubName(line.market_hub_id)}
+                      </small>
+                    </>
+                  )}
+                </td>
                 <td className="num">{line.percentage ?? "—"}</td>
                 <td className="num isk">
                   {line.unit_price ? formatIsk(line.unit_price) : "—"}
