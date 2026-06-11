@@ -47,6 +47,7 @@ describe("Locations", () => {
     vi.mocked(authApi.getMe).mockResolvedValue(manager())
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
       authorized: false,
       expired: false,
     })
@@ -85,6 +86,19 @@ describe("Locations", () => {
     // Unauthorized → no structure search box, just the authorize hint.
     expect(
       await screen.findByText(/authorize structure access/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText("Search structure")).not.toBeInTheDocument()
+  })
+
+  it("explains structures are unavailable when the server has no key", async () => {
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: false,
+      authorized: false,
+      expired: false,
+    })
+    renderLocations()
+    expect(
+      await screen.findByText(/not available on this server/i),
     ).toBeInTheDocument()
     expect(screen.queryByLabelText("Search structure")).not.toBeInTheDocument()
   })

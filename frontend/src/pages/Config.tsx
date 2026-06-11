@@ -98,11 +98,14 @@ export default function Config() {
     queryFn: () => searchStations(query),
     enabled: hubChoice === CUSTOM && query.length >= 2,
   })
+  // Fetched for any manager (not just when STRUCTURE is selected) so the picker can
+  // disable the structure option when the server has no token-encryption key.
   const structureStatus = useQuery({
     queryKey: ["structureStatus"],
     queryFn: getStructureStatus,
-    enabled: hubChoice === STRUCTURE,
+    enabled: canEdit,
   })
+  const structuresAvailable = structureStatus.data?.configured !== false
   const authorized = !!structureStatus.data?.authorized
   const sQuery = structureQuery.trim()
   const structureResults = useQuery({
@@ -192,7 +195,11 @@ export default function Config() {
               </option>
             ))}
             <option value={CUSTOM}>Other NPC station…</option>
-            <option value={STRUCTURE}>Player structure…</option>
+            <option value={STRUCTURE} disabled={!structuresAvailable}>
+              {structuresAvailable
+                ? "Player structure…"
+                : "Player structure… (not available on this server)"}
+            </option>
           </select>
         </label>
 
@@ -239,7 +246,15 @@ export default function Config() {
           </label>
         )}
 
-        {hubChoice === STRUCTURE && (
+        {hubChoice === STRUCTURE && !structuresAvailable && (
+          <p className="error">
+            Player-structure pricing isn&apos;t available on this server — the
+            operator hasn&apos;t configured the token-encryption key
+            (BUYBACK_TOKEN_ENCRYPTION_KEY). Pick another hub.
+          </p>
+        )}
+
+        {hubChoice === STRUCTURE && structuresAvailable && (
           <>
             {replacedCharacter.current && (
               <p role="alert">

@@ -56,7 +56,16 @@ function renderConfig(initialEntries: string[] = ["/config"]) {
 }
 
 describe("Config", () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    // Managers fetch the structure status to decide structure availability; default
+    // to a configured server with no authorization (tests override as needed).
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
+      authorized: false,
+      expired: false,
+    })
+  })
 
   it("lets a manager edit and save the config", async () => {
     const u = userEvent.setup()
@@ -120,6 +129,7 @@ describe("Config", () => {
     // Saved config still points at Jita — the structure isn't picked/saved yet.
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
     vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
       authorized: true,
       character_name: "Capsuleer",
       expired: false,
@@ -136,10 +146,28 @@ describe("Config", () => {
     expect(screen.getByText("Capsuleer")).toBeInTheDocument()
   })
 
+  it("disables the structure option when the server has no encryption key", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: false,
+      authorized: false,
+      expired: false,
+    })
+
+    renderConfig()
+
+    const option = (await screen.findByRole("option", {
+      name: /not available on this server/i,
+    })) as HTMLOptionElement
+    expect(option.disabled).toBe(true)
+  })
+
   it("warns when re-auth switched to a different character", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
     vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
       authorized: true,
       character_name: "Alt Pilot",
       expired: false,
