@@ -64,6 +64,10 @@ class AppraisalLineOut(BaseModel):
     line_total: Decimal
     reason: str | None
     reprocess: ReprocessBreakdownOut | None = None
+    # Hub override snapshot (ADR-0031): set only when a rule priced this line at a
+    # hub other than the appraisal's default.
+    market_hub_id: str | None = None
+    market_hub_name: str | None = None
 
 
 class AppraisalOut(BaseModel):

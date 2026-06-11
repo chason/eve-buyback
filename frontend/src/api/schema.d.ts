@@ -466,6 +466,10 @@ export interface components {
             basis: ("buy" | "sell" | "split") | null;
             /** Line Total */
             line_total: string;
+            /** Market Hub Id */
+            market_hub_id?: string | null;
+            /** Market Hub Name */
+            market_hub_name?: string | null;
             /** Percentage */
             percentage: string | null;
             /** Quantity */
@@ -740,6 +744,12 @@ export interface components {
             compressed_only: boolean;
             /** Enabled */
             enabled: boolean;
+            /** Market Hub Id */
+            market_hub_id?: string | null;
+            /** Market Hub Kind */
+            market_hub_kind?: ("npc_station" | "structure") | null;
+            /** Market Hub Name */
+            market_hub_name?: string | null;
             /** Percentage */
             percentage: string;
             /**
@@ -760,7 +770,8 @@ export interface components {
         /**
          * RulePutRequest
          * @description The full rule state for a target (the target comes from the URL). `PUT` is an
-         *     idempotent create-or-replace, so this is the complete representation.
+         *     idempotent create-or-replace, so this is the complete representation — omitting
+         *     the hub fields clears any hub override (ADR-0031).
          */
         RulePutRequest: {
             /**
@@ -780,6 +791,12 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /** Market Hub Id */
+            market_hub_id?: string | null;
+            /** Market Hub Kind */
+            market_hub_kind?: ("npc_station" | "structure") | null;
+            /** Market Hub Name */
+            market_hub_name?: string | null;
             /** Percentage */
             percentage: number | string;
             /**

@@ -166,12 +166,27 @@ async def set_rule(
     reprocess: bool,
     compressed_only: bool,
     accepted: bool,
+    market_hub_id: str | None = None,
+    market_hub_kind: HubKind | None = None,
+    market_hub_name: str | None = None,
 ) -> tuple[PricingRuleRecord, bool]:
     """Create or replace the corp's rule for a target (idempotent PUT). Returns
     `(record, created)`. The target must exist (else 400); there is no 409/404 on
-    write — setting the rule for a target is the whole operation."""
+    write — setting the rule for a target is the whole operation. A hub override
+    (ADR-0031) is validated and resolved like the config hub; PUT is
+    full-replacement, so a request without one clears it."""
     corp = await get_registered_corporation(session, corporation_id)
     target_name = await _validate_target(session, target_kind, target_id)
+
+    region_id: int | None = None
+    hub_name: str | None = None
+    hub_kind: HubKind | None = None
+    if market_hub_id is not None:
+        hub_kind = market_hub_kind or "npc_station"
+        region_id, hub_name = await _resolve_hub(
+            session, corp.id, market_hub_id, hub_kind, market_hub_name
+        )
+
     record, created = await rules_repo.upsert_rule(
         session,
         corporation_id=corp.id,
@@ -183,6 +198,10 @@ async def set_rule(
         reprocess=reprocess,
         compressed_only=compressed_only,
         accepted=accepted,
+        market_hub_id=market_hub_id,
+        market_hub_kind=hub_kind,
+        market_region_id=region_id,
+        market_hub_name=hub_name,
     )
     await session.commit()
     return record.model_copy(update={"target_name": target_name}), created

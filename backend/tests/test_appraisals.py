@@ -33,15 +33,41 @@ def _empty_side() -> FuzzworkSide:
 
 
 class FakeFuzzwork:
-    def __init__(self, response: dict[int, FuzzworkAggregate]):
-        self.response = response
+    """Canned aggregates. `response` serves any station; `by_station` (hub_id str →
+    response dict) overrides per hub for multi-hub tests (ADR-0031). `stations`
+    records which hubs were fetched."""
 
-    async def get_aggregates(self, *, station: int, type_ids: list[int]):
-        return {t: self.response[t] for t in type_ids if t in self.response}
+    def __init__(
+        self,
+        response: dict[int, FuzzworkAggregate] | None = None,
+        by_station: dict[str, dict[int, FuzzworkAggregate]] | None = None,
+    ):
+        self.response = response or {}
+        self.by_station = by_station
+        self.stations: list[str] = []
+
+    async def get_aggregates(self, *, station: str, type_ids: list[int]):
+        self.stations.append(str(station))
+        src = (
+            self.by_station.get(str(station), {})
+            if self.by_station is not None
+            else self.response
+        )
+        return {t: src[t] for t in type_ids if t in src}
 
 
-def _use_fuzzwork(response: dict[int, FuzzworkAggregate]) -> None:
-    app.dependency_overrides[get_fuzzwork_client] = lambda: FakeFuzzwork(response)
+def _use_fuzzwork(response: dict[int, FuzzworkAggregate]) -> FakeFuzzwork:
+    fake = FakeFuzzwork(response)
+    app.dependency_overrides[get_fuzzwork_client] = lambda: fake
+    return fake
+
+
+def _use_fuzzwork_by_station(
+    by_station: dict[str, dict[int, FuzzworkAggregate]],
+) -> FakeFuzzwork:
+    fake = FakeFuzzwork(by_station=by_station)
+    app.dependency_overrides[get_fuzzwork_client] = lambda: fake
+    return fake
 
 
 async def _seed_sde() -> None:
@@ -52,6 +78,8 @@ async def _seed_sde() -> None:
         await sde_repo.bulk_upsert_types(
             session,
             [{"type_id": 34, "name": "Tritanium", "group_id": 18,
+              "market_group_id": 1, "volume": 0.01, "published": True},
+             {"type_id": 35, "name": "Pyerite", "group_id": 18,
               "market_group_id": 1, "volume": 0.01, "published": True}],
         )
         await session.commit()
@@ -399,6 +427,132 @@ async def test_appraisal_paste_ambiguous_name_is_rejected():
         assert line["status"] == "rejected"
         assert line["type_id"] is None
         assert line["reason"] == "Ambiguous name (2 matches)"
+
+
+JITA = "60003760"
+AMARR = "60008494"
+
+
+async def test_rule_hub_prices_line_at_override_hub():
+    # Type rule sends Tritanium to Amarr; Pyerite stays on the Jita default
+    # (ADR-0031). Each line prices from its own hub and the override is annotated.
+    await _seed_sde()
+    fake = _use_fuzzwork_by_station({
+        JITA: {
+            34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("5.00")),
+            35: FuzzworkAggregate(buy=_side("2.00"), sell=_side("2.00")),
+        },
+        AMARR: {34: FuzzworkAggregate(buy=_side("10.00"), sell=_side("10.00"))},
+    })
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "market_hub_id": AMARR},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals",
+            json={"items": [
+                {"type_id": 34, "quantity": 10},
+                {"type_id": 35, "quantity": 10},
+            ]},
+        )
+        assert resp.status_code == 201
+        lines = {ln["type_id"]: ln for ln in resp.json()["lines"]}
+
+        # Tritanium priced at Amarr's 10.00 (90% → 9.00), annotated with the hub.
+        assert Decimal(lines[34]["unit_price"]) == Decimal("9.00")
+        assert lines[34]["market_hub_id"] == AMARR
+        assert "Amarr" in lines[34]["market_hub_name"]
+
+        # Pyerite priced at the Jita default (90% of 2.00), no annotation.
+        assert Decimal(lines[35]["unit_price"]) == Decimal("1.80")
+        assert lines[35]["market_hub_id"] is None
+
+        assert sorted(set(fake.stations)) == [JITA, AMARR]
+
+
+async def test_rule_hub_equal_to_config_hub_dedupes():
+    # An override pointing at the corp's own hub is a no-op: one fetch, no annotation.
+    await _seed_sde()
+    fake = _use_fuzzwork_by_station(
+        {JITA: {34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("5.00"))}}
+    )
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "market_hub_id": JITA},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 10}]}
+        )
+        assert resp.status_code == 201
+        line = resp.json()["lines"][0]
+        assert line["status"] == "accepted"
+        assert line["market_hub_id"] is None
+        assert fake.stations == [JITA]
+
+
+async def test_rule_hub_reprocess_prices_minerals_at_override_hub():
+    # A reprocess rule with a hub values the ore's minerals (and leftover) there.
+    await _seed_ore()
+    fake = _use_fuzzwork_by_station({
+        AMARR: {
+            34: FuzzworkAggregate(buy=_side("100.00"), sell=_side("100.00")),
+            1230: FuzzworkAggregate(buy=_side("2.00"), sell=_side("2.00")),
+        },
+    })
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/1230",
+            json={"percentage": "90", "reprocess": True, "market_hub_id": AMARR},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 1230, "quantity": 100}]}
+        )
+        assert resp.status_code == 201
+        line = resp.json()["lines"][0]
+        # 1 batch × 400 Trit × 0.9063 × 100.00 = 36252 → unit 362.52 → 90% rounds
+        # to 326.27/unit (ADR-0021 per-unit rounding) → ×100 = 32627.00
+        assert line["status"] == "accepted"
+        assert Decimal(line["line_total"]) == Decimal("32627.00")
+        assert line["market_hub_id"] == AMARR
+        # Everything (ore + minerals) was fetched from the override hub only.
+        assert set(fake.stations) == {AMARR}
+
+
+async def test_rule_hub_without_data_rejects_only_those_lines():
+    # A dead override hub rejects its lines; the default hub still prices the rest.
+    await _seed_sde()
+    _use_fuzzwork_by_station({
+        JITA: {35: FuzzworkAggregate(buy=_side("2.00"), sell=_side("2.00"))},
+        AMARR: {},
+    })
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "market_hub_id": AMARR},
+        )
+        resp = await http.post(
+            "/api/v1/appraisals",
+            json={"items": [
+                {"type_id": 34, "quantity": 10},
+                {"type_id": 35, "quantity": 10},
+            ]},
+        )
+        assert resp.status_code == 201
+        lines = {ln["type_id"]: ln for ln in resp.json()["lines"]}
+        assert lines[34]["status"] == "rejected"
+        assert lines[34]["reason"] == "No market data"
+        assert lines[34]["market_hub_id"] == AMARR  # annotated even on rejection
+        assert lines[35]["status"] == "accepted"
 
 
 async def test_appraisal_defaults_drop_off_to_market_hub():

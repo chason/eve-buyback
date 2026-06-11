@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Literal
 
+from app.domain.market import HubDescriptor
+
 Basis = Literal["buy", "sell", "split"]
 AggregateField = Literal[
     "weighted_average", "max", "min", "median", "percentile"
@@ -42,13 +44,15 @@ _CENT = Decimal("0.01")
 @dataclass(frozen=True)
 class RuleSpec:
     """A pricing rule reduced to what resolution needs. `basis is None` means
-    "inherit the config default basis"."""
+    "inherit the config default basis"; `hub is None` means "price at the corp's
+    default hub" (ADR-0031)."""
 
     basis: Basis | None
     percentage: Decimal
     reprocess: bool = False
     compressed_only: bool = False
     accepted: bool = True
+    hub: HubDescriptor | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,9 @@ class ResolvedRule:
     reprocess: bool = False  # price a matched ore by its refined minerals (ADR-0026)
     compressed_only: bool = False  # reject the uncompressed variants of matched ores
     accepted: bool = True  # False → the buyback rejects matching items (blacklist)
+    # The winning rule's hub override; None → the corp default hub, which the
+    # application substitutes (the default never enters the domain) — ADR-0031.
+    hub: HubDescriptor | None = None
 
 
 def resolve_rule(
@@ -90,6 +97,7 @@ def resolve_rule(
             reprocess=type_rule.reprocess,
             compressed_only=type_rule.compressed_only,
             accepted=type_rule.accepted,
+            hub=type_rule.hub,
         )
 
     group_id = market_group_id
@@ -105,6 +113,7 @@ def resolve_rule(
                 reprocess=group_rule.reprocess,
                 compressed_only=group_rule.compressed_only,
                 accepted=group_rule.accepted,
+                hub=group_rule.hub,
             )
         group_id = parent_of.get(group_id)
 

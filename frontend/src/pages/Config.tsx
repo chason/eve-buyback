@@ -4,19 +4,16 @@ import { useSearchParams } from "react-router-dom"
 
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
-import { searchStations } from "../api/sde"
 import {
   beginStructureAuthorize,
   getStructureStatus,
   revokeStructure,
-  searchStructures,
 } from "../api/structures"
 import type { AggregateField, Basis } from "../api/types"
-import { FUZZWORK_HUBS, hubName, isFuzzworkHub } from "../lib/hubs"
+import HubPicker, { type HubSelection } from "../components/HubPicker"
+import { hubName, isFuzzworkHub } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
-const CUSTOM = "custom" // "other NPC station" (searchable)
-const STRUCTURE = "structure" // player structure (authenticated ESI)
 const BASES: Basis[] = ["buy", "sell", "split"]
 const AGGREGATES: AggregateField[] = [
   "percentile",
@@ -36,16 +33,10 @@ export default function Config() {
   const [percentage, setPercentage] = useState("90")
   const [aggregate, setAggregate] = useState<AggregateField>("percentile")
   const [defaultAccepted, setDefaultAccepted] = useState(true)
-  // Hub picker: a Fuzzwork preset id, CUSTOM (search an NPC station), or STRUCTURE.
-  const [hubChoice, setHubChoice] = useState<string>(FUZZWORK_HUBS[0].id)
-  const [stationQuery, setStationQuery] = useState("")
-  const [station, setStation] = useState<{ id: string; label: string } | null>(
-    null,
-  )
-  const [structureQuery, setStructureQuery] = useState("")
-  const [structure, setStructure] = useState<{ id: string; label: string } | null>(
-    null,
-  )
+  // The hub resolved by the HubPicker; "incomplete" blocks saving.
+  const [selection, setSelection] = useState<HubSelection>({
+    state: "incomplete",
+  })
   const [authorizing, setAuthorizing] = useState(false)
 
   // Did we just return from the structure-access SSO round-trip? (Callback
@@ -64,74 +55,50 @@ export default function Config() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Seed the form once the config loads (and after a save refetch).
+  // Seed the form once the config loads (and after a save refetch). The HubPicker
+  // seeds itself from `initial` (keyed below); this mirrors the saved hub into
+  // `selection` — except in the just-authorized case, where the picker opens on
+  // "Player structure" with nothing picked yet.
   useEffect(() => {
     if (config.data) {
       setBasis(config.data.default_basis)
       setPercentage(config.data.default_percentage)
       setAggregate(config.data.aggregate_field)
       setDefaultAccepted(config.data.default_accepted)
-      const hub = config.data.market_hub_id
-      if (config.data.market_hub_kind === "structure") {
-        setHubChoice(STRUCTURE)
-        setStructure({
-          id: hub,
-          label: config.data.market_hub_name ?? `Structure ${hub}`,
-        })
-      } else if (justAuthorized.current) {
-        // Just authorized but no structure saved yet — keep the picker on
-        // "Player structure" so the search box is ready instead of snapping
-        // back to the saved (Fuzzwork) hub.
-        setHubChoice(STRUCTURE)
-      } else if (isFuzzworkHub(hub)) {
-        setHubChoice(hub)
+      if (justAuthorized.current && config.data.market_hub_kind !== "structure") {
+        setSelection({ state: "incomplete" })
       } else {
-        setHubChoice(CUSTOM)
-        setStation({ id: hub, label: config.data.market_hub_name ?? `Station ${hub}` })
+        setSelection({
+          state: "hub",
+          hubId: config.data.market_hub_id,
+          kind: config.data.market_hub_kind,
+          name: config.data.market_hub_name ?? null,
+        })
       }
     }
   }, [config.data])
 
-  const query = stationQuery.trim()
-  const stationResults = useQuery({
-    queryKey: ["stations", query],
-    queryFn: () => searchStations(query),
-    enabled: hubChoice === CUSTOM && query.length >= 2,
-  })
-  // Fetched for any manager (not just when STRUCTURE is selected) so the picker can
-  // disable the structure option when the server has no token-encryption key.
+  // Structure auth status for the authorize/revoke panel (HubPicker shares the
+  // same query key for availability, so this is deduped).
   const structureStatus = useQuery({
     queryKey: ["structureStatus"],
     queryFn: getStructureStatus,
     enabled: canEdit,
   })
-  const structuresAvailable = structureStatus.data?.configured !== false
   const authorized = !!structureStatus.data?.authorized
-  const sQuery = structureQuery.trim()
-  const structureResults = useQuery({
-    queryKey: ["structures", sQuery],
-    queryFn: () => searchStructures(sQuery),
-    enabled: hubChoice === STRUCTURE && authorized && sQuery.length >= 3,
-  })
-
-  const hubKind = hubChoice === STRUCTURE ? "structure" : "npc_station"
-  const hubId =
-    hubChoice === STRUCTURE
-      ? (structure?.id ?? "")
-      : hubChoice === CUSTOM
-        ? (station?.id ?? "")
-        : hubChoice
-  const hubInvalid = hubId === ""
 
   const save = useMutation({
     mutationFn: () =>
       updateConfig({
-        market_hub_id: hubId,
-        market_hub_kind: hubKind,
+        market_hub_id: selection.state === "hub" ? selection.hubId : "",
+        market_hub_kind:
+          selection.state === "hub" ? selection.kind : "npc_station",
         // Structures have no SDE to resolve against, so persist the friendly name
         // from the search (NPC/Fuzzwork names are resolved server-side).
         market_hub_name:
-          hubChoice === STRUCTURE ? (structure?.label ?? null) : null,
+          selection.state === "hub" && selection.kind === "structure"
+            ? selection.name
+            : null,
         default_basis: basis,
         default_percentage: percentage,
         aggregate_field: aggregate,
@@ -165,6 +132,68 @@ export default function Config() {
     return <p className="error">Could not load the buyback config.</p>
   }
 
+  const structureSlot = (
+    <>
+      {replacedCharacter.current && (
+        <p role="alert">
+          ⚠️ Structure access was switched from{" "}
+          <strong>{replacedCharacter.current}</strong> to the character you just
+          authorized — the new token replaced the old one. If that wasn&apos;t
+          intended, re-authorize as <strong>{replacedCharacter.current}</strong>.
+        </p>
+      )}
+      <article>
+        {structureStatus.isLoading || authorizing ? (
+          <p aria-busy="true">
+            {authorizing
+              ? "Redirecting to EVE for authorization…"
+              : "Checking structure access…"}
+          </p>
+        ) : (
+          <>
+            {authorized ? (
+              <p>
+                Structure access: connected as{" "}
+                <strong>{structureStatus.data?.character_name}</strong>
+                {structureStatus.data?.expired && (
+                  <span className="error"> — expired, please re-authorize</span>
+                )}
+                .{" "}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (canEdit) revoke.mutate()
+                  }}
+                >
+                  Revoke
+                </a>
+              </p>
+            ) : (
+              <p>
+                Authorize structure access to search and price at a structure.
+              </p>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              disabled={!canEdit}
+              onClick={() => void startStructureAuthorize()}
+            >
+              {authorized
+                ? "Re-authorize structure access"
+                : "Authorize structure access"}
+            </button>
+            <small className="field-hint">
+              Log in with a character that has docking + market access to the
+              structure. The token is stored encrypted (ADR-0029).
+            </small>
+          </>
+        )}
+      </article>
+    </>
+  )
+
   return (
     <>
       <hgroup>
@@ -178,196 +207,24 @@ export default function Config() {
           save.mutate()
         }}
       >
-        <label>
-          Market hub
-          <select
-            value={hubChoice}
-            disabled={!canEdit}
-            onChange={(e) => {
-              justAuthorized.current = false
-              setHubChoice(e.target.value)
-            }}
-            aria-label="Market hub"
-          >
-            {FUZZWORK_HUBS.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name}
-              </option>
-            ))}
-            <option value={CUSTOM}>Other NPC station…</option>
-            <option value={STRUCTURE} disabled={!structuresAvailable}>
-              {structuresAvailable
-                ? "Player structure…"
-                : "Player structure… (not available on this server)"}
-            </option>
-          </select>
-        </label>
-
-        {hubChoice === CUSTOM && (
-          <label>
-            Station
-            <input
-              type="search"
-              value={station ? station.label : stationQuery}
-              placeholder="Search by system or station…"
-              aria-label="Search station"
-              disabled={!canEdit}
-              onChange={(e) => {
-                setStation(null)
-                setStationQuery(e.target.value)
-              }}
-            />
-            {!station && query.length >= 2 && (
-              <ul className="search-results">
-                {stationResults.isLoading && <li aria-busy="true">Searching…</li>}
-                {stationResults.data?.map((s) => (
-                  <li key={s.station_id}>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setStation({
-                          id: String(s.station_id),
-                          label: `${s.system_name} - ${s.name}`,
-                        })
-                        setStationQuery("")
-                      }}
-                    >
-                      {s.system_name} - {s.name}
-                    </a>
-                  </li>
-                ))}
-                {stationResults.data?.length === 0 && <li>No matches.</li>}
-              </ul>
-            )}
-            <small className="field-hint">
-              Any NPC station — priced live from EVE ESI region orders.
-            </small>
-          </label>
-        )}
-
-        {hubChoice === STRUCTURE && !structuresAvailable && (
-          <p className="error">
-            Player-structure pricing isn&apos;t available on this server — the
-            operator hasn&apos;t configured the token-encryption key
-            (BUYBACK_TOKEN_ENCRYPTION_KEY). Pick another hub.
-          </p>
-        )}
-
-        {hubChoice === STRUCTURE && structuresAvailable && (
-          <>
-            {replacedCharacter.current && (
-              <p role="alert">
-                ⚠️ Structure access was switched from{" "}
-                <strong>{replacedCharacter.current}</strong> to the character you
-                just authorized — the new token replaced the old one. If that
-                wasn&apos;t intended, re-authorize as{" "}
-                <strong>{replacedCharacter.current}</strong>.
-              </p>
-            )}
-            <article>
-              {structureStatus.isLoading || authorizing ? (
-                <p aria-busy="true">
-                  {authorizing
-                    ? "Redirecting to EVE for authorization…"
-                    : "Checking structure access…"}
-                </p>
-              ) : (
-                <>
-                  {authorized ? (
-                    <p>
-                      Structure access: connected as{" "}
-                      <strong>{structureStatus.data?.character_name}</strong>
-                      {structureStatus.data?.expired && (
-                        <span className="error">
-                          {" "}
-                          — expired, please re-authorize
-                        </span>
-                      )}
-                      .{" "}
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          if (canEdit) revoke.mutate()
-                        }}
-                      >
-                        Revoke
-                      </a>
-                    </p>
-                  ) : (
-                    <p>
-                      Authorize structure access to search and price at a
-                      structure.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={!canEdit}
-                    onClick={() => void startStructureAuthorize()}
-                  >
-                    {authorized
-                      ? "Re-authorize structure access"
-                      : "Authorize structure access"}
-                  </button>
-                  <small className="field-hint">
-                    Log in with a character that has docking + market access to
-                    the structure. The token is stored encrypted (ADR-0029).
-                  </small>
-                </>
-              )}
-            </article>
-
-            {authorized && (
-              <label>
-                Structure
-                <input
-                  type="search"
-                  value={structure ? structure.label : structureQuery}
-                  placeholder="Search structures by name…"
-                  aria-label="Search structure"
-                  disabled={!canEdit}
-                  onChange={(e) => {
-                    setStructure(null)
-                    setStructureQuery(e.target.value)
-                  }}
-                />
-                {!structure && sQuery.length >= 3 && (
-                  <ul className="search-results">
-                    {structureResults.isLoading && (
-                      <li aria-busy="true">Searching…</li>
-                    )}
-                    {structureResults.isError && (
-                      <li className="error">
-                        Search failed — your structure access may have expired.
-                        Re-authorize and try again.
-                      </li>
-                    )}
-                    {structureResults.data?.map((s) => (
-                      <li key={s.structure_id}>
-                        <a
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            setStructure({ id: s.structure_id, label: s.name })
-                            setStructureQuery("")
-                          }}
-                        >
-                          {s.name}
-                        </a>
-                      </li>
-                    ))}
-                    {structureResults.data?.length === 0 && <li>No matches.</li>}
-                  </ul>
-                )}
-                <small className="field-hint">
-                  Only structures your authorized character can dock at appear.
-                </small>
-              </label>
-            )}
-          </>
-        )}
+        <HubPicker
+          key={`${config.data.market_hub_id}:${config.data.market_hub_kind}`}
+          initial={{
+            hubId: config.data.market_hub_id,
+            kind: config.data.market_hub_kind,
+            name: config.data.market_hub_name ?? null,
+          }}
+          forceStructureChoice={
+            justAuthorized.current &&
+            config.data.market_hub_kind !== "structure"
+          }
+          disabled={!canEdit}
+          onChange={(s) => {
+            justAuthorized.current = false
+            setSelection(s)
+          }}
+          structureSlot={structureSlot}
+        />
 
         <small className="field-hint">
           Currently pricing at{" "}
@@ -434,7 +291,11 @@ export default function Config() {
         </small>
 
         {canEdit ? (
-          <button type="submit" aria-busy={save.isPending} disabled={hubInvalid}>
+          <button
+            type="submit"
+            aria-busy={save.isPending}
+            disabled={selection.state !== "hub"}
+          >
             Save config
           </button>
         ) : (

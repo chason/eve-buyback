@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from app.domain.ids import generate_appraisal_id
+from app.domain.market import HubDescriptor
 from app.domain.pricing import (
     ORE_REFINE_YIELD,
     RuleSpec,
@@ -57,6 +58,36 @@ def test_default_fallback():
 def test_none_market_group_falls_through_to_default():
     r = resolve_rule(34, None, type_rules={}, group_rules={}, parent_of={}, **DEF)
     assert r.source == "default"
+
+
+def test_resolve_rule_carries_hub_override():
+    # The winning rule's hub rides through resolution (ADR-0031).
+    hub = HubDescriptor(hub_id="1035000000001", kind="structure", region_id=None)
+    r = resolve_rule(
+        34, None,
+        type_rules={34: RuleSpec("buy", Decimal("90"), hub=hub)},
+        group_rules={}, parent_of={}, **DEF,
+    )
+    assert r.hub == hub
+
+    # Via the ancestor walk too.
+    r2 = resolve_rule(
+        34, 3,
+        type_rules={},
+        group_rules={1: RuleSpec(None, Decimal("50"), hub=hub)},
+        parent_of={3: 2, 2: 1, 1: None}, **DEF,
+    )
+    assert r2.source == "market_group:1" and r2.hub == hub
+
+    # A rule without a hub, and the default fallback, both leave it None.
+    r3 = resolve_rule(
+        34, None,
+        type_rules={34: RuleSpec("buy", Decimal("90"))},
+        group_rules={}, parent_of={}, **DEF,
+    )
+    assert r3.hub is None
+    r4 = resolve_rule(34, None, type_rules={}, group_rules={}, parent_of={}, **DEF)
+    assert r4.hub is None
 
 
 def test_group_rule_basis_none_inherits_default_basis():

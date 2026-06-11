@@ -65,6 +65,9 @@ async def set_rule(
         reprocess=payload.reprocess,
         compressed_only=payload.compressed_only,
         accepted=payload.accepted,
+        market_hub_id=payload.market_hub_id,
+        market_hub_kind=payload.market_hub_kind,
+        market_hub_name=payload.market_hub_name,
     )
     response.status_code = (
         status.HTTP_201_CREATED if created else status.HTTP_200_OK

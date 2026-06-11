@@ -100,6 +100,40 @@ describe("Appraisal", () => {
     expect(screen.queryByText(/Get paid/)).not.toBeInTheDocument()
   })
 
+  it("annotates lines priced at a rule-override hub", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
+    vi.mocked(api.getAppraisal).mockResolvedValue({
+      public_id: "hub1",
+      created_by_character_id: 1,
+      created_at: "2026-06-07T00:00:00Z",
+      market_hub_id: "60003760",
+      accepted_total: "90.00",
+      rejected_count: 0,
+      lines: [
+        {
+          type_id: 34, type_name: "Tritanium", quantity: 10, status: "accepted",
+          basis: "buy", percentage: "90", unit_value: "10.00", unit_price: "9.00",
+          line_total: "90.00", reason: null,
+          market_hub_id: "60008494",
+          market_hub_name: "Amarr VIII (Oris) - Emperor Family Academy",
+        },
+        {
+          type_id: 35, type_name: "Pyerite", quantity: 10, status: "accepted",
+          basis: "buy", percentage: "90", unit_value: "2.00", unit_price: "1.80",
+          line_total: "18.00", reason: null,
+        },
+      ],
+    })
+
+    renderAt("hub1")
+
+    // The overridden line shows where it priced; the default-hub line doesn't.
+    expect(
+      await screen.findByText(/@ Amarr VIII \(Oris\)/),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText(/@ /).length).toBe(1)
+  })
+
   it("shows the reprocessed mineral breakdown for an ore line", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
     vi.mocked(api.getAppraisal).mockResolvedValue({

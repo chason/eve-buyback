@@ -7,12 +7,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import * as authApi from "../api/auth"
 import * as pricingApi from "../api/pricing"
 import * as sdeApi from "../api/sde"
+import * as structuresApi from "../api/structures"
 import type { SessionUser } from "../api/types"
 import Rules from "./Rules"
 
 vi.mock("../api/auth")
 vi.mock("../api/pricing")
 vi.mock("../api/sde")
+vi.mock("../api/structures")
 
 function user(role: SessionUser["role"]): SessionUser {
   return {
@@ -40,7 +42,16 @@ function renderRules() {
 }
 
 describe("Rules", () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    // The AddRule hub picker checks structure availability; default to a
+    // configured-but-unauthorized server (tests override as needed).
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
+      authorized: false,
+      expired: false,
+    })
+  })
 
   it("shows each rule's backend-resolved target name", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
@@ -93,6 +104,41 @@ describe("Rules", () => {
       accepted: true,
       reprocess: true,
       compressed_only: true,
+    })
+  })
+
+  it("sends a hub override when one is picked, and shows it in the table", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.listRules).mockResolvedValue([
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true, market_hub_id: "60008494", market_hub_name: "Amarr VIII (Oris) - Emperor Family Academy" },
+    ])
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
+    vi.mocked(sdeApi.searchTypes).mockResolvedValue([
+      { type_id: 35, name: "Pyerite", market_group_id: 5 },
+    ])
+    vi.mocked(pricingApi.putRule).mockResolvedValue({
+      target_kind: "type", target_id: 35, basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true,
+    })
+
+    renderRules()
+
+    // The existing rule's hub renders in the table.
+    expect(
+      await screen.findByText("Amarr VIII (Oris) - Emperor Family Academy"),
+    ).toBeInTheDocument()
+
+    // Add a rule with a hub override picked from the presets.
+    await u.type(screen.getByLabelText("Search type by name"), "pyer")
+    await u.click(await screen.findByText("Pyerite"))
+    await u.selectOptions(screen.getByLabelText("Market hub"), "60008494")
+    await u.click(screen.getByRole("button", { name: "Save rule" }))
+
+    await waitFor(() => expect(pricingApi.putRule).toHaveBeenCalled())
+    expect(vi.mocked(pricingApi.putRule).mock.calls[0][2]).toMatchObject({
+      market_hub_id: "60008494",
+      market_hub_kind: "npc_station",
+      market_hub_name: null,
     })
   })
 
