@@ -58,6 +58,30 @@ there instead of the corp default.
 
 ## Alternatives considered
 
+- **A normalized `market_hubs` table** (rules/config FK-ing a shared hub row instead
+  of carrying the quartet) — rejected because a hub here is **not an entity we own**;
+  it's a *reference* to an external EVE station/structure plus resolution results
+  **cached at save time** (kind/region/name are memoization, not state — their
+  canonical source is the SDE/ESI). Normalization wouldn't buy its usual benefits:
+  - *Update anomalies don't apply.* The cached name/region refresh whenever a rule or
+    config is saved, and SDE drift is explicitly accepted (ADR-0028); a shared row
+    wouldn't eliminate staleness, only centralize it.
+  - *The expensive shared data is already normalized.* `market_prices` is keyed
+    `(hub_id, type_id)`, so every rule/config pointing at the same hub shares one
+    price cache today; the duplicated quartet itself is tens of bytes per rule.
+  - *Appraisal lines must stay denormalized regardless* — they're immutable snapshots
+    (ADR-0014), so a rename of a shared hub row must never rewrite history. The table
+    would only cover rules + config, where duplication is cheapest.
+  - *It raises tenancy questions for free.* Structure names come from a corp's own
+    authorized ESI search (ADR-0029): a global table makes one corp's resolution (or
+    mistake) another corp's display name; a per-corp table is the same quartet again,
+    one join away — and rules are read on every appraisal.
+  - It also keeps the rule consistent with `BuybackConfig`, which has carried this
+    exact quartet since ADR-0028, so both flow through the same `_resolve_hub`
+    validation. **Revisit** if hubs grow their own lifecycle — per-hub settings
+    (data-quality thresholds, refresh cadence), a "corp's saved hubs" picker, or
+    enough rules that bulk-renaming a hub matters; at that point a hub becomes an
+    owned entity and the FK design earns its keep.
 - **Multiple hubs on the config with per-rule selection by name** — indirection
   without benefit at this scale; rejected.
 - **Hub only on market-group rules** — arbitrary asymmetry; type rules carry it too.
