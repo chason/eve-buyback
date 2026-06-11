@@ -149,9 +149,11 @@ docker build -t buyback .                # build the image alone (e.g. for Cooli
 
 - Keep the API and frontend independently runnable; the frontend reaches the
   backend over HTTP (configure the base URL via env, don't hardcode).
-- **Versioning is one number, bumped per PR.** Increment `APP_VERSION` in
-  `backend/app/_version.py` by one in each PR (served at `/api/v1/version`, shown in
-  the UI footer). This is the whole scheme — no tags or semver.
+- **Versioning is one number, bumped automatically per merged PR.** A GitHub Action
+  (`.github/workflows/version-bump.yml`) increments `APP_VERSION` in
+  `backend/app/_version.py` on every merge to `main` (ADR-0032). **Do not bump it in
+  a PR** — parallel PRs would claim the same number. Served at `/api/v1/version`,
+  shown in the UI top bar. This is the whole scheme — no tags or semver.
 - Match the style of surrounding code. Add tests alongside new behavior.
 - Don't commit secrets — use `.env` files (already gitignored).
 - A pre-commit hook (`.githooks/pre-commit`) runs checks for what you stage:
