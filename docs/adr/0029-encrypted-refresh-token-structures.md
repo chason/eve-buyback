@@ -36,7 +36,10 @@ entirely token-free.
   (`structure_market_tokens.encrypted_refresh_token`) with a new
   `BUYBACK_TOKEN_ENCRYPTION_KEY`; only the ciphertext touches the DB. Outside
   development the app refuses to *authorize* (not boot) while the key is the public
-  placeholder, so corps that never use structures aren't forced to set it.
+  placeholder, so corps that never use structures aren't forced to set it. A key that
+  is **set but malformed** (not structurally a valid Fernet key) fails at **boot**
+  instead — the operator clearly intended to configure it, and a startup error in the
+  deploy logs beats a request-time 500.
 - **Access tokens are never persisted.** `get_structure_access_token` decrypts the
   refresh token, calls EVE's refresh grant, and returns a fresh access token held only
   for the one ESI call — the same "use once, drop it" posture as login. EVE may

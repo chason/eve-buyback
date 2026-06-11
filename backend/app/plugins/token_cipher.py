@@ -14,28 +14,20 @@ from app.config import get_settings
 class TokenCipher:
     """Thin Fernet wrapper: `str` plaintext ⇄ `bytes` ciphertext.
 
-    The Fernet is built **lazily** on first use: this object is constructed as a
-    FastAPI dependency on every request that *might* need it (including ordinary
-    appraisals), so a malformed `BUYBACK_TOKEN_ENCRYPTION_KEY` must not take those
-    endpoints down — the structure-token use cases gate on
-    `settings.structure_tokens_configured` and fail with a clean typed error before
-    any encrypt/decrypt happens.
+    Constructed per-request as a FastAPI dependency; safe to build eagerly because
+    the key's structural validity is enforced at boot (`Settings._require_valid_token_key`)
+    — a malformed `BUYBACK_TOKEN_ENCRYPTION_KEY` refuses to start the app instead of
+    surfacing here.
     """
 
     def __init__(self, key: str) -> None:
-        self._key = key
-        self._fernet: Fernet | None = None
-
-    def _get_fernet(self) -> Fernet:
-        if self._fernet is None:
-            self._fernet = Fernet(self._key.encode())
-        return self._fernet
+        self._fernet = Fernet(key.encode())
 
     def encrypt(self, plaintext: str) -> bytes:
-        return self._get_fernet().encrypt(plaintext.encode())
+        return self._fernet.encrypt(plaintext.encode())
 
     def decrypt(self, ciphertext: bytes) -> str:
-        return self._get_fernet().decrypt(bytes(ciphertext)).decode()
+        return self._fernet.decrypt(bytes(ciphertext)).decode()
 
 
 def get_token_cipher() -> TokenCipher:

@@ -163,11 +163,10 @@ async def revoke(
 
 def _decrypt_or_none(cipher: TokenCipher, ciphertext: bytes) -> str | None:
     """Decrypt a stored refresh token, or None if the key can no longer read it
-    (rotated key → InvalidToken; malformed key → ValueError from Fernet) — in either
-    case we can't revoke the old grant at EVE, so just skip that step."""
+    (e.g. the encryption key was rotated) — in which case we can't revoke it anyway."""
     try:
         return cipher.decrypt(ciphertext)
-    except (InvalidToken, ValueError):
+    except InvalidToken:
         log.warning("Could not decrypt a stored structure refresh token to revoke it")
         return None
 

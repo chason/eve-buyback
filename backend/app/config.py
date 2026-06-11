@@ -17,8 +17,8 @@ INSECURE_TOKEN_KEY = "YnV5YmFjay1kZXYtaW5zZWN1cmUtdG9rZW4ta2V5ISE="
 
 def _is_valid_fernet_key(key: str) -> bool:
     """Whether the string is a structurally valid Fernet key (32 url-safe-base64
-    bytes). A malformed `BUYBACK_TOKEN_ENCRYPTION_KEY` (e.g. a `token_urlsafe`
-    secret) must read as *not configured* rather than blow up at encrypt time."""
+    bytes). Checked at boot: a malformed `BUYBACK_TOKEN_ENCRYPTION_KEY` (e.g. a
+    `token_urlsafe` secret) must refuse to start, not 500 at encrypt time."""
     try:
         Fernet(key.encode())
     except (ValueError, TypeError):
@@ -84,15 +84,14 @@ class Settings(BaseSettings):
 
     @property
     def structure_tokens_configured(self) -> bool:
-        """Whether a *usable* token-encryption key is set: structurally a valid
-        Fernet key, and outside development not the public placeholder (ADR-0029).
-        Structure auth is refused with a clean error while this is False."""
-        key = self.token_encryption_key.strip()
-        if not _is_valid_fernet_key(key):
-            return False
+        """Whether a real token-encryption key is set. Structure auth is refused
+        outside development while this is the public placeholder (ADR-0029). The
+        key's structural validity is enforced at boot (`_require_valid_token_key`),
+        so a True here means the cipher actually works."""
         if self.environment == "development":
             return True
-        return key != INSECURE_TOKEN_KEY
+        key = self.token_encryption_key.strip()
+        return bool(key) and key != INSECURE_TOKEN_KEY
 
     @model_validator(mode="after")
     def _require_secure_session_secret(self) -> "Settings":
@@ -105,6 +104,26 @@ class Settings(BaseSettings):
                 "BUYBACK_SESSION_SECRET must be set to a strong, unique value when "
                 "BUYBACK_ENVIRONMENT is not 'development'. The placeholder default "
                 "would let anyone forge a session cookie."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _require_valid_token_key(self) -> "Settings":
+        """Refuse to boot with a malformed token-encryption key (any environment).
+
+        An invalid key (including empty) can never construct the cipher — failing at
+        startup puts the error in the deploy logs instead of 500ing requests at use
+        time. Structures stay optional (ADR-0029): leaving the variable **unset**
+        keeps the valid dev-placeholder default, which boots fine and is simply
+        refused for authorization outside development.
+        """
+        if not _is_valid_fernet_key(self.token_encryption_key.strip()):
+            raise ValueError(
+                "BUYBACK_TOKEN_ENCRYPTION_KEY is not a valid Fernet key (44 chars, "
+                "url-safe base64). Generate one with: python -c \"from "
+                "cryptography.fernet import Fernet; "
+                'print(Fernet.generate_key().decode())" — or unset it entirely if '
+                "you don't price at player structures."
             )
         return self
 
