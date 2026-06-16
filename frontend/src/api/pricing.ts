@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from "./client"
+import { apiGet, apiSend, throwApiError } from "./client"
 import type {
   ConfigOut,
   ConfigUpdateRequest,
@@ -23,7 +23,7 @@ export async function updateConfig(
   body: ConfigUpdateRequest,
 ): Promise<ConfigOut> {
   const res = await apiSend("PUT", "/corporations/me/config", body)
-  if (!res.ok) throw new Error(`Save config failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Save config failed")
   return (await res.json()) as ConfigOut
 }
 
@@ -39,7 +39,7 @@ export async function putRule(
     `/corporations/me/rules/${targetKind}/${targetId}`,
     body,
   )
-  if (!res.ok) throw new Error(`Save rule failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Save rule failed")
   return (await res.json()) as RuleOut
 }
 
@@ -51,5 +51,5 @@ export async function deleteRule(
     "DELETE",
     `/corporations/me/rules/${targetKind}/${targetId}`,
   )
-  if (!res.ok) throw new Error(`Delete rule failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Delete rule failed")
 }
