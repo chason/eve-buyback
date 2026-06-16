@@ -18,6 +18,11 @@
   --bb-text: #c7d3de; /* body copy */
   --bb-heading: #e6eef5; /* brighter than body, for headings */
   --bb-muted: #7d93a6; /* secondary / muted copy */
+  --bb-danger-muted: #b0727a; /* dimmed danger — rejected (not-bought) rows */
+  /* Monospace stack for figures and grid headers; #43 (typography) can later point
+     this at a loaded technical mono (e.g. JetBrains Mono). */
+  --bb-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
 [data-theme="dark"] {
@@ -93,18 +98,40 @@ article,
     0 0 28px rgba(51, 194, 255, 0.05);
 }
 
+/* Market-data grid (#47): tables read like a terminal ledger — uppercase mono
+   column headers, thin cyan-tinted row borders, a subtle hover glow on data rows,
+   and muted-red rejected (not-bought) rows. */
+th {
+  font-family: var(--bb-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.8125rem;
+  color: var(--bb-muted);
+}
+
+table td,
+table th {
+  border-bottom: 1px solid rgba(51, 194, 255, 0.12);
+}
+
+tbody tr:hover {
+  background: rgba(51, 194, 255, 0.05);
+}
+
 .isk {
+  font-family: var(--bb-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 td.num {
   text-align: right;
+  font-family: var(--bb-mono);
   font-variant-numeric: tabular-nums;
 }
 
 tr.rejected {
-  color: var(--pico-del-color, crimson);
+  color: var(--bb-danger-muted);
 }
 
 tr.reprocess-detail td {
