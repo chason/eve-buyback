@@ -109,7 +109,31 @@ export default function Home() {
             <CorporationStatus user={me.data} />
           </section>
         ) : (
-          <button onClick={startLogin}>Log in with EVE Online</button>
+          <section className="login-hero">
+            <article className="login-panel">
+              <p className="login-eyebrow">Capsuleer Access</p>
+              <h2 className="login-title">Sign in to your corp buyback</h2>
+              <p className="login-tagline">
+                Authenticate with your EVE Online character to get instant,
+                market-priced quotes and contract your haul to the corporation.
+              </p>
+              <button
+                type="button"
+                className="login-cta"
+                onClick={startLogin}
+              >
+                <img
+                  src="https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-black-large.png"
+                  alt="Log in with EVE Online"
+                  width="270"
+                  height="45"
+                />
+              </button>
+              <p className="login-fineprint">
+                We never see your password — login is handled by EVE Online SSO.
+              </p>
+            </article>
+          </section>
         ))}
     </>
   )

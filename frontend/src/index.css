@@ -29,6 +29,11 @@
 }
 
 [data-theme="dark"] {
+  /* Sharp, angular HUD geometry (#48): EVE consoles are hard-edged, not rounded.
+     Drop Pico's global radius to a hard 2px so every panel, button, input, and chip
+     reads as a console element rather than a rounded web card. */
+  --pico-border-radius: 2px;
+
   --pico-background-color: var(--bb-void);
   --pico-color: var(--bb-text);
   /* Route Pico's monospace family (code, kbd, pre) to our technical mono (#43). */
@@ -95,12 +100,73 @@ body {
 }
 
 /* A faint holographic glow lifts panels off the void: a cyan hairline outline plus
-   a soft low-opacity bloom (#45). */
+   a soft low-opacity bloom (#45). Rendered as a drop-shadow *filter* rather than a
+   box-shadow so it follows the chamfered silhouette below (#48) — a box-shadow traces
+   the unclipped rectangle and would shear off at the cut corner. */
 article,
 .flow-step {
-  box-shadow:
-    0 0 0 1px rgba(51, 194, 255, 0.08),
-    0 0 28px rgba(51, 194, 255, 0.05);
+  filter:
+    drop-shadow(0 0 1px rgba(51, 194, 255, 0.22))
+    drop-shadow(0 0 22px rgba(51, 194, 255, 0.05));
+}
+
+/* Chamfer the top-right corner of every panel (#48) — the signature EVE angular-HUD
+   cut. clip-path (not a pseudo-element) so the cut is a true notch through the panel
+   edge; the drop-shadow filter above re-draws the glow along the new silhouette. The
+   cut is small and sits in the panel's corner padding, so no panel content is clipped;
+   in-flow children (e.g. search dropdowns) grow the panel rather than overflow it. */
+article {
+  --bb-chamfer: 14px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--bb-chamfer)) 0,
+    100% var(--bb-chamfer),
+    100% 100%,
+    0 100%
+  );
+}
+
+/* Product wordmark in the nav (#42): the angular bracket favicon as a logo, "BUYBACK"
+   set in the condensed display face with wide letter-spacing, and a mono codename
+   tag — a corp-logistics console identity rather than plain bold text. */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.brand-logo {
+  display: block;
+}
+
+.brand-name {
+  font-family: var(--bb-display);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--bb-heading);
+}
+
+.brand-codename {
+  font-family: var(--bb-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bb-muted);
+  align-self: center;
+}
+
+.brand-codename::before {
+  content: "// ";
+  color: var(--bb-cyan);
+}
+
+/* Keep the nav compact on small screens — drop the codename tag, keep the wordmark. */
+@media (max-width: 600px) {
+  .brand-codename {
+    display: none;
+  }
 }
 
 /* Condensed display face for headings — the technical EVE look (#43). Body copy
@@ -326,6 +392,71 @@ label:has(> .search-results) > input {
   color: var(--pico-muted-color);
 }
 
+/* Login hero (#46): the signed-out CTA is a centered console panel — a mono eyebrow,
+   a capsuleer tagline, and the official EVE SSO button with a cyan-glow hover, rather
+   than a bare full-width button. */
+.login-hero {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.login-panel {
+  max-width: 30rem;
+  text-align: center;
+}
+
+.login-eyebrow {
+  font-family: var(--bb-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.7rem;
+  color: var(--bb-cyan);
+  margin-bottom: 0.35rem;
+}
+
+.login-title {
+  margin-bottom: 0.5rem;
+}
+
+.login-tagline {
+  color: var(--bb-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* Wrap the official SSO button image: strip Pico's full-width button chrome and add
+   the glowing cyan CTA treatment on hover/focus. */
+.login-cta {
+  display: inline-flex;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--bb-panel-border);
+  border-radius: 2px;
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.login-cta img {
+  display: block;
+}
+
+.login-cta:hover,
+.login-cta:focus-visible {
+  border-color: var(--bb-cyan);
+  filter: drop-shadow(0 0 10px rgba(51, 194, 255, 0.55));
+  transform: translateY(-1px);
+}
+
+.login-fineprint {
+  margin: 1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--bb-muted);
+}
+
 /* "How it works" — boxes connected by arrows: [ ] -> [ ] -> [ ]. */
 .flow {
   display: flex;
@@ -378,5 +509,47 @@ label:has(> .search-results) > input {
   }
   .flow-arrow {
     transform: rotate(90deg);
+  }
+}
+
+/* Micro-delight polish (#49). Two static console touches — no animation, so nothing
+   here needs a reduced-motion guard (the one transform/transition, on .login-cta, is
+   guarded below). */
+
+/* A cyan glow focus ring on interactive elements: keyboard focus reads as a powered-up
+   HUD control. :focus-visible so it only shows for keyboard nav, not mouse clicks. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--bb-cyan),
+    0 0 8px rgba(51, 194, 255, 0.45);
+}
+
+/* A very faint scanline texture on panels — the CRT-console feel, dialed low enough to
+   read as grain rather than stripes. Layered over the panel's solid background color. */
+article {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(51, 194, 255, 0.022) 0,
+    rgba(51, 194, 255, 0.022) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Reduced-motion: hold the login CTA steady (no lift/transition). The focus ring and
+   scanlines are static and stay. */
+@media (prefers-reduced-motion: reduce) {
+  .login-cta {
+    transition: none;
+  }
+  .login-cta:hover,
+  .login-cta:focus-visible {
+    transform: none;
   }
 }

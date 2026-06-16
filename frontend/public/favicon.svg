@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Buyback">
+  <defs>
+    <linearGradient id="bb-cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5fd0ff" />
+      <stop offset="1" stop-color="#33c2ff" />
+    </linearGradient>
+  </defs>
+  <!-- Chamfered HUD panel (top-right corner cut), matching the app's angular panels. -->
+  <path d="M2 2 H23 L30 9 V30 H2 Z" fill="#0e1622" stroke="#1c3a4d" stroke-width="1.5" />
+  <!-- Angular bracket mark: a chevron + bar — a console "buyback" glyph. -->
+  <path d="M10 8 L18 16 L10 24" fill="none" stroke="url(#bb-cyan)" stroke-width="2.6"
+        stroke-linejoin="miter" stroke-linecap="square" />
+  <path d="M21 8 V24" stroke="#33c2ff" stroke-width="2.6" stroke-linecap="square" />
+</svg>
