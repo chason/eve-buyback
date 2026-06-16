@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from "./client"
+import { apiGet, apiSend, throwApiError } from "./client"
 import type { LocationCreateRequest, LocationOut } from "./types"
 
 export type { LocationCreateRequest, LocationOut, LocationKind } from "./types"
@@ -12,7 +12,7 @@ export async function addLocation(
   body: LocationCreateRequest,
 ): Promise<LocationOut> {
   const res = await apiSend("POST", "/corporations/me/locations", body)
-  if (!res.ok) throw new Error(`Add location failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Add location failed")
   return (await res.json()) as LocationOut
 }
 
@@ -22,5 +22,5 @@ export async function removeLocation(locationId: string): Promise<void> {
     "DELETE",
     `/corporations/me/locations/${encodeURIComponent(locationId)}`,
   )
-  if (!res.ok) throw new Error(`Remove location failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Remove location failed")
 }

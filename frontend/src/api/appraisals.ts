@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from "./client"
+import { apiGet, apiSend, throwApiError } from "./client"
 import type {
   AppraisalCreateRequest,
   AppraisalOut,
@@ -16,7 +16,7 @@ export async function createAppraisal(
   body: AppraisalCreateRequest,
 ): Promise<AppraisalOut> {
   const res = await apiSend("POST", "/appraisals", body)
-  if (!res.ok) throw new Error(`Appraisal failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Appraisal failed")
   return (await res.json()) as AppraisalOut
 }
 
