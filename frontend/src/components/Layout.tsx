@@ -28,17 +28,6 @@ export default function Layout() {
             <Link to="/" className="contrast">
               <strong>Buyback</strong>
             </Link>
-            {version.data && (
-              <small
-                style={{
-                  marginLeft: "0.4rem",
-                  fontSize: "0.7em",
-                  color: "var(--pico-muted-color)",
-                }}
-              >
-                v{version.data.version}
-              </small>
-            )}
           </li>
         </ul>
         {user && (
@@ -80,6 +69,11 @@ export default function Layout() {
       <main className="container">
         <Outlet />
       </main>
+      <footer className="hud-status">
+        <span className="hud-dot" aria-hidden="true" />
+        <span>Buyback{version.data ? ` v${version.data.version}` : ""}</span>
+        <span>· Node: {window.location.hostname}</span>
+      </footer>
     </>
   )
 }

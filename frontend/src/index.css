@@ -162,6 +162,97 @@ tr.reprocess-detail td {
   color: var(--pico-del-color, crimson);
 }
 
+/* HUD status chips (#44): uppercase, letter-spaced, mono, bordered pills that read
+   like console telemetry. The border/tint inherit the variant color via currentColor
+   so a variant only needs to set `color`. */
+.status {
+  display: inline-block;
+  font-family: var(--bb-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  white-space: nowrap;
+}
+
+.status--online,
+.status--accepted {
+  color: var(--bb-isk-green);
+}
+
+.status--expired,
+.status--rejected,
+.status--danger {
+  color: var(--bb-danger);
+}
+
+.status--offline,
+.status--muted {
+  color: var(--bb-muted);
+}
+
+/* The rejection reason sits next to a REJECTED chip — muted so the chip leads. */
+.status-reason {
+  color: var(--bb-muted);
+  margin-left: 0.4rem;
+}
+
+/* Fixed HUD status line pinned to the bottom of the viewport (#44): the app version
+   and serving node in mono, with a pulsing cyan "online" dot. */
+.hud-status {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 1rem;
+  font-family: var(--bb-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bb-muted);
+  background: rgba(7, 11, 16, 0.85);
+  border-top: 1px solid var(--bb-panel-border);
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+.hud-status .hud-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--bb-cyan);
+  box-shadow: 0 0 6px var(--bb-cyan);
+  animation: hud-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hud-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Respect reduced-motion: hold the dot steady (#44, #45). */
+@media (prefers-reduced-motion: reduce) {
+  .hud-status .hud-dot {
+    animation: none;
+  }
+}
+
+/* Keep page content clear of the fixed HUD line. */
+body {
+  padding-bottom: 2.5rem;
+}
+
 /* Autocomplete panel under the type / market-group search inputs: a dropdown that
    attaches to the box with hoverable rows — not a bare bulleted list. */
 .search-results {
