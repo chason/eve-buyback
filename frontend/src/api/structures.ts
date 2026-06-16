@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from "./client"
+import { apiGet, apiSend, throwApiError } from "./client"
 import type {
   StructureAuthorizeResponse,
   StructureSearchResult,
@@ -20,7 +20,7 @@ export const searchStructures = (q: string) =>
 /** Begin the structure-access grant: returns the EVE SSO URL to redirect to. */
 export async function beginStructureAuthorize(): Promise<StructureAuthorizeResponse> {
   const res = await apiSend("POST", "/corporations/me/structure-token/authorize")
-  if (!res.ok) throw new Error(`Authorize start failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Authorize start failed")
   return (await res.json()) as StructureAuthorizeResponse
 }
 
@@ -33,14 +33,14 @@ export async function completeStructureAuthorize(
     code,
     state,
   })
-  if (!res.ok) throw new Error(`Authorize failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Authorize failed")
   return (await res.json()) as StructureTokenStatus
 }
 
 /** Revoke the corp's structure authorization. */
 export async function revokeStructure(): Promise<void> {
   const res = await apiSend("DELETE", "/corporations/me/structure-token")
-  if (!res.ok) throw new Error(`Revoke failed: ${res.status}`)
+  if (!res.ok) await throwApiError(res, "Revoke failed")
 }
 
 // The login and structure flows share one /auth/callback. We route on the OAuth
