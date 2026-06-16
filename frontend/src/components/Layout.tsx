@@ -25,8 +25,16 @@ export default function Layout() {
       <nav className="container">
         <ul>
           <li>
-            <Link to="/" className="contrast">
-              <strong>Buyback</strong>
+            <Link to="/" className="brand">
+              <img
+                src="/favicon.svg"
+                alt=""
+                className="brand-logo"
+                width="22"
+                height="22"
+              />
+              <span className="brand-name">BUYBACK</span>
+              <span className="brand-codename">Corp&nbsp;Logistics</span>
             </Link>
           </li>
         </ul>
