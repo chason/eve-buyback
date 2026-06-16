@@ -471,6 +471,7 @@
           "default_percentage": {
             "anyOf": [
               {
+                "maximum": 1000.0,
                 "minimum": 0.0,
                 "type": "number"
               },
@@ -1001,6 +1002,7 @@
           "percentage": {
             "anyOf": [
               {
+                "maximum": 1000.0,
                 "minimum": 0.0,
                 "type": "number"
               },
@@ -1300,7 +1302,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "18"
+    "version": "20"
   },
   "openapi": "3.1.0",
   "paths": {
