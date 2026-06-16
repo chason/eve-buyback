@@ -1,5 +1,70 @@
 /* App-specific tweaks on top of Pico (ADR-0023). */
 
+/* EVE "Capsuleer Console" palette (#41). We force data-theme="dark" in index.html
+   and override Pico's dark tokens with a deep-space cyan scheme. The palette lives
+   in our own --bb-* tokens first so the rest of the app — and the design tickets
+   stacked on top of this one — can reuse it; those tokens are then mapped onto the
+   --pico-* variables Pico's own components read, so the theme cascades through the
+   existing semantic markup with no per-component styling. */
+:root {
+  --bb-void: #070b10; /* page background — deep space */
+  --bb-panel: #0e1622; /* cards / articles / nav */
+  --bb-panel-input: #0a121b; /* form fields — a touch darker than panels */
+  --bb-panel-border: #1c3a4d; /* hairline cyan-steel borders */
+  --bb-cyan: #33c2ff; /* primary accent — links, buttons, focus */
+  --bb-cyan-hover: #5fd0ff;
+  --bb-isk-green: #39e8a0; /* positive / ISK figures (used by later tickets) */
+  --bb-danger: #ff5d5d; /* errors, rejected lines */
+  --bb-text: #c7d3de; /* body copy */
+  --bb-heading: #e6eef5; /* brighter than body, for headings */
+  --bb-muted: #7d93a6; /* secondary / muted copy */
+}
+
+[data-theme="dark"] {
+  --pico-background-color: var(--bb-void);
+  --pico-color: var(--bb-text);
+  --pico-h1-color: var(--bb-heading);
+  --pico-h2-color: var(--bb-heading);
+  --pico-h3-color: var(--bb-heading);
+  --pico-h4-color: var(--bb-heading);
+  --pico-h5-color: var(--bb-heading);
+  --pico-h6-color: var(--bb-heading);
+  --pico-muted-color: var(--bb-muted);
+
+  /* Panels, cards, and every hairline border. */
+  --pico-card-background-color: var(--bb-panel);
+  --pico-card-sectioning-background-color: var(--bb-panel);
+  --pico-card-border-color: var(--bb-panel-border);
+  --pico-border-color: var(--bb-panel-border);
+  --pico-muted-border-color: var(--bb-panel-border);
+  --pico-table-border-color: var(--bb-panel-border);
+  --pico-accordion-border-color: var(--bb-panel-border);
+  --pico-blockquote-border-color: var(--bb-panel-border);
+
+  /* Primary accent — cyan links, buttons, focus rings. Dark text reads on cyan. */
+  --pico-primary: var(--bb-cyan);
+  --pico-primary-hover: var(--bb-cyan-hover);
+  --pico-primary-focus: rgba(51, 194, 255, 0.35);
+  --pico-primary-background: var(--bb-cyan);
+  --pico-primary-hover-background: var(--bb-cyan-hover);
+  --pico-primary-underline: rgba(51, 194, 255, 0.5);
+  --pico-primary-inverse: #04161f;
+  --pico-text-selection-color: rgba(51, 194, 255, 0.3);
+
+  /* Form fields. */
+  --pico-form-element-background-color: var(--bb-panel-input);
+  --pico-form-element-border-color: var(--bb-panel-border);
+  --pico-form-element-active-border-color: var(--bb-cyan);
+  --pico-form-element-focus-color: var(--bb-cyan);
+
+  /* Inline code / IDs. */
+  --pico-code-background-color: var(--bb-panel-input);
+  --pico-code-color: var(--bb-cyan);
+
+  /* Errors / deletions. */
+  --pico-del-color: var(--bb-danger);
+}
+
 .isk {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
