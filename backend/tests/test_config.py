@@ -37,6 +37,28 @@ def test_placeholder_allowed_in_development():
     assert settings.session_secret == INSECURE_SESSION_SECRET
 
 
+def test_unset_environment_fails_closed(monkeypatch):
+    # An unset BUYBACK_ENVIRONMENT must NOT silently relax the guards (#25): the
+    # default is production, so the placeholder secret refuses to boot.
+    monkeypatch.delenv("BUYBACK_ENVIRONMENT", raising=False)
+    settings = Settings(session_secret="a-real-strong-secret", _env_file=None)
+    assert settings.environment == "production"
+    assert settings.session_https_only is True
+    with pytest.raises(ValidationError):
+        Settings(session_secret=INSECURE_SESSION_SECRET, _env_file=None)
+
+
+def test_unknown_environment_treated_as_production():
+    # Only the exact value "development" relaxes the guards; anything else is
+    # treated as production (fail-closed).
+    with pytest.raises(ValidationError):
+        Settings(
+            environment="staging",
+            session_secret=INSECURE_SESSION_SECRET,
+            _env_file=None,
+        )
+
+
 # --- BUYBACK_TOKEN_ENCRYPTION_KEY is validated at startup (any environment) ---
 
 

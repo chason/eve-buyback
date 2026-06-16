@@ -34,7 +34,12 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "buyback"
-    environment: str = "development"
+    # Defaults to "production" so the security guards (Secure cookies, a real
+    # session secret, real structure-token key) fail **closed**: an unset or
+    # unknown BUYBACK_ENVIRONMENT is treated as production. Local dev must opt in
+    # explicitly with BUYBACK_ENVIRONMENT=development (see .env.example) — only
+    # that exact value relaxes the guards (#25).
+    environment: str = "production"
 
     # Path to the built SPA (frontend/dist). When set and present, the backend
     # serves it alongside /api/v1 as a single deployable (ADR-0012); empty in

@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,16 +8,33 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app._version import APP_VERSION
 from app.application.errors import ApplicationError
-from app.config import Settings, get_settings
+from app.config import INSECURE_SESSION_SECRET, Settings, get_settings
 from app.interface.errors import application_error_handler
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
 
+logger = logging.getLogger("app")
+
+
+def _warn_on_insecure_defaults(settings: Settings) -> None:
+    """Loudly flag insecure relaxations at boot. The model validators already
+    refuse to start production with placeholder secrets (#25); this surfaces the
+    development relaxation so it can't be mistaken for a hardened deployment."""
+    if settings.environment != "development":
+        return
+    if settings.session_secret == INSECURE_SESSION_SECRET:
+        logger.warning(
+            "Running in DEVELOPMENT mode: using the publicly known placeholder "
+            "session secret and non-Secure cookies. Never expose this to a public "
+            "network. Set BUYBACK_ENVIRONMENT=production with real secrets to deploy."
+        )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    _warn_on_insecure_defaults(settings)
     # Shared async HTTP client for outbound EVE SSO / ESI calls (eve-esi skill).
     app.state.http = httpx.AsyncClient(
         timeout=httpx.Timeout(20.0),
