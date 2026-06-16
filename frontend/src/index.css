@@ -19,15 +19,20 @@
   --bb-heading: #e6eef5; /* brighter than body, for headings */
   --bb-muted: #7d93a6; /* secondary / muted copy */
   --bb-danger-muted: #b0727a; /* dimmed danger — rejected (not-bought) rows */
-  /* Monospace stack for figures and grid headers; #43 (typography) can later point
-     this at a loaded technical mono (e.g. JetBrains Mono). */
-  --bb-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+  /* Condensed display face for headings + grid headers — the technical EVE look
+     (#43). Loaded in index.html; falls back to a condensed system sans. */
+  --bb-display: "Chakra Petch", "Saira Condensed", system-ui, sans-serif;
+  /* Monospace for figures, IDs, and code so they read like a market terminal (#43);
+     falls back to the platform mono if the webfont hasn't loaded. */
+  --bb-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas,
     "Liberation Mono", monospace;
 }
 
 [data-theme="dark"] {
   --pico-background-color: var(--bb-void);
   --pico-color: var(--bb-text);
+  /* Route Pico's monospace family (code, kbd, pre) to our technical mono (#43). */
+  --pico-font-family-monospace: var(--bb-mono);
   --pico-h1-color: var(--bb-heading);
   --pico-h2-color: var(--bb-heading);
   --pico-h3-color: var(--bb-heading);
@@ -98,13 +103,26 @@ article,
     0 0 28px rgba(51, 194, 255, 0.05);
 }
 
-/* Market-data grid (#47): tables read like a terminal ledger — uppercase mono
-   column headers, thin cyan-tinted row borders, a subtle hover glow on data rows,
-   and muted-red rejected (not-bought) rows. */
+/* Condensed display face for headings — the technical EVE look (#43). Body copy
+   stays Pico's clean system sans. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--bb-display);
+  letter-spacing: 0.01em;
+}
+
+/* Market-data grid (#47): tables read like a terminal ledger — uppercase column
+   headers, thin cyan-tinted row borders, a subtle hover glow on data rows, and
+   muted-red rejected (not-bought) rows. Headers use the condensed display face
+   (#43) rather than mono — the two reinforce each other in the header row. */
 th {
-  font-family: var(--bb-mono);
+  font-family: var(--bb-display);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   font-size: 0.8125rem;
   color: var(--bb-muted);
 }
