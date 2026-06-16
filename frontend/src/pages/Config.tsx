@@ -162,12 +162,18 @@ export default function Config() {
           <>
             {authorized ? (
               <p>
+                <span
+                  className={`status ${
+                    structureStatus.data?.expired
+                      ? "status--expired"
+                      : "status--online"
+                  }`}
+                >
+                  {structureStatus.data?.expired ? "Expired" : "Online"}
+                </span>{" "}
                 Structure access: connected as{" "}
                 <strong>{structureStatus.data?.character_name}</strong>
-                {structureStatus.data?.expired && (
-                  <span className="error"> — expired, please re-authorize</span>
-                )}
-                .{" "}
+                {structureStatus.data?.expired && " — please re-authorize"}.{" "}
                 <a
                   href="#"
                   onClick={(e) => {
@@ -180,7 +186,8 @@ export default function Config() {
               </p>
             ) : (
               <p>
-                Authorize structure access to search and price at a structure.
+                <span className="status status--offline">Offline</span> Authorize
+                structure access to search and price at a structure.
               </p>
             )}
             <button
