@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from cryptography.fernet import Fernet
 from pydantic import model_validator
@@ -58,6 +59,14 @@ class Settings(BaseSettings):
     # Max concurrent ESI region-order requests when pricing a non-Fuzzwork hub
     # (one request per type; ADR-0028). Keep modest to respect ESI's error budget.
     esi_market_concurrency: int = 8
+
+    # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
+    # is an in-process LRU; set "memcached" + the address to share across processes.
+    cache_backend: Literal["memory", "memcached"] = "memory"
+    memcached_addr: str = "localhost:11211"  # host:port
+    # L1 freshness — keep ≤ market_cache_ttl_seconds (the durable DB tier).
+    market_l1_cache_ttl_seconds: int = 60
+    cache_max_entries: int = 10_000  # MemoryCache LRU bound
 
     # Session cookie signing (ADR-0004). CHANGE in production.
     session_secret: str = INSECURE_SESSION_SECRET

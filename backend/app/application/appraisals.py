@@ -40,6 +40,7 @@ from app.domain.ids import generate_appraisal_id
 from app.domain.market import FUZZWORK_HUB_NAMES, HubDescriptor
 from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
+from app.plugins.cache import Cache
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.fuzzwork import FuzzworkClient
 from app.plugins.sso import EveSsoClient
@@ -74,6 +75,7 @@ async def create_appraisal(
     items: list[AppraisalItem],
     paste: str | None,
     delivery_location_id: str | None = None,
+    cache: Cache | None = None,
     now: datetime,
 ) -> AppraisalRecord:
     corp = await get_registered_corporation(session, user.corporation_id)  # 404 if not
@@ -210,6 +212,7 @@ async def create_appraisal(
             type_ids=sorted(ids),
             now=now,
             structure_token_provider=structure_token_provider,
+            cache=cache,
         )
         price_maps.setdefault(bucket_hub.hub_id, {}).update(
             {p.type_id: p for p in prices}

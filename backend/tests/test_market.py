@@ -5,9 +5,11 @@ import httpx
 
 from app.application.market import get_market_prices
 from app.data.db import SessionLocal
+from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
 from app.domain.aggregates import OrderBookAggregate, SideAggregate
 from app.domain.market import HubDescriptor
+from app.plugins.cache import MemoryCache, get_model, safe_key, set_model
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide
 
 HUB = "60003760"  # Jita — a Fuzzwork hub
@@ -225,3 +227,85 @@ async def test_esi_outage_serves_stale_cache():
     assert esi.region_calls == 1
     assert [r.type_id for r in result] == [34]
     assert result[0].buy_percentile == Decimal("1.0")
+
+
+# --- L1 cache tier (ADR-0033) ---
+
+
+def _spy_get_prices(monkeypatch) -> dict:
+    """Count DB-cache reads so an L1 hit can be proven to skip the DB."""
+    counter = {"n": 0}
+    original = prices_repo.get_prices
+
+    async def counting(*args, **kwargs):
+        counter["n"] += 1
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "app.application.market.prices_repo.get_prices", counting
+    )
+    return counter
+
+
+async def test_l1_hit_skips_db_and_source(monkeypatch):
+    cache = MemoryCache()
+    # Prime L1 directly with a record for type 34.
+    seeded = MarketPriceRecord(hub_id=HUB, **_price_row(34, "7.0", NOW))
+    await set_model(cache, safe_key("mp", HUB, 34), seeded, ttl_seconds=60)
+
+    db_reads = _spy_get_prices(monkeypatch)
+    fuzz = FakeFuzzwork(response={34: _aggregate(buy="99.0", sell="99.0")})
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, fuzz, FakeEsiMarket(), hub=FUZ_HUB, type_ids=[34], now=NOW,
+            cache=cache,
+        )
+    assert db_reads["n"] == 0          # never touched the DB
+    assert fuzz.calls == 0             # never touched the source
+    assert result[0].buy_percentile == Decimal("7.0")
+    # sanity: the helper used above resolves the same key the use case writes
+    assert await get_model(cache, safe_key("mp", HUB, 34), MarketPriceRecord)
+
+
+async def test_l1_populated_from_fresh_db():
+    await _seed_cache([_price_row(34, marker="2.0", fetched_at=NOW)])  # fresh DB row
+    cache = MemoryCache()
+    fuzz = FakeFuzzwork()
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, fuzz, FakeEsiMarket(), hub=FUZ_HUB, type_ids=[34], now=NOW,
+            cache=cache,
+        )
+    assert fuzz.calls == 0  # DB was fresh
+    assert result[0].buy_percentile == Decimal("2.0")
+    promoted = await get_model(cache, safe_key("mp", HUB, 34), MarketPriceRecord)
+    assert promoted is not None and promoted.buy_percentile == Decimal("2.0")
+
+
+async def test_l1_populated_from_source_fetch():
+    cache = MemoryCache()  # empty L1, empty DB
+    fuzz = FakeFuzzwork(response={34: _aggregate(buy="5.0", sell="8.0")})
+    async with SessionLocal() as session:
+        await get_market_prices(
+            session, fuzz, FakeEsiMarket(), hub=FUZ_HUB, type_ids=[34], now=NOW,
+            cache=cache,
+        )
+    assert fuzz.calls == 1
+    cached = await get_model(cache, safe_key("mp", HUB, 34), MarketPriceRecord)
+    assert cached is not None and cached.buy_percentile == Decimal("5.0")
+
+
+async def test_l1_not_poisoned_by_stale_fallback():
+    stale_at = NOW - timedelta(seconds=7200)
+    await _seed_cache([_price_row(34, marker="1.0", fetched_at=stale_at)])
+    cache = MemoryCache()
+    fuzz = FakeFuzzwork(error=httpx.HTTPError("fuzzwork down"))
+    async with SessionLocal() as session:
+        result = await get_market_prices(
+            session, fuzz, FakeEsiMarket(), hub=FUZ_HUB, type_ids=[34], now=NOW,
+            cache=cache,
+        )
+    # Serves stale from the DB, but never writes stale data into L1 (so the next
+    # request retries the source rather than locking in a stale value).
+    assert result[0].buy_percentile == Decimal("1.0")
+    assert await get_model(cache, safe_key("mp", HUB, 34), MarketPriceRecord) is None

@@ -7,6 +7,7 @@ from app.application import appraisals as appraisals_app
 from app.application.appraisals import AppraisalItem
 from app.interface.deps import SessionDep
 from app.interface.security import RequireUser
+from app.plugins.cache import Cache, get_cache
 from app.plugins.esi_market import EsiMarketClient, get_esi_market_client
 from app.plugins.fuzzwork import FuzzworkClient, get_fuzzwork_client
 from app.plugins.sso import EveSsoClient, get_sso_client
@@ -23,6 +24,7 @@ FuzzworkDep = Annotated[FuzzworkClient, Depends(get_fuzzwork_client)]
 EsiMarketDep = Annotated[EsiMarketClient, Depends(get_esi_market_client)]
 SsoDep = Annotated[EveSsoClient, Depends(get_sso_client)]
 CipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
+CacheDep = Annotated[Cache, Depends(get_cache)]
 
 
 @router.post("", response_model=AppraisalOut, status_code=status.HTTP_201_CREATED)
@@ -34,6 +36,7 @@ async def create_appraisal(
     esi_market: EsiMarketDep,
     sso: SsoDep,
     cipher: CipherDep,
+    cache: CacheDep,
 ) -> AppraisalOut:
     items = [
         AppraisalItem(type_id=i.type_id, quantity=i.quantity) for i in payload.items
@@ -48,6 +51,7 @@ async def create_appraisal(
         items=items,
         paste=payload.paste,
         delivery_location_id=payload.delivery_location_id,
+        cache=cache,
         now=datetime.now(UTC),
     )
     return AppraisalOut(**record.model_dump())

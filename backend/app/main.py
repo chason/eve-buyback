@@ -13,6 +13,7 @@ from app.interface.errors import application_error_handler
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
+from app.plugins.cache import build_cache
 
 logger = logging.getLogger("app")
 
@@ -40,7 +41,10 @@ async def lifespan(app: FastAPI):
         timeout=httpx.Timeout(20.0),
         headers={"User-Agent": f"{settings.app_name}/{app.version} (EVE buyback)"},
     )
+    # Process-wide cache backing the market-price L1 tier (ADR-0033).
+    app.state.cache = build_cache(settings)
     yield
+    await app.state.cache.aclose()
     await app.state.http.aclose()
 
 

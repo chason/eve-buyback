@@ -47,7 +47,7 @@ buyback/
 │   │   ├── application/  # APPLICATION: use cases (auth, corporations, sde, market, reference, pricing, appraisals, locations) + typed errors
 │   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers, market TTL, pricing/resolution)
 │   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
-│   │   ├── plugins/      # PLUGINS: outside-API gateways (EVE ESI, SSO, Fuzzwork, SDE source); return pydantic
+│   │   ├── plugins/      # PLUGINS: outside-resource gateways (EVE ESI, SSO, Fuzzwork, SDE source, cache); return pydantic
 │   │   ├── schemas/      # API request/response DTOs (interface contracts)
 │   │   ├── sde/          # deploy-time SDE seed CLI (python -m app.sde.seed)
 │   │   └── openapi_export.py  # writes frontend/openapi.json for TS type-gen (ADR-0011)
