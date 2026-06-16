@@ -242,19 +242,25 @@ describe("Rules", () => {
     )
     const box = screen.getByLabelText("Search market group by name")
 
-    // A non-ore group → no Reprocess checkbox.
+    // A non-ore group → no Reprocess checkbox and no Compressed-only hint.
     await u.type(box, "ship equipment")
     await u.click(await screen.findByText("Ship Equipment"))
     expect(
       screen.queryByLabelText("Reprocess (ore → minerals)"),
     ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/rejects the uncompressed variants/i),
+    ).not.toBeInTheDocument()
 
-    // Switch to an ore branch → the checkbox appears.
+    // Switch to an ore branch → the checkbox and its explanatory hint appear.
     await u.clear(box)
     await u.type(box, "standard ores")
     await u.click(await screen.findByText("Standard Ores"))
     expect(
       screen.getByLabelText("Reprocess (ore → minerals)"),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/rejects the uncompressed variants/i),
     ).toBeInTheDocument()
   })
 

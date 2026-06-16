@@ -438,6 +438,12 @@ function AddRule({
                 </label>
               </div>
             )}
+            {reprocessEligible && (
+              <small className="field-hint">
+                <strong>Compressed only</strong> rejects the uncompressed variants
+                of matched ores — only the <em>Compressed</em> versions are bought.
+              </small>
+            )}
           </>
         ) : (
           <p>
