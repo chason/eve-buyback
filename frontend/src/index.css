@@ -65,6 +65,34 @@
   --pico-del-color: var(--bb-danger);
 }
 
+/* Deep-space backdrop (#45): a radial wash from a lighter top down into the void,
+   plus a faint, fixed starfield scattered with low-opacity dots. Pure CSS — no image
+   assets. The whole thing is static (no animation), so there's no motion to guard. */
+body {
+  background-color: var(--bb-void);
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(199, 211, 222, 0.5), transparent),
+    radial-gradient(1px 1px at 28% 64%, rgba(199, 211, 222, 0.35), transparent),
+    radial-gradient(1px 1px at 47% 13%, rgba(199, 211, 222, 0.45), transparent),
+    radial-gradient(1px 1px at 63% 48%, rgba(199, 211, 222, 0.3), transparent),
+    radial-gradient(1px 1px at 78% 28%, rgba(199, 211, 222, 0.45), transparent),
+    radial-gradient(1px 1px at 88% 72%, rgba(199, 211, 222, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 35% 84%, rgba(95, 208, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 70% 90%, rgba(95, 208, 255, 0.3), transparent),
+    radial-gradient(ellipse 120% 80% at 50% 0%, #10202e 0%, var(--bb-void) 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* A faint holographic glow lifts panels off the void: a cyan hairline outline plus
+   a soft low-opacity bloom (#45). */
+article,
+.flow-step {
+  box-shadow:
+    0 0 0 1px rgba(51, 194, 255, 0.08),
+    0 0 28px rgba(51, 194, 255, 0.05);
+}
+
 .isk {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
