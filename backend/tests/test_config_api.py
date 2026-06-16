@@ -150,6 +150,25 @@ async def test_config_rejects_bad_basis():
         assert resp.status_code == 422  # Literal rejects the bad enum
 
 
+@pytest.mark.parametrize("pct", ["-1", "100000"])
+async def test_config_rejects_out_of_range_percentage(pct: str):
+    # default_percentage is bounded [0, MAX_PERCENTAGE] (#28): a negative or an
+    # absurdly large value is rejected before it reaches the DB.
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/config",
+            json={
+                "market_hub_id": "60003760",
+                "default_basis": "buy",
+                "default_percentage": pct,
+                "aggregate_field": "percentile",
+            },
+        )
+        assert resp.status_code == 422
+
+
 async def test_non_fuzzwork_station_resolves_region_from_sde():
     # A non-Fuzzwork station is resolved from the seeded SDE (region + label).
     async with SessionLocal() as session:

@@ -5,6 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, TargetKind
 
+# A buyback percentage is a share of market value, so even a generous "above
+# market" rule stays well under this. The cap just rejects absurd or fat-fingered
+# input (e.g. a stray extra digit); the exact ceiling isn't otherwise meaningful (#28).
+MAX_PERCENTAGE = Decimal(1000)
+
 
 class ConfigOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -31,7 +36,7 @@ class ConfigUpdateRequest(BaseModel):
     market_hub_kind: HubKind = "npc_station"
     market_hub_name: str | None = None
     default_basis: Basis
-    default_percentage: Decimal = Field(ge=0)
+    default_percentage: Decimal = Field(ge=0, le=MAX_PERCENTAGE)
     aggregate_field: AggregateField
     default_accepted: bool = True
 
@@ -66,7 +71,7 @@ class RulePutRequest(BaseModel):
     the hub fields clears any hub override (ADR-0031)."""
 
     basis: Basis | None = None
-    percentage: Decimal = Field(ge=0)
+    percentage: Decimal = Field(ge=0, le=MAX_PERCENTAGE)
     enabled: bool = True
     reprocess: bool = False
     compressed_only: bool = False

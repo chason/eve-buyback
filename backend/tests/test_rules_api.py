@@ -72,6 +72,20 @@ async def test_put_rule_lifecycle():
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
 
 
+@pytest.mark.parametrize("pct", ["-1", "100000"])
+async def test_put_rule_rejects_out_of_range_percentage(pct: str):
+    # A rule's percentage is bounded [0, MAX_PERCENTAGE] (#28), same as the config
+    # default: a negative or absurdly large value is rejected.
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": pct}
+        )
+        assert resp.status_code == 422
+
+
 async def test_put_rule_reprocess_round_trips():
     await _seed_sde()
     async with make_client(CeoEsi()) as http:
