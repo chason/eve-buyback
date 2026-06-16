@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 
 import { beginLogin, getMe, registerCorporation, type SessionUser } from "../api/auth"
+import { roleLabel } from "../lib/roles"
 
 function CorporationStatus({ user }: { user: SessionUser }) {
   const queryClient = useQueryClient()
@@ -103,7 +104,7 @@ export default function Home() {
           <section>
             <p>
               Logged in as <strong>{me.data.character_name}</strong> — role{" "}
-              <code>{me.data.role}</code>
+              <strong>{roleLabel(me.data.role)}</strong>
             </p>
             <CorporationStatus user={me.data} />
           </section>
