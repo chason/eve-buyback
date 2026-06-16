@@ -44,8 +44,13 @@ async def lifespan(app: FastAPI):
     # Process-wide cache backing the market-price L1 tier (ADR-0033).
     app.state.cache = build_cache(settings)
     yield
-    await app.state.cache.aclose()
-    await app.state.http.aclose()
+    # Guarded + ordered: a failing cache close must not skip the HTTP client close.
+    try:
+        await app.state.cache.aclose()
+    except Exception:  # noqa: BLE001 — teardown is best-effort
+        logger.exception("cache aclose failed during shutdown")
+    finally:
+        await app.state.http.aclose()
 
 
 def create_app() -> FastAPI:

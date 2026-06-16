@@ -42,6 +42,13 @@ tier in front of the durable `market_prices` DB cache** (L2).
 - **Only fresh data enters L1.** On a source outage the request still degrades to
   *stale* DB rows (ADR-0028), but those are **not** written to L1, so the next request
   retries the source instead of locking in a stale value.
+- **L1 is best-effort, never a hard dependency.** The memcached adapter bounds every
+  operation with a timeout and swallows transport errors: a `get` degrades to a miss, a
+  `set`/`delete` to a no-op. So an unreachable or slow memcached degrades to the durable
+  DB tier instead of failing the request — the same posture as a source outage. Boot
+  validators enforce `market_l1_cache_ttl_seconds ≤ market_cache_ttl_seconds` and a
+  well-formed `memcached_addr`, so an L1 entry can't outlive the DB freshness window and
+  a bad address fails in the deploy logs rather than inside the app lifespan.
 - The **DB stays the durable tier**: it survives restarts/deploys, so a redeploy
   doesn't cold-hit ESI (whose error budget we must respect). memcached, like the memory
   cache, is empty on restart — hence L1, not replacement.
@@ -56,6 +63,11 @@ tier in front of the durable `market_prices` DB cache** (L2).
   (`market_l1_cache_ttl_seconds`, default 60s) is independent of and ≤ the DB TTL.
 - The port is reusable for other lookups later (SDE, structure names) but only market
   prices use it now.
+- **Security:** memcached is an **unauthenticated** trust boundary — anything that can
+  reach the port can read or poison cached prices (L1 hits win over the DB and source).
+  Operators must bind it to loopback or a private/firewalled network and never expose it
+  publicly (documented in `config.py` and `.env.example`). The in-process default has no
+  such surface.
 
 ## Alternatives considered
 

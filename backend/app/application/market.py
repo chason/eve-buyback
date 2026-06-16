@@ -128,6 +128,10 @@ async def get_market_prices(
     l1_ttl = settings.market_l1_cache_ttl_seconds
 
     def l1_key(tid: int) -> str:
+        # Keyed on hub_id only (matching the hub_id-keyed DB cache): the cached
+        # aggregate is independent of region_id/kind — those only steer which source
+        # fills a miss (resolve_market_source), not the cached content. Revisit this
+        # (and the DB key) if cached content ever becomes region/kind-dependent.
         return safe_key("mp", hub.hub_id, tid)
 
     # L1: hits are fresh by construction (the cache TTL enforces it).

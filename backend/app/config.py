@@ -62,9 +62,15 @@ class Settings(BaseSettings):
 
     # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
     # is an in-process LRU; set "memcached" + the address to share across processes.
+    # SECURITY: memcached is UNAUTHENTICATED — bind it to loopback or a private/
+    # firewalled network. Anything that can reach the port can read/poison cached
+    # prices (L1 hits win over the DB and source). Never expose 11211 publicly.
     cache_backend: Literal["memory", "memcached"] = "memory"
     memcached_addr: str = "localhost:11211"  # host:port
-    # L1 freshness — keep ≤ market_cache_ttl_seconds (the durable DB tier).
+    # Per-op timeout for the memcached backend; on timeout the L1 op degrades to a
+    # miss/no-op (best-effort), so a slow node can't stall requests.
+    memcached_timeout_seconds: float = 1.0
+    # L1 freshness — enforced ≤ market_cache_ttl_seconds at boot (the durable DB tier).
     market_l1_cache_ttl_seconds: int = 60
     cache_max_entries: int = 10_000  # MemoryCache LRU bound
 
@@ -139,6 +145,41 @@ class Settings(BaseSettings):
                 'print(Fernet.generate_key().decode())" — or unset it entirely if '
                 "you don't price at player structures."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_l1_ttl_within_db_ttl(self) -> "Settings":
+        """The L1 cache (ADR-0033) must not outlive the durable DB freshness window —
+        an L1 hit is served without an `is_fresh` check, so a longer L1 TTL would serve
+        prices staler than the DB tier permits. Fail at boot rather than silently."""
+        if self.market_l1_cache_ttl_seconds > self.market_cache_ttl_seconds:
+            raise ValueError(
+                "BUYBACK_MARKET_L1_CACHE_TTL_SECONDS "
+                f"({self.market_l1_cache_ttl_seconds}) must be ≤ "
+                "BUYBACK_MARKET_CACHE_TTL_SECONDS "
+                f"({self.market_cache_ttl_seconds}); a longer L1 TTL would serve "
+                "prices staler than the durable DB cache allows (ADR-0033)."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _require_valid_memcached_addr(self) -> "Settings":
+        """Parse `memcached_addr` at boot when the memcached backend is selected, so a
+        bad host:port fails in the deploy logs instead of raising inside the app
+        lifespan (which would leak the already-created HTTP client)."""
+        if self.cache_backend != "memcached":
+            return self
+        _, sep, port = self.memcached_addr.partition(":")
+        if sep and port:
+            try:
+                p = int(port)
+            except ValueError:
+                p = -1
+            if not (1 <= p <= 65535):
+                raise ValueError(
+                    "BUYBACK_MEMCACHED_ADDR must be 'host' or 'host:port' with a port "
+                    f"in 1..65535; got {self.memcached_addr!r}."
+                )
         return self
 
 

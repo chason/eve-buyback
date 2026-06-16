@@ -1,12 +1,14 @@
 """The pluggable cache plugin (ADR-0033): MemoryCache semantics, the model helpers,
 the safe-key contract, the backend factory, and the memcached adapter wiring."""
 
+import asyncio
 import hashlib
 
 from pydantic import BaseModel
 
 from app.config import Settings
 from app.plugins.cache import (
+    _MAX_EXPTIME,
     MemcachedCache,
     MemoryCache,
     build_cache,
@@ -139,3 +141,72 @@ async def test_memcached_adapter_encodes_keys_and_passes_ttl():
         ("delete", b"k"),
         ("close",),
     ]
+
+
+async def test_memcached_clamps_ttl_to_relative_window():
+    # memcached reads exptime 0 as "never" and > 30 days as an absolute timestamp;
+    # the adapter must clamp into the 1..30-day relative window.
+    cache = MemcachedCache("localhost:11211")
+    fake = _FakeMC()
+    cache._client = fake
+    await cache.set("a", b"v", ttl_seconds=0)
+    await cache.set("b", b"v", ttl_seconds=10**9)
+    exptimes = [c[3] for c in fake.calls if c[0] == "set"]
+    assert exptimes == [1, _MAX_EXPTIME]
+
+
+class _FailingMC:
+    async def get(self, key):
+        raise ConnectionRefusedError("memcached down")
+
+    async def set(self, key, value, exptime):
+        raise ConnectionRefusedError("memcached down")
+
+    async def delete(self, key):
+        raise ConnectionRefusedError("memcached down")
+
+    async def close(self):
+        raise ConnectionRefusedError("memcached down")
+
+
+async def test_memcached_best_effort_swallows_backend_errors():
+    # An unreachable memcached must degrade to a miss / no-op, never raise.
+    cache = MemcachedCache("localhost:11211")
+    cache._client = _FailingMC()
+    assert await cache.get("k") is None  # miss
+    await cache.set("k", b"v", ttl_seconds=30)  # no-op, no raise
+    await cache.delete("k")  # no-op, no raise
+    await cache.aclose()  # best-effort, no raise
+
+
+class _HangingMC:
+    async def get(self, key):
+        await asyncio.Event().wait()  # never resolves
+
+    async def set(self, key, value, exptime):
+        await asyncio.Event().wait()
+
+    async def delete(self, key):
+        await asyncio.Event().wait()
+
+    async def close(self):
+        pass
+
+
+async def test_memcached_times_out_to_miss():
+    # A slow/hung node must not stall the caller — the per-op timeout degrades to miss.
+    cache = MemcachedCache("localhost:11211", timeout_seconds=0.05)
+    cache._client = _HangingMC()
+    assert await cache.get("k") is None
+    await cache.set("k", b"v", ttl_seconds=30)  # times out → no-op, no raise
+
+
+def test_build_cache_threads_memcached_timeout():
+    cache = build_cache(
+        Settings(
+            cache_backend="memcached", memcached_addr="localhost:11211",
+            memcached_timeout_seconds=2.5, environment="development", _env_file=None,
+        )
+    )
+    assert isinstance(cache, MemcachedCache)
+    assert cache._timeout == 2.5
