@@ -4,6 +4,7 @@
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.plugins.cache import MemoryCache, get_cache
 from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
 from app.plugins.esi_market import get_esi_market_client
 from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
@@ -70,6 +71,11 @@ def make_client(esi: BaseEsi) -> AsyncClient:
     app.dependency_overrides[get_sso_client] = lambda: FakeSso()
     app.dependency_overrides[get_esi_client] = lambda: esi
     app.dependency_overrides[get_esi_market_client] = lambda: FakeEsiMarket()
+    # The ASGI transport doesn't run the lifespan, so app.state.cache is unset. Close
+    # over ONE cache so it persists across requests like the production singleton
+    # (get_cache returns the process-wide app.state.cache), not a fresh one per call.
+    cache = MemoryCache()
+    app.dependency_overrides[get_cache] = lambda: cache
     return AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",

@@ -94,3 +94,37 @@ def test_placeholder_token_key_boots_but_is_not_configured_in_production():
         _env_file=None,
     )
     assert settings.structure_tokens_configured is False
+
+
+# --- cache config validators (ADR-0033) ---
+
+
+def _dev(**kw):
+    # environment=development relaxes the secret/key guards so we isolate cache checks.
+    return Settings(environment="development", _env_file=None, **kw)
+
+
+def test_l1_ttl_must_not_exceed_db_ttl():
+    with pytest.raises(ValidationError, match="L1_CACHE_TTL"):
+        _dev(market_l1_cache_ttl_seconds=7200, market_cache_ttl_seconds=3600)
+
+
+def test_l1_ttl_within_db_ttl_ok():
+    s = _dev(market_l1_cache_ttl_seconds=60, market_cache_ttl_seconds=3600)
+    assert s.market_l1_cache_ttl_seconds == 60
+
+
+def test_bad_memcached_addr_rejected_when_selected():
+    with pytest.raises(ValidationError, match="MEMCACHED_ADDR"):
+        _dev(cache_backend="memcached", memcached_addr="localhost:not-a-port")
+
+
+def test_bad_memcached_addr_ignored_when_memory_backend():
+    # The address is only parsed when the memcached backend is actually selected.
+    s = _dev(cache_backend="memory", memcached_addr="localhost:not-a-port")
+    assert s.cache_backend == "memory"
+
+
+def test_good_memcached_addr_accepted():
+    assert _dev(cache_backend="memcached", memcached_addr="cache.host:11211")
+    assert _dev(cache_backend="memcached", memcached_addr="cache.host")  # host only

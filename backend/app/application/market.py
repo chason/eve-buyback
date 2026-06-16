@@ -23,6 +23,7 @@ from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
 from app.domain.market import HubDescriptor, is_fresh, resolve_market_source
+from app.plugins.cache import Cache, get_model, safe_key, set_model
 from app.plugins.esi_market import EsiMarketClient, StructureAccessDenied
 from app.plugins.fuzzwork import FuzzworkClient
 
@@ -112,23 +113,57 @@ async def get_market_prices(
     type_ids: list[int],
     now,
     structure_token_provider: StructureTokenProvider | None = None,
+    cache: Cache | None = None,
 ) -> list[MarketPriceRecord]:
+    """Read prices through three tiers (ADR-0033): the pluggable L1 cache (in-memory
+    or memcached), then the durable `market_prices` DB cache, then the hub's source.
+    `cache=None` skips L1 (identical to the prior two-tier behavior). Only fresh data
+    is promoted into L1, so a source outage still degrades to stale DB rows without
+    poisoning the cache."""
     if not type_ids:
         return []
 
-    ttl = get_settings().market_cache_ttl_seconds
-    cached = {
-        r.type_id: r
-        for r in await prices_repo.get_prices(
-            session, hub_id=hub.hub_id, type_ids=type_ids
-        )
-    }
+    settings = get_settings()
+    ttl = settings.market_cache_ttl_seconds
+    l1_ttl = settings.market_l1_cache_ttl_seconds
+
+    def l1_key(tid: int) -> str:
+        # Keyed on hub_id only (matching the hub_id-keyed DB cache): the cached
+        # aggregate is independent of region_id/kind — those only steer which source
+        # fills a miss (resolve_market_source), not the cached content. Revisit this
+        # (and the DB key) if cached content ever becomes region/kind-dependent.
+        return safe_key("mp", hub.hub_id, tid)
+
+    # L1: hits are fresh by construction (the cache TTL enforces it).
+    l1_hits: dict[int, MarketPriceRecord] = {}
+    if cache is not None:
+        for tid in type_ids:
+            record = await get_model(cache, l1_key(tid), MarketPriceRecord)
+            if record is not None:
+                l1_hits[tid] = record
+
+    # L2 (DB) for the L1 misses; promote the fresh ones into L1.
+    l2_ids = [tid for tid in type_ids if tid not in l1_hits]
+    cached = (
+        {
+            r.type_id: r
+            for r in await prices_repo.get_prices(
+                session, hub_id=hub.hub_id, type_ids=l2_ids
+            )
+        }
+        if l2_ids
+        else {}
+    )
     fresh = {
         tid: r
         for tid, r in cached.items()
         if is_fresh(r.fetched_at, now=now, ttl_seconds=ttl)
     }
-    to_fetch = [tid for tid in type_ids if tid not in fresh]
+    if cache is not None:
+        for tid, record in fresh.items():
+            await set_model(cache, l1_key(tid), record, ttl_seconds=l1_ttl)
+
+    to_fetch = [tid for tid in l2_ids if tid not in fresh]
 
     refreshed: dict[int, MarketPriceRecord] = {}
     if to_fetch:
@@ -146,11 +181,19 @@ async def get_market_prices(
                 row["type_id"]: MarketPriceRecord(hub_id=hub.hub_id, **row)
                 for row in rows
             }
+            if cache is not None:
+                for tid, record in refreshed.items():
+                    await set_model(cache, l1_key(tid), record, ttl_seconds=l1_ttl)
 
-    # Prefer fresh-fetched, fall back to stale cache, omit the never-priced.
+    # Prefer L1, then fresh-fetched, then fresh DB, then stale cache; omit never-priced.
     result: list[MarketPriceRecord] = []
     for tid in type_ids:
-        record = refreshed.get(tid) or fresh.get(tid) or cached.get(tid)
+        record = (
+            l1_hits.get(tid)
+            or refreshed.get(tid)
+            or fresh.get(tid)
+            or cached.get(tid)
+        )
         if record is not None:
             result.append(record)
     return result

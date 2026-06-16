@@ -48,6 +48,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 30 | **Accepted drop-off locations** per corp; chosen at appraisal time, snapshotted | [0030](adr/0030-buyback-drop-off-locations.md) |
 | 31 | **Per-rule market-hub override**; appraisals fetch per hub, lines snapshot theirs | [0031](adr/0031-per-rule-market-hub.md) |
 | 32 | **Automated version bump on merge** (CI commits the +1; PRs don't touch it) | [0032](adr/0032-automated-version-bump.md) |
+| 33 | **Pluggable cache** (L1) in front of the market_prices DB cache; memory→memcached by config | [0033](adr/0033-pluggable-cache.md) |
 
 ## 3. System context
 
@@ -174,7 +175,12 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
   returns per-`type_id` `buy`/`sell` objects (`weightedAverage`, `max`, `min`,
   `median`, `percentile`, `volume`, `orderCount`).
 - Batch requests by type id; **cache** rows in `MarketPrice` with `fetched_at`,
-  TTL ~1h. Quotes read cache first, fetch misses/stale on demand.
+  TTL ~1h (the durable **L2** tier). Quotes read cache first, fetch misses/stale on demand.
+- A pluggable **L1 cache** sits in front of that DB cache
+  ([ADR-0033](adr/0033-pluggable-cache.md)): a backend-agnostic port (`plugins/cache.py`)
+  with an in-process `MemoryCache` default, swappable to **memcached** via
+  `BUYBACK_CACHE_BACKEND` alone (no call-site changes) for multi-process/tenant sharing.
+  Only fresh prices are promoted into L1; a source outage still degrades to stale L2.
 - Optional periodic refresh of "hot" types via the in-process scheduler
   ([ADR-0010](adr/0010-in-process-scheduling.md)) — no Redis/Celery.
 
