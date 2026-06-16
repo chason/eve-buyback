@@ -169,7 +169,18 @@ export default function Appraisal() {
                   {line.unit_price ? formatIsk(line.unit_price) : "—"}
                 </td>
                 <td className="num isk">{formatIsk(line.line_total)}</td>
-                <td>{line.status === "accepted" ? "✓" : line.reason}</td>
+                <td>
+                  {line.status === "accepted" ? (
+                    <span className="status status--accepted">Accepted</span>
+                  ) : (
+                    <>
+                      <span className="status status--rejected">Rejected</span>
+                      {line.reason && (
+                        <small className="status-reason">{line.reason}</small>
+                      )}
+                    </>
+                  )}
+                </td>
               </tr>
               {line.reprocess && (
                 <tr className="reprocess-detail">
