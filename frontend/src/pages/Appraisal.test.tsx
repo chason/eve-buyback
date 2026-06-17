@@ -76,6 +76,31 @@ describe("Appraisal", () => {
     expect(screen.getByText("abc123")).toBeInTheDocument()
   })
 
+  it("keeps the full total accessible while the typewriter animates (#49)", async () => {
+    // Motion allowed → the headline total types out, but its full value stays exposed
+    // via aria-label the whole time.
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
+    vi.mocked(api.getAppraisal).mockResolvedValue({
+      public_id: "tw1",
+      created_by_character_id: 1,
+      created_at: "2026-06-07T00:00:00Z",
+      market_hub_id: "60003760",
+      accepted_total: "4500.00",
+      rejected_count: 0,
+      lines: [],
+    })
+
+    renderAt("tw1")
+
+    expect(await screen.findByLabelText("4,500.00 ISK")).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
   it("hides the contract panel when nothing was accepted", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
     vi.mocked(api.getAppraisal).mockResolvedValue({
