@@ -54,7 +54,7 @@ describe("Appraise", () => {
     // The picked item shows up in the editable list.
     expect(screen.getByLabelText("Quantity for Tritanium")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Appraise" }))
+    await user.click(screen.getByRole("button", { name: "Create appraisal" }))
 
     await waitFor(() =>
       expect(appraisalsApi.createAppraisal).toHaveBeenCalled(),
@@ -93,7 +93,7 @@ describe("Appraise", () => {
     await user.click(await screen.findByText("Tritanium"))
 
     // Submit is blocked until a drop-off is chosen.
-    const button = screen.getByRole("button", { name: "Appraise" })
+    const button = screen.getByRole("button", { name: "Create appraisal" })
     expect(button).toBeDisabled()
 
     await user.selectOptions(
@@ -109,5 +109,16 @@ describe("Appraise", () => {
     expect(
       vi.mocked(appraisalsApi.createAppraisal).mock.calls[0][0],
     ).toMatchObject({ delivery_location_id: "1035000000001" })
+  })
+
+  it("frames submission as a saved, corp-visible record (#31)", async () => {
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([])
+    renderAppraise()
+    expect(
+      await screen.findByText(/creates a saved appraisal record/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Create appraisal" }),
+    ).toBeInTheDocument()
   })
 })
