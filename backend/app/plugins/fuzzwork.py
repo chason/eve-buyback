@@ -11,6 +11,8 @@ import httpx
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.aggregates import BuySellAggregate
+
 FUZZWORK_AGGREGATES_URL = "https://market.fuzzwork.co.uk/aggregates/"
 
 # Fuzzwork accepts a large CSV, but keep requests modest and merge the results.
@@ -18,9 +20,11 @@ _CHUNK = 200
 
 
 class FuzzworkSide(BaseModel):
-    """One side (buy or sell) of a Fuzzwork aggregate. Fuzzwork returns camelCase
-    keys and stringy numbers; parsing straight to `Decimal` preserves the exact
-    wire digits (no float round-trip — ADR-0020)."""
+    """One side (buy or sell) of a Fuzzwork aggregate, satisfying the domain
+    `AggregateSide` protocol (#19). Fuzzwork returns camelCase keys and stringy numbers;
+    the snake_case fields (aliased to the wire keys) match the protocol, and parsing
+    straight to `Decimal` preserves the exact wire digits (no float round-trip,
+    ADR-0020)."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -34,6 +38,9 @@ class FuzzworkSide(BaseModel):
 
 
 class FuzzworkAggregate(BaseModel):
+    """A Fuzzwork buy/sell aggregate, satisfying the domain `BuySellAggregate`
+    protocol (#19)."""
+
     buy: FuzzworkSide
     sell: FuzzworkSide
 
@@ -46,9 +53,11 @@ class FuzzworkClient:
 
     async def get_aggregates(
         self, *, station: str, type_ids: list[int]
-    ) -> dict[int, FuzzworkAggregate]:
-        """Fetch buy/sell aggregates for `type_ids` at one station, keyed by type id."""
-        result: dict[int, FuzzworkAggregate] = {}
+    ) -> dict[int, BuySellAggregate]:
+        """Fetch buy/sell aggregates for `type_ids` at one station, keyed by type id.
+        Returned as `BuySellAggregate` (the protocol) so the source is interchangeable
+        with ESI's at the market seam (#19)."""
+        result: dict[int, BuySellAggregate] = {}
         for start in range(0, len(type_ids), _CHUNK):
             chunk = type_ids[start : start + _CHUNK]
             resp = await self._client.get(

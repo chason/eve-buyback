@@ -21,9 +21,38 @@ and rejects the line.
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Protocol, runtime_checkable
 
 # Fraction of volume that defines the "best orders" window for the percentile.
 PERCENTILE_FRACTION = Decimal("0.05")
+
+
+@runtime_checkable
+class AggregateSide(Protocol):
+    """Structural contract for one side (buy or sell) of a market aggregate — the 7
+    figures the `(hub_id, type_id)` price cache stores. Both `SideAggregate` (ESI) and
+    `plugins.fuzzwork.FuzzworkSide` (Fuzzwork) satisfy it, so the market use case reads
+    either source through this one shape rather than relying on the two classes matching
+    by convention (#19). `@runtime_checkable` lets a test assert the concrete types still
+    conform — catching a silent field rename in one plugin that would break the other."""
+
+    weighted_average: Decimal
+    max: Decimal
+    min: Decimal
+    median: Decimal
+    percentile: Decimal
+    volume: Decimal
+    order_count: int
+
+
+@runtime_checkable
+class BuySellAggregate(Protocol):
+    """Structural contract for a buy/sell market aggregate. Both `OrderBookAggregate`
+    (ESI) and `plugins.fuzzwork.FuzzworkAggregate` (Fuzzwork) satisfy it (#19); the
+    market use case types its source seam against this, not the concrete classes."""
+
+    buy: AggregateSide
+    sell: AggregateSide
 
 
 @dataclass(frozen=True)
@@ -37,8 +66,9 @@ class RawOrder:
 
 @dataclass(frozen=True)
 class SideAggregate:
-    """One side (buy or sell) — mirrors `plugins.fuzzwork.FuzzworkSide`'s fields so
-    the market use case can build a cache row from either source uniformly."""
+    """One side (buy or sell), satisfying the `AggregateSide` protocol — mirrors
+    `plugins.fuzzwork.FuzzworkSide`'s fields so the market use case builds a cache row
+    from either source uniformly (#19)."""
 
     weighted_average: Decimal
     max: Decimal
@@ -51,7 +81,8 @@ class SideAggregate:
 
 @dataclass(frozen=True)
 class OrderBookAggregate:
-    """Both sides — mirrors `plugins.fuzzwork.FuzzworkAggregate`."""
+    """Both sides, satisfying the `BuySellAggregate` protocol — mirrors
+    `plugins.fuzzwork.FuzzworkAggregate` (#19)."""
 
     buy: SideAggregate
     sell: SideAggregate
