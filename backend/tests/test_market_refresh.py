@@ -237,6 +237,29 @@ async def test_structure_not_due_skips_fetch():
     assert summary.hubs_refreshed == 0
 
 
+async def test_structure_empty_book_is_not_refetched_within_the_window():
+    # #70: a structure whose book comes back empty writes no price rows, but the refresh
+    # marker still advances — so it isn't re-fetched again until the window lapses
+    # (previously latest_fetched_at stayed null and the whole book re-fetched forever).
+    corp = await _make_corp(98000017)
+    await _set_config(corp.id, hub_id=STRUCT_HUB, kind="structure")
+    await _grant_token(corp.id, eve_char_id=831)
+    esi = FakeEsi(structure={})  # empty book — a successful fetch with no orders
+
+    summary = await _run(esi)
+    assert esi.structure_calls == 1
+    assert summary.hubs_refreshed == 0  # nothing written
+    assert await _prices(STRUCT_HUB, [34]) == {}
+
+    # Same window → the marker suppresses the re-fetch.
+    await _run(esi)
+    assert esi.structure_calls == 1
+
+    # Once the window lapses, it fetches again.
+    await _run(esi, now=NOW + timedelta(hours=2))
+    assert esi.structure_calls == 2
+
+
 async def test_structure_missing_token_skips_gracefully():
     corp = await _make_corp(98000006)
     await _set_config(corp.id, hub_id=STRUCT_HUB, kind="structure")
