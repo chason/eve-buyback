@@ -94,6 +94,23 @@ describe("Config", () => {
     })
   })
 
+  it("explains the pricing knobs with humanized labels and helper text", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+
+    renderConfig()
+
+    // Enum options render friendly labels, not the raw values ("buy", "weighted_average").
+    expect(
+      await screen.findByRole("option", { name: "Buy orders" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("option", { name: "Weighted average" }),
+    ).toBeInTheDocument()
+    // The most consequential knob — the aggregate — gets a manipulation-resistance hint.
+    expect(screen.getByText(/manipulated order can/i)).toBeInTheDocument()
+  })
+
   it("prices at a custom NPC station picked from the search list", async () => {
     const u = userEvent.setup()
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))

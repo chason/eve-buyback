@@ -15,6 +15,12 @@ import { hubName, isFuzzworkHub } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
 const BASES: Basis[] = ["buy", "sell", "split"]
+const BASIS_LABELS: Record<Basis, string> = {
+  buy: "Buy orders",
+  sell: "Sell orders",
+  split: "Split (buy/sell midpoint)",
+}
+
 const AGGREGATES: AggregateField[] = [
   "percentile",
   "weighted_average",
@@ -22,6 +28,13 @@ const AGGREGATES: AggregateField[] = [
   "max",
   "min",
 ]
+const AGGREGATE_LABELS: Record<AggregateField, string> = {
+  percentile: "Percentile",
+  weighted_average: "Weighted average",
+  median: "Median",
+  max: "Max",
+  min: "Min",
+}
 
 export default function Config() {
   const queryClient = useQueryClient()
@@ -271,11 +284,16 @@ export default function Config() {
           >
             {BASES.map((b) => (
               <option key={b} value={b}>
-                {b}
+                {BASIS_LABELS[b]}
               </option>
             ))}
           </select>
         </label>
+        <small className="field-hint">
+          Which side of the market to price from — what buyers bid (Buy), what
+          sellers ask (Sell), or the midpoint between them (Split). Buy is the usual
+          choice for a buyback.
+        </small>
 
         <label>
           Default percentage
@@ -289,6 +307,10 @@ export default function Config() {
             aria-label="Default percentage"
           />
         </label>
+        <small className="field-hint">
+          Share of the market price members are paid — e.g. <strong>90</strong> pays
+          90% of the basis price.
+        </small>
 
         <label>
           Price aggregate
@@ -299,11 +321,16 @@ export default function Config() {
           >
             {AGGREGATES.map((a) => (
               <option key={a} value={a}>
-                {a}
+                {AGGREGATE_LABELS[a]}
               </option>
             ))}
           </select>
         </label>
+        <small className="field-hint">
+          How to summarise the order book into one price.{" "}
+          <strong>Percentile</strong> ignores a few outlier orders, so a single
+          manipulated order can&apos;t skew the quote — the recommended default.
+        </small>
 
         <label>
           <input
