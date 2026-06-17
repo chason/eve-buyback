@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import BuybackConfig
-from app.data.records import BuybackConfigRecord
+from app.data.records import BuybackConfigRecord, ConfiguredHubRecord
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis
 
@@ -18,6 +18,27 @@ async def get_config(
 ) -> BuybackConfigRecord | None:
     row = await _row(session, corporation_id)
     return BuybackConfigRecord.model_validate(row) if row is not None else None
+
+
+async def list_hubs(session: AsyncSession) -> list[ConfiguredHubRecord]:
+    """Every corp's default market hub (ADR-0034 background refresh enumerates these
+    across all tenants). Returns the hub descriptor + owning corp."""
+    stmt = select(
+        BuybackConfig.market_hub_id,
+        BuybackConfig.market_hub_kind,
+        BuybackConfig.market_region_id,
+        BuybackConfig.corporation_id,
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        ConfiguredHubRecord(
+            hub_id=hub_id,
+            kind=kind,
+            region_id=region_id,
+            corporation_id=corp_id,
+        )
+        for hub_id, kind, region_id, corp_id in rows
+    ]
 
 
 async def upsert_config(

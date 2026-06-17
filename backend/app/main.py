@@ -1,8 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -10,6 +13,7 @@ from app._version import APP_VERSION
 from app.application.errors import ApplicationError
 from app.config import INSECURE_SESSION_SECRET, Settings, get_settings
 from app.interface.errors import application_error_handler
+from app.interface.jobs import run_market_refresh
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
@@ -43,14 +47,45 @@ async def lifespan(app: FastAPI):
     )
     # Process-wide cache backing the market-price L1 tier (ADR-0033).
     app.state.cache = build_cache(settings)
+    # Periodic background refresh of non-Fuzzwork hub prices (ADR-0034). Single
+    # in-process scheduler (ADR-0010); a no-op when no ESI-priced hub is configured.
+    app.state.scheduler = _start_market_refresh(app, settings)
     yield
-    # Guarded + ordered: a failing cache close must not skip the HTTP client close.
+    # Guarded + ordered: a failure in one teardown step must not skip the others.
+    if app.state.scheduler is not None:
+        try:
+            app.state.scheduler.shutdown(wait=False)
+        except Exception:  # noqa: BLE001 — teardown is best-effort
+            logger.exception("scheduler shutdown failed")
     try:
         await app.state.cache.aclose()
     except Exception:  # noqa: BLE001 — teardown is best-effort
         logger.exception("cache aclose failed during shutdown")
     finally:
         await app.state.http.aclose()
+
+
+def _start_market_refresh(
+    app: FastAPI, settings: Settings
+) -> AsyncIOScheduler | None:
+    """Start the background market-refresh job (ADR-0034), or return None when it's
+    disabled. Runs first after a short delay so a cold deploy warms soon without
+    hammering ESI at boot, then every `market_refresh_interval_seconds`."""
+    if not settings.market_background_refresh_enabled:
+        return None
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        run_market_refresh,
+        trigger=IntervalTrigger(seconds=settings.market_refresh_interval_seconds),
+        args=[app],
+        id="market_refresh",
+        max_instances=1,  # never overlap a slow run with the next tick
+        coalesce=True,  # collapse missed ticks into one
+        next_run_time=datetime.now()
+        + timedelta(seconds=settings.market_refresh_initial_delay_seconds),
+    )
+    scheduler.start()
+    return scheduler
 
 
 def create_app() -> FastAPI:

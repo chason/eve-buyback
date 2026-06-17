@@ -128,3 +128,11 @@ def test_bad_memcached_addr_ignored_when_memory_backend():
 def test_good_memcached_addr_accepted():
     assert _dev(cache_backend="memcached", memcached_addr="cache.host:11211")
     assert _dev(cache_backend="memcached", memcached_addr="cache.host")  # host only
+
+
+def test_background_refresh_defaults():
+    # On by default (ADR-0034) with a 10-minute cycle and a short initial delay.
+    s = _dev()
+    assert s.market_background_refresh_enabled is True
+    assert s.market_refresh_interval_seconds == 600
+    assert s.market_refresh_initial_delay_seconds == 30

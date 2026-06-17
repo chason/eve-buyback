@@ -39,5 +39,10 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0027](0027-deploy-coolify.md) | Deploy on Coolify with a managed PostgreSQL | Accepted |
 | [0028](0028-esi-market-source-and-aggregation.md) | ESI market source + aggregation for non-Fuzzwork hubs | Accepted |
 | [0029](0029-encrypted-refresh-token-structures.md) | Encrypted refresh token for structure-market access | Accepted |
+| [0030](0030-buyback-drop-off-locations.md) | Buyback drop-off locations a member picks per appraisal | Accepted |
+| [0031](0031-per-rule-market-hub.md) | Per-rule market-hub override | Accepted |
+| [0032](0032-automated-version-bump.md) | Automated version bump on merge | Accepted |
+| [0033](0033-pluggable-cache.md) | Pluggable cache (L1) in front of the market_prices DB cache | Accepted |
+| [0034](0034-background-market-refresh.md) | Background auto-refresh of non-Fuzzwork market prices | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

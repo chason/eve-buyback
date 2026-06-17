@@ -33,6 +33,14 @@ log = logging.getLogger(__name__)
 StructureTokenProvider = Callable[[], Awaitable[str]]
 
 
+def _l1_key(hub_id: str, type_id: int) -> str:
+    # Keyed on hub_id only (matching the hub_id-keyed DB cache): the cached aggregate
+    # is independent of region_id/kind — those only steer which source fills a miss
+    # (resolve_market_source), not the cached content. Revisit this (and the DB key) if
+    # cached content ever becomes region/kind-dependent.
+    return safe_key("mp", hub_id, type_id)
+
+
 def _row_from_aggregate(type_id: int, agg, fetched_at) -> dict:
     """Build a `market_prices` row from any buy/sell aggregate — Fuzzwork's
     `FuzzworkAggregate` or ESI's `OrderBookAggregate` share the 7-field side shape."""
@@ -104,6 +112,34 @@ async def _fetch_aggregates(
         return {}
 
 
+async def persist_market_rows(
+    session: AsyncSession,
+    cache: Cache | None,
+    *,
+    hub_id: str,
+    aggregates: dict,
+    now,
+    l1_ttl: int,
+) -> dict[int, MarketPriceRecord]:
+    """Write freshly-fetched aggregates to the durable `market_prices` DB cache
+    (committing the unit of work) and, when an L1 cache is wired, promote them into it
+    (ADR-0033). Returns the persisted records keyed by type id; a no-op on empty input.
+    Shared by the lazy read-through (`get_market_prices`) and the background refresh
+    (`market_refresh`), so both write the cache identically."""
+    if not aggregates:
+        return {}
+    rows = [_row_from_aggregate(tid, agg, now) for tid, agg in aggregates.items()]
+    await prices_repo.upsert_prices(session, hub_id=hub_id, rows=rows)
+    await session.commit()
+    records = {
+        row["type_id"]: MarketPriceRecord(hub_id=hub_id, **row) for row in rows
+    }
+    if cache is not None:
+        for tid, record in records.items():
+            await set_model(cache, _l1_key(hub_id, tid), record, ttl_seconds=l1_ttl)
+    return records
+
+
 async def get_market_prices(
     session: AsyncSession,
     fuzzwork: FuzzworkClient,
@@ -127,18 +163,11 @@ async def get_market_prices(
     ttl = settings.market_cache_ttl_seconds
     l1_ttl = settings.market_l1_cache_ttl_seconds
 
-    def l1_key(tid: int) -> str:
-        # Keyed on hub_id only (matching the hub_id-keyed DB cache): the cached
-        # aggregate is independent of region_id/kind — those only steer which source
-        # fills a miss (resolve_market_source), not the cached content. Revisit this
-        # (and the DB key) if cached content ever becomes region/kind-dependent.
-        return safe_key("mp", hub.hub_id, tid)
-
     # L1: hits are fresh by construction (the cache TTL enforces it).
     l1_hits: dict[int, MarketPriceRecord] = {}
     if cache is not None:
         for tid in type_ids:
-            record = await get_model(cache, l1_key(tid), MarketPriceRecord)
+            record = await get_model(cache, _l1_key(hub.hub_id, tid), MarketPriceRecord)
             if record is not None:
                 l1_hits[tid] = record
 
@@ -161,7 +190,7 @@ async def get_market_prices(
     }
     if cache is not None:
         for tid, record in fresh.items():
-            await set_model(cache, l1_key(tid), record, ttl_seconds=l1_ttl)
+            await set_model(cache, _l1_key(hub.hub_id, tid), record, ttl_seconds=l1_ttl)
 
     to_fetch = [tid for tid in l2_ids if tid not in fresh]
 
@@ -170,20 +199,10 @@ async def get_market_prices(
         aggregates = await _fetch_aggregates(
             fuzzwork, esi_market, hub, to_fetch, structure_token_provider
         )
-        if aggregates:
-            rows = [
-                _row_from_aggregate(tid, agg, now)
-                for tid, agg in aggregates.items()
-            ]
-            await prices_repo.upsert_prices(session, hub_id=hub.hub_id, rows=rows)
-            await session.commit()
-            refreshed = {
-                row["type_id"]: MarketPriceRecord(hub_id=hub.hub_id, **row)
-                for row in rows
-            }
-            if cache is not None:
-                for tid, record in refreshed.items():
-                    await set_model(cache, l1_key(tid), record, ttl_seconds=l1_ttl)
+        refreshed = await persist_market_rows(
+            session, cache, hub_id=hub.hub_id, aggregates=aggregates, now=now,
+            l1_ttl=l1_ttl,
+        )
 
     # Prefer L1, then fresh-fetched, then fresh DB, then stale cache; omit never-priced.
     result: list[MarketPriceRecord] = []

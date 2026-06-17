@@ -49,6 +49,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 31 | **Per-rule market-hub override**; appraisals fetch per hub, lines snapshot theirs | [0031](adr/0031-per-rule-market-hub.md) |
 | 32 | **Automated version bump on merge** (CI commits the +1; PRs don't touch it) | [0032](adr/0032-automated-version-bump.md) |
 | 33 | **Pluggable cache** (L1) in front of the market_prices DB cache; memory→memcached by config | [0033](adr/0033-pluggable-cache.md) |
+| 34 | **Background refresh** of non-Fuzzwork hub prices (APScheduler; hot-set + structure pre-warm) | [0034](adr/0034-background-market-refresh.md) |
 
 ## 3. System context
 
@@ -181,8 +182,13 @@ its own session ([ADR-0004](adr/0004-eve-sso-session-auth.md),
   with an in-process `MemoryCache` default, swappable to **memcached** via
   `BUYBACK_CACHE_BACKEND` alone (no call-site changes) for multi-process/tenant sharing.
   Only fresh prices are promoted into L1; a source outage still degrades to stale L2.
-- Optional periodic refresh of "hot" types via the in-process scheduler
-  ([ADR-0010](adr/0010-in-process-scheduling.md)) — no Redis/Celery.
+- **Background refresh** keeps the slow, ESI-priced hubs warm
+  ([ADR-0034](adr/0034-background-market-refresh.md)): an in-process APScheduler job
+  ([ADR-0010](adr/0010-in-process-scheduling.md), no Redis/Celery) periodically renews
+  prices for every configured **non-Fuzzwork** hub — the appraised *hot set* for ESI
+  region stations, and the *whole order book* (full pre-warm) for player structures —
+  so appraisals there don't pay the ESI fetch on a miss. Best-effort per hub; a pure-Jita
+  deploy has no such hubs and it's a no-op. The lazy fetch above remains the fallback.
 
 ## 9. SDE reference data
 
