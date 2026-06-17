@@ -501,6 +501,15 @@ label:has(> .search-results) > input {
   color: var(--pico-muted-color);
 }
 
+/* A muted note below a control (e.g. the Appraise submit button). Unlike .field-hint
+   it has no negative top margin / checkbox indent, so it sits cleanly below the button
+   instead of overlapping it. */
+.submit-note {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--pico-muted-color);
+}
+
 /* Login hero (#46): the signed-out CTA is a centered console panel — a mono eyebrow,
    a capsuleer tagline, and the official EVE SSO button with a cyan-glow hover, rather
    than a bare full-width button. */
