@@ -558,13 +558,16 @@ label:has(> .search-results) > input {
   font-size: 0.875rem;
 }
 
+/* Hard-edged chamfered badge, not a round circle (#84) — matches the 2px/chamfer HUD
+   language of the panels rather than contradicting it. */
 .flow-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: 50%;
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
   background: var(--pico-primary-background);
   color: var(--pico-primary-inverse);
   font-weight: bold;

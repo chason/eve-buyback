@@ -107,7 +107,8 @@ export default function Home() {
   return (
     <>
       <hgroup>
-        <h1>Buyback</h1>
+        {/* Uppercase to match the BUYBACK brand wordmark (#84). */}
+        <h1>BUYBACK</h1>
         <p>EVE Online corporation buyback.</p>
       </hgroup>
 
