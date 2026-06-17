@@ -13,7 +13,7 @@
   --bb-panel-border: #1c3a4d; /* hairline cyan-steel borders */
   --bb-cyan: #33c2ff; /* primary accent — links, buttons, focus */
   --bb-cyan-hover: #5fd0ff;
-  --bb-isk-green: #39e8a0; /* positive / ISK figures (used by later tickets) */
+  --bb-isk-green: #39e8a0; /* positive ISK figures — accepted totals + line values (#85) */
   --bb-danger: #ff5d5d; /* errors, rejected lines */
   --bb-text: #c7d3de; /* body copy */
   --bb-heading: #e6eef5; /* brighter than body, for headings */
@@ -233,10 +233,14 @@ tbody tr:hover {
   background: rgba(51, 194, 255, 0.05);
 }
 
+/* ISK figures (accepted totals + per-line values) render in the market-green token
+   (#85), so positive payout reads like an EVE market readout. Rejected line cells are
+   excluded below — they keep their row's muted-red. */
 .isk {
   font-family: var(--bb-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  color: var(--bb-isk-green);
 }
 
 td.num {
@@ -247,6 +251,12 @@ td.num {
 
 tr.rejected {
   color: var(--bb-danger-muted);
+}
+
+/* A rejected (not-bought) line's figures aren't a positive payout — keep the row's
+   muted-red rather than market-green. */
+tr.rejected .isk {
+  color: inherit;
 }
 
 tr.reprocess-detail td {
