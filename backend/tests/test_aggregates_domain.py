@@ -7,10 +7,13 @@ Hand-computed Decimal vectors — this is the correctness core of ESI pricing
 from decimal import Decimal
 
 from app.domain.aggregates import (
+    AggregateSide,
+    BuySellAggregate,
     RawOrder,
     aggregate_orders,
     aggregate_side,
 )
+from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide
 
 
 def _sell(price: str, volume: int) -> RawOrder:
@@ -98,3 +101,26 @@ def test_all_one_side_zeroes_the_other():
     assert book.buy.order_count == 2
     assert book.sell.order_count == 0  # rejected upstream by the order_count gate
     assert book.sell.weighted_average == Decimal(0)
+
+
+def test_both_aggregate_sources_satisfy_the_protocol():
+    # #19: the market seam (`_row_from_aggregate`, `_fetch_aggregates`) types against
+    # `BuySellAggregate`. Assert the two concrete sources — ESI's OrderBookAggregate and
+    # Fuzzwork's FuzzworkAggregate — structurally conform, so a field rename in either
+    # plugin (which would silently break the other) fails here instead. The
+    # `@runtime_checkable` protocols check attribute presence.
+    esi = aggregate_orders([_buy("4", 10), _sell("5", 10)])
+    fuzz = FuzzworkAggregate(
+        buy=FuzzworkSide(
+            weightedAverage="4", max="4", min="4", median="4",
+            percentile="4", volume="10", orderCount=1,
+        ),
+        sell=FuzzworkSide(
+            weightedAverage="5", max="5", min="5", median="5",
+            percentile="5", volume="10", orderCount=1,
+        ),
+    )
+    for agg in (esi, fuzz):
+        assert isinstance(agg, BuySellAggregate)
+        assert isinstance(agg.buy, AggregateSide)
+        assert isinstance(agg.sell, AggregateSide)

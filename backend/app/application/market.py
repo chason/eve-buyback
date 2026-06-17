@@ -10,6 +10,7 @@ items it has never priced, rather than failing the whole request.
 
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ from app.application.errors import (
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
+from app.domain.aggregates import BuySellAggregate
 from app.domain.market import HubDescriptor, is_fresh, resolve_market_source
 from app.plugins.cache import Cache, get_model, safe_key, set_model
 from app.plugins.esi_market import EsiMarketClient, StructureAccessDenied
@@ -41,9 +43,12 @@ def _l1_key(hub_id: str, type_id: int) -> str:
     return safe_key("mp", hub_id, type_id)
 
 
-def _row_from_aggregate(type_id: int, agg, fetched_at) -> dict:
+def _row_from_aggregate(
+    type_id: int, agg: BuySellAggregate, fetched_at: datetime
+) -> dict:
     """Build a `market_prices` row from any buy/sell aggregate — Fuzzwork's
-    `FuzzworkAggregate` or ESI's `OrderBookAggregate` share the 7-field side shape."""
+    `FuzzworkAggregate` or ESI's `OrderBookAggregate`, both typed as `BuySellAggregate`
+    so the shared 7-field side shape is a contract, not a coincidence (#19)."""
     return {
         "type_id": type_id,
         "buy_weighted_average": agg.buy.weighted_average,
@@ -70,7 +75,7 @@ async def _fetch_aggregates(
     hub: HubDescriptor,
     type_ids: list[int],
     structure_token_provider: StructureTokenProvider | None,
-) -> dict:
+) -> dict[int, BuySellAggregate]:
     """Fetch buy/sell aggregates for the cache misses from the hub's source. Returns
     `{}` on any outage so the caller falls back to cached prices."""
     source = resolve_market_source(hub)
@@ -117,8 +122,8 @@ async def persist_market_rows(
     cache: Cache | None,
     *,
     hub_id: str,
-    aggregates: dict,
-    now,
+    aggregates: dict[int, BuySellAggregate],
+    now: datetime,
     l1_ttl: int,
 ) -> dict[int, MarketPriceRecord]:
     """Write freshly-fetched aggregates to the durable `market_prices` DB cache
@@ -147,7 +152,7 @@ async def get_market_prices(
     *,
     hub: HubDescriptor,
     type_ids: list[int],
-    now,
+    now: datetime,
     structure_token_provider: StructureTokenProvider | None = None,
     cache: Cache | None = None,
 ) -> list[MarketPriceRecord]:

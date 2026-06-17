@@ -19,7 +19,12 @@ import httpx
 from fastapi import Request
 
 from app.config import get_settings
-from app.domain.aggregates import OrderBookAggregate, RawOrder, aggregate_orders
+from app.domain.aggregates import (
+    BuySellAggregate,
+    OrderBookAggregate,
+    RawOrder,
+    aggregate_orders,
+)
 
 ESI_BASE = "https://esi.evetech.net/latest"
 # Back off when ESI's sliding error budget drops to/below this many remaining.
@@ -47,7 +52,7 @@ class EsiMarketClient:
 
     async def get_region_aggregates(
         self, *, region_id: int, station_id: str, type_ids: list[int]
-    ) -> dict[int, OrderBookAggregate]:
+    ) -> dict[int, BuySellAggregate]:
         """Aggregate buy/sell at one NPC station from its region's order book, keyed
         by type id. One paginated request per type, fanned out under a concurrency
         cap; a single type's failure is logged and skipped (the cache simply keeps
@@ -73,7 +78,7 @@ class EsiMarketClient:
         results = await asyncio.gather(
             *(one(t) for t in type_ids), return_exceptions=True
         )
-        out: dict[int, OrderBookAggregate] = {}
+        out: dict[int, BuySellAggregate] = {}
         for result in results:
             if isinstance(result, Exception):
                 log.warning("ESI region-orders fetch failed for a type: %r", result)
@@ -119,7 +124,7 @@ class EsiMarketClient:
 
     async def get_structure_aggregates(
         self, *, structure_id: str, type_ids: list[int], access_token: str
-    ) -> dict[int, OrderBookAggregate]:
+    ) -> dict[int, BuySellAggregate]:
         """Aggregate buy/sell at a player structure (ADR-0029). The structure market
         endpoint returns ALL orders (not type-filterable), paginated and authenticated
         — fetch the whole book once, index by type, aggregate the requested types.
@@ -132,7 +137,7 @@ class EsiMarketClient:
 
     async def get_all_structure_aggregates(
         self, *, structure_id: str, access_token: str
-    ) -> dict[int, OrderBookAggregate]:
+    ) -> dict[int, BuySellAggregate]:
         """Aggregate buy/sell for **every** type in a structure's market, not just a
         requested subset (ADR-0034 background pre-warm). The structure book is a single
         paginated fetch regardless of how many types it holds, so caching the whole
