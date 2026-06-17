@@ -47,9 +47,13 @@ hub whose source is **not Fuzzwork**. The wiring lives in
   a hub's price is the same for everyone, so corps sharing a hub share the rows; "which
   token" decides only *who fetches*, never *what is cached*. Region orders are public
   (no token). For a structure referenced by multiple corps, the job tries their tokens
-  **healthiest-first** (skip any flagged `last_refresh_failed_at`, then most-recently
-  authorized) and uses the **first that successfully fetches** — handling one corp's
-  character losing docking access while another's still has it. None usable → skip.
+  **healthiest-first** — skip any flagged `last_refresh_failed_at`, then **least-recently
+  used first** (`structure_market_tokens.last_used_at`, never-used first) — and uses the
+  **first that successfully fetches**, stamping that token's `last_used_at` so the next
+  cycle **rotates** to a different corp (#88). This spreads the load and exercises every
+  grant (surfacing a silently-broken one sooner) instead of always leaning on one corp;
+  it also handles a character losing docking access while another corp's still has it.
+  The ordering is done in SQL. None usable → skip.
 - **Best-effort, per hub.** A hub that errors (down ESI, revoked/denied structure token)
   is logged and skipped; the others still refresh. The job commits per hub (via the
   shared `persist_market_rows`), so partial progress survives a mid-cycle failure, and a

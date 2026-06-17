@@ -243,3 +243,4 @@ class StructureMarketTokenRecord(BaseModel):
     scopes: str
     created_at: datetime
     last_refresh_failed_at: datetime | None = None
+    last_used_at: datetime | None = None
