@@ -872,6 +872,28 @@ async def test_list_appraisals_returns_created():
         assert len(listed.json()) == 1
 
 
+async def test_zero_value_appraisal_is_hidden_from_history_but_still_retrievable():
+    # #31: a curiosity click that prices to nothing is saved (ADR-0014) and reachable by
+    # its link, but doesn't clutter history.
+    await _seed_sde()
+    _use_fuzzwork({})  # no market data → every line rejects → accepted_total == 0
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        created = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1}]}
+        )
+        body = created.json()
+        assert Decimal(body["accepted_total"]) == 0
+
+        # Not surfaced in history…
+        listed = await http.get("/api/v1/appraisals")
+        assert listed.json() == []
+        # …but still retrievable by its public id.
+        direct = await http.get(f"/api/v1/appraisals/{body['public_id']}")
+        assert direct.status_code == 200
+
+
 async def test_list_scope_member_sees_own_manager_sees_all():
     """A member lists only their own appraisals; a manager/CEO sees the corp's."""
     await _seed_sde()
@@ -884,11 +906,12 @@ async def test_list_scope_member_sees_own_manager_sees_all():
             session, corporation_id=corp.id, market_hub_id="60003760",
             default_basis="buy", default_percentage=90, aggregate_field="percentile",
         )
-        # An appraisal owned by a different character in the same corp.
+        # An appraisal owned by a different character in the same corp (non-zero so it
+        # surfaces in history — zero-value ones are hidden, see the dedicated test).
         await appraisals_repo.create_appraisal(
             session, public_id="teammateAppr", corporation_id=corp.id,
             created_by_character_id=777, market_hub_id="60003760",
-            accepted_total=Decimal("0"), rejected_count=0,
+            accepted_total=Decimal("123.00"), rejected_count=0,
             request_json={"items": []}, lines=[],
         )
         await session.commit()

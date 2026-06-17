@@ -86,13 +86,20 @@ async def get_by_public_id(
     return _to_record(appraisal, lines, creator_name)
 
 
+# History lists hide zero-value appraisals (#31): a curiosity "what's this worth"
+# click that prices to nothing (no accepted items) is still saved as a record (ADR-0014)
+# and stays retrievable by its link, but it doesn't clutter the member's or the corp's
+# history. An appraisal that bought back anything has accepted_total > 0.
+_HAS_VALUE = Appraisal.accepted_total > 0
+
+
 async def list_for_corp(
     session: AsyncSession, corporation_id: uuid.UUID
 ) -> list[AppraisalSummaryRecord]:
     stmt = (
         select(Appraisal, _CREATOR_NAME)
         .outerjoin(*_CREATOR_JOIN)
-        .where(Appraisal.corporation_id == corporation_id)
+        .where(Appraisal.corporation_id == corporation_id, _HAS_VALUE)
         .order_by(Appraisal.created_at.desc())
     )
     rows = (await session.execute(stmt)).all()
@@ -109,6 +116,7 @@ async def list_for_character(
         .where(
             Appraisal.corporation_id == corporation_id,
             Appraisal.created_by_character_id == character_id,
+            _HAS_VALUE,
         )
         .order_by(Appraisal.created_at.desc())
     )

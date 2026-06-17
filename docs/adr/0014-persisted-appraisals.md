@@ -49,6 +49,12 @@ Cross-corp access is denied.
   appraisal" and "share within corp" without a separate sharing system.
 - Raises the core quote endpoint to a REST resource: `POST /appraisals` (create) and
   `GET /appraisals/{public_id}` (read), replacing an ephemeral `/quote`.
+- **History hides zero-value appraisals** (#31): with no ephemeral preview (still
+  deferred, below), a curiosity "what's this worth" click that prices to nothing is
+  still saved and reachable by its `public_id`, but doesn't surface in the member's or
+  corp's history list (the `list_*` queries filter `accepted_total > 0`). The submit
+  control is labelled "Save appraisal" with a note that it creates a corp-visible
+  record, so the persistence isn't a surprise.
 
 ## Alternatives considered
 
