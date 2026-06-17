@@ -56,12 +56,21 @@ export default function Callback() {
 
   const verb = isStructure ? "Authorizing structure access" : "Signing you in"
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      {error ? (
-        <p style={{ color: "crimson" }}>{verb} failed: {error}</p>
-      ) : (
-        <p>{verb}…</p>
-      )}
+    <main className="container">
+      <section className="login-hero">
+        <article className="login-panel">
+          <p className="login-eyebrow">
+            {error ? "Uplink Failed" : "Establishing Uplink"}
+          </p>
+          {error ? (
+            <p className="error">
+              {verb} failed: {error}
+            </p>
+          ) : (
+            <p aria-busy="true">{verb}…</p>
+          )}
+        </article>
+      </section>
     </main>
   )
 }
