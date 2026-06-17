@@ -243,6 +243,35 @@ tbody tr:hover {
   color: var(--bb-isk-green);
 }
 
+/* Typewriter reveal on the appraisal total (#49). A hidden ghost reserves the final
+   width so neighbouring text doesn't shift while the value types over it; the caret
+   reuses the console-blink keyframes (#86) and is reduced-motion guarded. */
+.typewriter {
+  position: relative;
+  display: inline-block;
+}
+
+.typewriter-ghost {
+  visibility: hidden;
+}
+
+.typewriter-text {
+  position: absolute;
+  inset: 0;
+  white-space: nowrap;
+}
+
+.type-caret {
+  color: var(--bb-cyan);
+  animation: console-blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .type-caret {
+    animation: none;
+  }
+}
+
 td.num {
   text-align: right;
   font-family: var(--bb-mono);

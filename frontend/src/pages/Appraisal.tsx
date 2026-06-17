@@ -1,11 +1,66 @@
 import { useQuery } from "@tanstack/react-query"
-import { Fragment, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
 import { getMe } from "../api/auth"
 import { formatIsk } from "../lib/format"
 import { hubName } from "../lib/hubs"
+
+/** Whether the user (or environment) prefers reduced motion. Defaults to `true` when
+ *  `matchMedia` is unavailable (jsdom/SSR/old browsers) so motion-guarded UI degrades
+ *  to its static form rather than animating blindly. */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return true
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  })
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const onChange = () => setReduced(mq.matches)
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [])
+  return reduced
+}
+
+/** Reveals an ISK figure with a typewriter effect (#49) — a small flourish on the
+ *  appraisal total. Honors prefers-reduced-motion (shows the value at once), keeps the
+ *  full value accessible via aria-label, and reserves the final width (a hidden ghost)
+ *  so neighbouring text doesn't shift as it types. */
+function TypewriterIsk({ value }: { value: string }) {
+  const reduced = usePrefersReducedMotion()
+  const [shown, setShown] = useState(reduced ? value : "")
+
+  useEffect(() => {
+    if (reduced) {
+      setShown(value)
+      return
+    }
+    setShown("")
+    let i = 0
+    const id = window.setInterval(() => {
+      i += 1
+      setShown(value.slice(0, i))
+      if (i >= value.length) window.clearInterval(id)
+    }, 35)
+    return () => window.clearInterval(id)
+  }, [value, reduced])
+
+  const typing = !reduced && shown.length < value.length
+  return (
+    <strong className="isk typewriter" aria-label={value}>
+      <span className="typewriter-ghost" aria-hidden="true">
+        {value}
+      </span>
+      <span className="typewriter-text" aria-hidden="true">
+        {shown}
+        {typing && <span className="type-caret">▋</span>}
+      </span>
+    </strong>
+  )
+}
 
 export default function Appraisal() {
   const { publicId } = useParams<{ publicId: string }>()
@@ -69,7 +124,7 @@ export default function Appraisal() {
       </hgroup>
 
       <p>
-        <strong className="isk">{formatIsk(a.accepted_total)}</strong> accepted
+        <TypewriterIsk value={formatIsk(a.accepted_total)} /> accepted
         {a.rejected_count > 0 && ` · ${a.rejected_count} rejected`}
       </p>
       {a.delivery_location_name && (
