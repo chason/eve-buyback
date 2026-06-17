@@ -53,7 +53,7 @@ Cross-corp access is denied.
   deferred, below), a curiosity "what's this worth" click that prices to nothing is
   still saved and reachable by its `public_id`, but doesn't surface in the member's or
   corp's history list (the `list_*` queries filter `accepted_total > 0`). The submit
-  control is labelled "Save appraisal" with a note that it creates a corp-visible
+  control is labelled "Create appraisal" with a note that it creates a corp-visible
   record, so the persistence isn't a surprise.
 
 ## Alternatives considered

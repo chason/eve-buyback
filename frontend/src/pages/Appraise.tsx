@@ -194,11 +194,11 @@ export default function Appraise() {
       )}
 
       <button onClick={submit} disabled={!canSubmit} aria-busy={appraise.isPending}>
-        Save appraisal
+        Create appraisal
       </button>
       <small className="field-hint">
-        This saves an appraisal record your corp&apos;s Buyback Managers can see in
-        History — it&apos;s your priced quote, not yet an in-game contract.
+        This creates a saved appraisal record your corp&apos;s Buyback Managers can see
+        in History — it&apos;s your priced quote, not yet an in-game contract.
       </small>
       {appraise.isError && (
         <p className="error">{(appraise.error as Error).message}</p>
