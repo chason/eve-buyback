@@ -17,9 +17,12 @@ from app.main import _start_market_refresh
 
 
 def _fake_app(cache=None) -> SimpleNamespace:
-    # run_market_refresh only stores `http` on the plugin clients and reads `cache`; with
-    # the use case stubbed it never touches them, so stand-ins are enough.
-    return SimpleNamespace(state=SimpleNamespace(http=object(), cache=cache))
+    # run_market_refresh only stores `http`/`esi_semaphore` on the plugin clients and
+    # reads `cache`; with the use case stubbed it never touches them, so stand-ins are
+    # enough. `esi_semaphore` mirrors the lifespan (ADR-0035).
+    return SimpleNamespace(
+        state=SimpleNamespace(http=object(), esi_semaphore=None, cache=cache)
+    )
 
 
 # --- lifespan scheduler setup (_start_market_refresh) ---

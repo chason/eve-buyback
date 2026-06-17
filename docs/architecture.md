@@ -50,6 +50,7 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 | 32 | **Automated version bump on merge** (CI commits the +1; PRs don't touch it) | [0032](adr/0032-automated-version-bump.md) |
 | 33 | **Pluggable cache** (L1) in front of the market_prices DB cache; memory→memcached by config | [0033](adr/0033-pluggable-cache.md) |
 | 34 | **Background refresh** of non-Fuzzwork hub prices (APScheduler; hot-set + structure pre-warm) | [0034](adr/0034-background-market-refresh.md) |
+| 35 | **ESI-overload protection**: per-appraisal ESI-type cap + process-wide ESI concurrency cap | [0035](adr/0035-esi-overload-protection.md) |
 
 ## 3. System context
 

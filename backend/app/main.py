@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -47,6 +48,10 @@ async def lifespan(app: FastAPI):
     )
     # Process-wide cache backing the market-price L1 tier (ADR-0033).
     app.state.cache = build_cache(settings)
+    # Process-wide ESI concurrency cap (ADR-0035): one semaphore shared by every
+    # in-flight appraisal + the background refresh, so they can't multiply outbound
+    # ESI market requests and exhaust ESI's per-IP error budget.
+    app.state.esi_semaphore = asyncio.Semaphore(settings.esi_market_concurrency)
     # Periodic background refresh of non-Fuzzwork hub prices (ADR-0034). Single
     # in-process scheduler (ADR-0010); a no-op when no ESI-priced hub is configured.
     app.state.scheduler = _start_market_refresh(app, settings)

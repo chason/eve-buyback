@@ -765,6 +765,57 @@ async def test_appraisal_blocked_when_structure_token_is_failing():
     assert "re-authorize" in resp.json()["detail"].lower()
 
 
+REGION_HUB_ID = "60012345"  # a non-Fuzzwork NPC station (priced via ESI region orders)
+REGION_ID = 10000002
+
+
+async def _point_config_at_region_hub() -> None:
+    async with SessionLocal() as session:
+        corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+        await config_repo.upsert_config(
+            session, corporation_id=corp.id, market_hub_id=REGION_HUB_ID,
+            market_hub_kind="npc_station", market_region_id=REGION_ID,
+            default_basis="buy", default_percentage=Decimal("90"),
+            aggregate_field="percentile",
+        )
+        await session.commit()
+
+
+async def test_appraisal_blocked_over_esi_type_cap(monkeypatch):
+    # #23/ADR-0035: too many distinct ESI-priced types in one appraisal is rejected
+    # before any pricing, bounding the outbound ESI fan-out.
+    await _seed_sde()  # seeds types 34 + 35
+    _use_fuzzwork({})
+    monkeypatch.setattr(get_settings(), "max_esi_types_per_appraisal", 1)
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await _point_config_at_region_hub()
+        resp = await http.post("/api/v1/appraisals", json={"items": [
+            {"type_id": 34, "quantity": 1}, {"type_id": 35, "quantity": 1},
+        ]})
+    assert resp.status_code == 422
+    assert "non-fuzzwork" in resp.json()["detail"].lower()
+
+
+async def test_esi_type_cap_does_not_apply_to_fuzzwork(monkeypatch):
+    # The cap is ESI-only: a Fuzzwork (Jita) basket of the same size batches into one
+    # request and is exempt, even under a tiny cap.
+    await _seed_sde()
+    _use_fuzzwork({
+        34: FuzzworkAggregate(buy=_side("5"), sell=_side("8")),
+        35: FuzzworkAggregate(buy=_side("5"), sell=_side("8")),
+    })
+    monkeypatch.setattr(get_settings(), "max_esi_types_per_appraisal", 1)
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")  # default hub stays Jita (Fuzzwork)
+        resp = await http.post("/api/v1/appraisals", json={"items": [
+            {"type_id": 34, "quantity": 1}, {"type_id": 35, "quantity": 1},
+        ]})
+    assert resp.status_code == 201
+
+
 async def test_appraisal_not_blocked_when_structure_token_is_healthy():
     # A healthy token must not over-block: the appraisal proceeds (the fake ESI returns
     # no orders, so the line rejects as "No market data", but the request succeeds).

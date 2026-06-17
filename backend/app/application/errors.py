@@ -58,6 +58,14 @@ class AppraisalTooLarge(ApplicationError):
     default_detail = "An appraisal may contain at most 1000 items (EVE's contract limit)"
 
 
+class AppraisalTooManyEsiTypes(ApplicationError):
+    default_detail = (
+        "This appraisal prices too many distinct items at a non-Fuzzwork market "
+        "(each one is a separate live market lookup). Split it into smaller appraisals, "
+        "or price at a major trade hub."
+    )
+
+
 class MarketHubInvalid(ApplicationError):
     default_detail = "Market hub could not be resolved"
 
