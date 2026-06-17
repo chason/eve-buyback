@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-04
+- **Implemented by:** [ADR-0034](0034-background-market-refresh.md) — the APScheduler
+  job reserved here now refreshes non-Fuzzwork hub prices in the background.
 
 ## Context
 

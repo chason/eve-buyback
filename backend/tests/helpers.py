@@ -66,6 +66,9 @@ class FakeEsiMarket:
         self.region_calls += 1
         return {}
 
+    async def get_all_structure_aggregates(self, *, structure_id, access_token):
+        return {}
+
 
 def make_client(esi: BaseEsi) -> AsyncClient:
     app.dependency_overrides[get_sso_client] = lambda: FakeSso()

@@ -45,3 +45,16 @@ def resolve_market_source(hub: HubDescriptor) -> MarketSource:
 def is_fresh(fetched_at: datetime, *, now: datetime, ttl_seconds: int) -> bool:
     """True if a cached price fetched at `fetched_at` is still within its TTL."""
     return now - fetched_at < timedelta(seconds=ttl_seconds)
+
+
+def refresh_cutoff(
+    now: datetime, *, ttl_seconds: int, interval_seconds: int
+) -> datetime:
+    """The background refresh "due" cutoff (ADR-0034): a price fetched **before** this
+    instant will expire before the next refresh cycle, so it should be renewed now.
+
+    `now - (ttl - interval)`, with the window clamped at 0 — if the refresh interval is
+    as long as (or longer than) the TTL there's no lead time to preserve, so everything
+    is due every cycle (`cutoff == now`) rather than going negative."""
+    lead = max(0, ttl_seconds - interval_seconds)
+    return now - timedelta(seconds=lead)

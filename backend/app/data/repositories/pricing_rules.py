@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import PricingRule
-from app.data.records import PricingRuleRecord
+from app.data.records import ConfiguredHubRecord, PricingRuleRecord
 from app.domain.market import HubKind
 from app.domain.pricing import Basis, TargetKind
 
@@ -25,6 +25,29 @@ async def list_rules(
     )
     rows = (await session.execute(stmt)).scalars().all()
     return [PricingRuleRecord.model_validate(r) for r in rows]
+
+
+async def list_hub_overrides(session: AsyncSession) -> list[ConfiguredHubRecord]:
+    """Every per-rule market-hub override across all corps (ADR-0031/0034), with the
+    owning corp. Only rules that actually set a hub (`market_hub_id` non-null) — those
+    feed the background refresh's hub set alongside the corp-default hubs."""
+    stmt = select(
+        PricingRule.market_hub_id,
+        PricingRule.market_hub_kind,
+        PricingRule.market_region_id,
+        PricingRule.corporation_id,
+    ).where(PricingRule.market_hub_id.is_not(None))
+    rows = (await session.execute(stmt)).all()
+    return [
+        ConfiguredHubRecord(
+            hub_id=hub_id,
+            # An override always saves its kind alongside the id; default defensively.
+            kind=kind or "npc_station",
+            region_id=region_id,
+            corporation_id=corp_id,
+        )
+        for hub_id, kind, region_id, corp_id in rows
+    ]
 
 
 async def upsert_rule(

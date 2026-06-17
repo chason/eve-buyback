@@ -122,6 +122,20 @@ class EsiMarketClient:
             for type_id in type_ids
         }
 
+    async def get_all_structure_aggregates(
+        self, *, structure_id: str, access_token: str
+    ) -> dict[int, OrderBookAggregate]:
+        """Aggregate buy/sell for **every** type in a structure's market, not just a
+        requested subset (ADR-0034 background pre-warm). The structure book is a single
+        paginated fetch regardless of how many types it holds, so caching the whole
+        thing makes even never-before-appraised items at that structure instant. A 403
+        (lost docking/market access) raises `StructureAccessDenied`."""
+        orders_by_type = await self._structure_orders(structure_id, access_token)
+        return {
+            type_id: aggregate_orders(orders)
+            for type_id, orders in orders_by_type.items()
+        }
+
     async def _structure_orders(
         self, structure_id: str, access_token: str
     ) -> dict[int, list[RawOrder]]:

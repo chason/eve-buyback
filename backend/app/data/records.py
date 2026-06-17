@@ -93,6 +93,17 @@ class MarketPriceRecord(BaseModel):
     fetched_at: datetime
 
 
+class ConfiguredHubRecord(BaseModel):
+    """A market hub referenced by a corp's config or a pricing rule (ADR-0034), with
+    the owning corp — enough to choose a price source and, for structures, a token.
+    Built from selected columns (not a single ORM row), so no `from_attributes`."""
+
+    hub_id: str
+    kind: HubKind
+    region_id: int | None = None
+    corporation_id: uuid.UUID
+
+
 class SdeMetadataRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

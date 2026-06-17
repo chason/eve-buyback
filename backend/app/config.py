@@ -60,6 +60,15 @@ class Settings(BaseSettings):
     # (one request per type; ADR-0028). Keep modest to respect ESI's error budget.
     esi_market_concurrency: int = 8
 
+    # Background refresh of non-Fuzzwork hub prices (ADR-0034): a scheduled job keeps
+    # ESI-priced hubs (non-Jita NPC stations, player structures) warm so appraisals
+    # there don't pay the slow ESI fetch. A pure-Fuzzwork (Jita) deploy has no such
+    # hubs and the job is a no-op. The window renewed each cycle is
+    # market_cache_ttl_seconds - market_refresh_interval_seconds (clamped at 0).
+    market_background_refresh_enabled: bool = True
+    market_refresh_interval_seconds: int = 600  # 10 minutes
+    market_refresh_initial_delay_seconds: int = 30  # first run after boot
+
     # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
     # is an in-process LRU; set "memcached" + the address to share across processes.
     # SECURITY: memcached is UNAUTHENTICATED — bind it to loopback or a private/

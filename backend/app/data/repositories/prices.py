@@ -5,8 +5,9 @@ the application layer (which owns the clock and the `commit()`).
 """
 
 from collections.abc import Sequence
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +43,30 @@ async def get_prices(
     )
     rows = (await session.execute(stmt)).scalars().all()
     return [MarketPriceRecord.model_validate(r) for r in rows]
+
+
+async def list_type_ids_for_hub(
+    session: AsyncSession, *, hub_id: str, older_than: datetime | None = None
+) -> list[int]:
+    """The type ids cached for a hub — the "hot set" someone has priced there. With
+    `older_than`, only those whose `fetched_at` predates it (the refresh-due set for an
+    ESI-region hub, ADR-0034)."""
+    stmt = select(MarketPrice.type_id).where(MarketPrice.hub_id == hub_id)
+    if older_than is not None:
+        stmt = stmt.where(MarketPrice.fetched_at < older_than)
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def latest_fetched_at(
+    session: AsyncSession, *, hub_id: str
+) -> datetime | None:
+    """The most recent `fetched_at` across a hub's cached prices, or None if it has
+    none. Used as the structure-refresh "due" proxy (ADR-0034): a structure's whole
+    book is fetched at once, so its freshest row dates the last full refresh."""
+    stmt = select(func.max(MarketPrice.fetched_at)).where(
+        MarketPrice.hub_id == hub_id
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def upsert_prices(

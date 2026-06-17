@@ -3,6 +3,7 @@ corporation. Returns records (incl. the ciphertext for internal refresh use); th
 interface maps to a status DTO that omits it. The application owns the commit."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import delete, select, update
@@ -19,6 +20,28 @@ async def get_for_corp(
     return (
         StructureMarketTokenRecord.model_validate(row) if row is not None else None
     )
+
+
+async def list_corps_by_token_health(
+    session: AsyncSession, corporation_ids: Sequence[uuid.UUID]
+) -> list[uuid.UUID]:
+    """The corp ids (among `corporation_ids`) that hold a structure token, ordered
+    healthiest-first for the background refresh's token selection (ADR-0034): tokens
+    not flagged `last_refresh_failed_at` come before flagged ones, then
+    least-recently-authorized first so the job doesn't always lean on the newest grant.
+    Corps without a token are absent. The ordering is done in SQL, not Python."""
+    if not corporation_ids:
+        return []
+    stmt = (
+        select(StructureMarketToken.corporation_id)
+        .where(StructureMarketToken.corporation_id.in_(corporation_ids))
+        .order_by(
+            # False (healthy) sorts before True (failed); then oldest grant first.
+            StructureMarketToken.last_refresh_failed_at.is_not(None),
+            StructureMarketToken.created_at.asc(),
+        )
+    )
+    return list((await session.execute(stmt)).scalars().all())
 
 
 async def upsert_token(

@@ -15,6 +15,7 @@ dependencies = [
     "itsdangerous>=2.2",
     "cryptography>=43",
     "aiomcache>=0.8",
+    "apscheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]
