@@ -20,6 +20,7 @@ from app.application.errors import (
     DeliveryLocationInvalid,
     DeliveryLocationRequired,
     EmptyAppraisal,
+    StructureMarketUnavailable,
 )
 from app.application.pricing import get_config
 from app.data.records import (
@@ -35,6 +36,7 @@ from app.data.repositories import buyback_locations as locations_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
+from app.data.repositories import structure_tokens as tokens_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
 from app.domain.market import FUZZWORK_HUB_NAMES, HubDescriptor
@@ -192,6 +194,14 @@ async def create_appraisal(
     # provider is only invoked for esi_structure fetches, so pass it to all of them.
     structure_token_provider = None
     if any(h.kind == "structure" for h in ids_by_hub):
+        # If the corp's structure token isn't working (never authorized, or flagged
+        # failing — revoked grant / lost docking access, #68), block the appraisal with
+        # an actionable error instead of silently returning unpriced "No market data"
+        # lines: the member can't fix it, so point them at a manager re-authorize.
+        token = await tokens_repo.get_for_corp(session, corp.id)
+        if token is None or token.last_refresh_failed_at is not None:
+            raise StructureMarketUnavailable()
+
         async def structure_token_provider() -> str:
             return await structure_tokens_app.get_structure_access_token(
                 session, sso, corporation_uuid=corp.id, cipher=cipher

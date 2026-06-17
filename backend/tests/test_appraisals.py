@@ -1,15 +1,20 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
+from app.config import get_settings
 from app.data.db import SessionLocal
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import buyback_config as config_repo
+from app.data.repositories import characters as characters_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
+from app.data.repositories import structure_tokens as tokens_repo
 from app.main import app
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide, get_fuzzwork_client
+from app.plugins.token_cipher import TokenCipher
 from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, MemberEsi, login, make_client
 
 
@@ -712,6 +717,68 @@ async def test_get_unknown_appraisal_404():
         await login(http)
         await http.post("/api/v1/corporations")
         assert (await http.get("/api/v1/appraisals/doesnotexist")).status_code == 404
+
+
+STRUCT_HUB_ID = "1035000000001"
+
+
+async def _configure_structure_hub(*, token_failed: bool) -> None:
+    """Point the corp's default hub at a structure and grant it a token, optionally
+    flagged as failing (#68)."""
+    cipher = TokenCipher(get_settings().token_encryption_key)
+    async with SessionLocal() as session:
+        corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+        await config_repo.upsert_config(
+            session, corporation_id=corp.id, market_hub_id=STRUCT_HUB_ID,
+            market_hub_kind="structure", market_region_id=None,
+            default_basis="buy", default_percentage=Decimal("90"),
+            aggregate_field="percentile",
+        )
+        char = await characters_repo.upsert_character(
+            session, eve_character_id=CHAR_ID, name="Boss"
+        )
+        await tokens_repo.upsert_token(
+            session, corporation_id=corp.id, character_id=char.id,
+            character_eve_id=CHAR_ID, character_name="Boss",
+            encrypted_refresh_token=cipher.encrypt("refresh-tok"), scopes="s",
+        )
+        if token_failed:
+            await tokens_repo.mark_failed(
+                session, corporation_id=corp.id, at=datetime.now(UTC)
+            )
+        await session.commit()
+
+
+async def test_appraisal_blocked_when_structure_token_is_failing():
+    # #68: a failing corp structure token blocks appraisals at that market with an
+    # actionable error, instead of silently returning unpriced "No market data" lines.
+    await _seed_sde()
+    _use_fuzzwork({})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await _configure_structure_hub(token_failed=True)
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 10}]}
+        )
+    assert resp.status_code == 409
+    assert "re-authorize" in resp.json()["detail"].lower()
+
+
+async def test_appraisal_not_blocked_when_structure_token_is_healthy():
+    # A healthy token must not over-block: the appraisal proceeds (the fake ESI returns
+    # no orders, so the line rejects as "No market data", but the request succeeds).
+    await _seed_sde()
+    _use_fuzzwork({})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        await _configure_structure_hub(token_failed=False)
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 10}]}
+        )
+    assert resp.status_code == 201
+    assert resp.json()["lines"][0]["status"] == "rejected"
 
 
 async def test_cross_corp_appraisal_is_404():

@@ -82,6 +82,14 @@ class StructureTokenExpired(ApplicationError):
     default_detail = "Structure access has expired; please re-authorize"
 
 
+class StructureMarketUnavailable(ApplicationError):
+    default_detail = (
+        "Structure-market pricing is currently unavailable — a Buyback Manager must "
+        "re-authorize structure access before items can be priced at the corp's "
+        "structure hub."
+    )
+
+
 class LocationInvalid(ApplicationError):
     default_detail = "Drop-off location could not be resolved"
 
