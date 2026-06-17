@@ -36,8 +36,12 @@ async def list_corps_by_token_health(
         select(StructureMarketToken.corporation_id)
         .where(StructureMarketToken.corporation_id.in_(corporation_ids))
         .order_by(
-            # False (healthy) sorts before True (failed); then oldest grant first.
+            # False (healthy) sorts before True (failed);
             StructureMarketToken.last_refresh_failed_at.is_not(None),
+            # then least-recently-used first (never-used first), so the fetching token
+            # rotates across corps each cycle (ADR-0034, #88);
+            StructureMarketToken.last_used_at.asc().nulls_first(),
+            # then oldest grant as a stable tiebreak among the never-used.
             StructureMarketToken.created_at.asc(),
         )
     )
@@ -92,6 +96,18 @@ async def mark_failed(
         update(StructureMarketToken)
         .where(StructureMarketToken.corporation_id == corporation_id)
         .values(last_refresh_failed_at=at)
+    )
+
+
+async def mark_used(
+    session: AsyncSession, *, corporation_id: uuid.UUID, at: datetime
+) -> None:
+    """Record that this corp's token was just used to fetch a structure book (ADR-0034
+    rotation, #88), so least-recently-used selection moves to another corp next cycle."""
+    await session.execute(
+        update(StructureMarketToken)
+        .where(StructureMarketToken.corporation_id == corporation_id)
+        .values(last_used_at=at)
     )
 
 

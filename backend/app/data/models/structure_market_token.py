@@ -35,3 +35,7 @@ class StructureMarketToken(Base):
     last_refresh_failed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # Bumped each time this token is used to fetch a structure book in the background
+    # refresh (ADR-0034, #88), so the next cycle's token selection rotates to the
+    # least-recently-used corp rather than always leaning on the same one.
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -199,7 +199,7 @@ async def _refresh_one_hub(
     if latest is not None and latest >= cutoff:
         return 0
     aggregates = await _fetch_structure_book(
-        session, esi_market=esi_market, sso=sso, cipher=cipher, group=group
+        session, esi_market=esi_market, sso=sso, cipher=cipher, group=group, now=now
     )
     if aggregates is None:
         return 0  # no referencing corp could fetch it (logged inside)
@@ -217,12 +217,14 @@ async def _fetch_structure_book(
     sso: EveSsoClient,
     cipher: TokenCipher,
     group: _HubGroup,
+    now: datetime,
 ) -> dict | None:
     """Fetch a structure's full order book using the first referencing corp whose token
     can actually read it (ADR-0034). Corps are tried healthiest-first — tokens not
-    flagged `last_refresh_failed_at` before flagged ones, then least-recently-authorized
-    first so the job doesn't always lean on the newest grant (ordering done in SQL).
-    Returns the aggregates, or None if no corp could fetch it."""
+    flagged `last_refresh_failed_at` before flagged ones, then least-recently-*used*
+    first so the fetching token rotates across corps each cycle (#88; ordering in SQL).
+    On success the winning corp's `last_used_at` is stamped so it falls to the back of
+    the queue next time. Returns the aggregates, or None if no corp could fetch it."""
     for corp_id in await tokens_repo.list_corps_by_token_health(
         session, group.corp_ids
     ):
@@ -237,7 +239,7 @@ async def _fetch_structure_book(
         ):
             continue  # this corp's grant is unusable; try the next
         try:
-            return await esi_market.get_all_structure_aggregates(
+            aggregates = await esi_market.get_all_structure_aggregates(
                 structure_id=group.hub_id, access_token=access_token
             )
         except StructureAccessDenied:
@@ -247,6 +249,10 @@ async def _fetch_structure_book(
                 group.hub_id,
             )
             continue
+        # Stamp the winning token so selection rotates to another corp next cycle (#88).
+        await tokens_repo.mark_used(session, corporation_id=corp_id, at=now)
+        await session.commit()
+        return aggregates
     log.warning(
         "no referencing corp could access structure %s; skipping", group.hub_id
     )

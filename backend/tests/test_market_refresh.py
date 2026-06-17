@@ -137,11 +137,11 @@ async def _grant_token(corp_id, *, eve_char_id=777, failed_at=None, refresh="rt"
         await session.commit()
 
 
-async def _run(esi, *, cache=None, sso=None):
+async def _run(esi, *, cache=None, sso=None, now=NOW):
     async with SessionLocal() as session:
         return await market_refresh.refresh_due_prices(
             session, esi_market=esi, sso=sso or FakeSso(), cipher=_cipher(),
-            cache=cache, settings=get_settings(), now=NOW,
+            cache=cache, settings=get_settings(), now=now,
         )
 
 
@@ -282,6 +282,28 @@ async def test_structure_prefers_least_recently_authorized_healthy_corp():
     await _run(esi, sso=sso)
 
     assert sso.refresh_tokens_seen == ["rt-older"]
+
+
+async def test_structure_token_selection_rotates_across_corps():
+    # #88: the fetching token rotates least-recently-used first. Cycle 1 uses the older
+    # grant; once stamped, cycle 2 (a later `now`, so the structure is due again) moves
+    # to the other corp.
+    a = await _make_corp(98000014, name="A")
+    b = await _make_corp(98000015, name="B")
+    await _set_config(a.id, hub_id=STRUCT_HUB, kind="structure")
+    await _set_config(b.id, hub_id=STRUCT_HUB, kind="structure")
+    await _grant_token(a.id, eve_char_id=811, refresh="rt-a")  # older grant
+    await _grant_token(b.id, eve_char_id=812, refresh="rt-b")
+    esi = FakeEsi(structure={34: _book(buy="3.0", sell="4.0")})
+
+    sso1 = FakeSso()
+    await _run(esi, sso=sso1)  # both never used → oldest (A) wins
+    assert sso1.refresh_tokens_seen == ["rt-a"]
+
+    sso2 = FakeSso()
+    # Two hours on so the structure is due again; A was just used → B is now LRU.
+    await _run(esi, sso=sso2, now=NOW + timedelta(hours=2))
+    assert sso2.refresh_tokens_seen == ["rt-b"]
 
 
 # --- isolation + degrade across hubs ---
