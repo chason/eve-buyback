@@ -26,6 +26,9 @@ class FakeSso:
     async def verify_token(self, access_token: str) -> VerifiedCharacter:
         return VerifiedCharacter(character_id=CHAR_ID, name=CHAR_NAME)
 
+    async def refresh_access_token(self, refresh_token: str) -> OAuthToken:
+        return OAuthToken(access_token="fake-access-token", refresh_token=refresh_token)
+
 
 class BaseEsi:
     ceo_id = 99999  # not the logged-in char → member
@@ -64,6 +67,9 @@ class FakeEsiMarket:
 
     async def get_region_aggregates(self, *, region_id, station_id, type_ids):
         self.region_calls += 1
+        return {}
+
+    async def get_structure_aggregates(self, *, structure_id, type_ids, access_token):
         return {}
 
     async def get_all_structure_aggregates(self, *, structure_id, access_token):

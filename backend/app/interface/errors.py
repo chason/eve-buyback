@@ -25,6 +25,7 @@ from app.application.errors import (
     PricingRuleTargetInvalid,
     SsoNotConfigured,
     StructureEncryptionNotConfigured,
+    StructureMarketUnavailable,
     StructureTokenExpired,
     StructureTokenMissing,
 )
@@ -47,6 +48,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     StructureEncryptionNotConfigured: 503,
     StructureTokenMissing: 409,
     StructureTokenExpired: 409,
+    StructureMarketUnavailable: 409,
     LocationInvalid: 422,
     LocationNotFound: 404,
     DeliveryLocationRequired: 422,

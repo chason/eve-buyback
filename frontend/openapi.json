@@ -1199,6 +1199,18 @@
             "title": "Expired",
             "type": "boolean"
           },
+          "failed_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Since"
+          },
           "replaced_character_name": {
             "anyOf": [
               {
@@ -1302,7 +1314,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "20"
+    "version": "31"
   },
   "openapi": "3.1.0",
   "paths": {

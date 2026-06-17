@@ -330,6 +330,32 @@ async def test_one_hub_failure_does_not_abort_the_others():
     assert summary.hubs_refreshed == 1  # only the region hub
 
 
+async def test_structure_access_denied_flags_token_then_recovery_clears_it():
+    # #68: a 403 on the structure fetch flags the token (so the manager sees a
+    # "re-authorize" warning instead of a silent failure); a later successful fetch
+    # clears the flag (self-heal, no re-auth needed).
+    from app.plugins.esi_market import StructureAccessDenied
+
+    corp = await _make_corp(98000016)
+    await _set_config(corp.id, hub_id=STRUCT_HUB, kind="structure")
+    await _grant_token(corp.id, eve_char_id=821)
+
+    await _run(FakeEsi(structure_error=StructureAccessDenied()))
+    async with SessionLocal() as session:
+        token = await tokens_repo.get_for_corp(session, corp.id)
+    assert token.last_refresh_failed_at is not None  # flagged
+
+    # A successful fetch later (structure is due again) clears the failure.
+    await _run(
+        FakeEsi(structure={34: _book(buy="3.0", sell="4.0")}),
+        now=NOW + timedelta(hours=2),
+    )
+    async with SessionLocal() as session:
+        token = await tokens_repo.get_for_corp(session, corp.id)
+    assert token.last_refresh_failed_at is None  # self-healed
+    assert token.last_used_at is not None
+
+
 async def test_fuzzwork_hub_is_never_refreshed():
     corp = await _make_corp(98000011)
     await _set_config(corp.id, hub_id=FUZZ_HUB)  # Jita — Fuzzwork covers it
