@@ -41,7 +41,7 @@ describe("Home — registration", () => {
     vi.resetAllMocks()
   })
 
-  it("tells a Director they are now a Buyback Manager after registering", async () => {
+  it("orients the manager after registering: live on defaults + setup links", async () => {
     // A Director with no buyback role yet; registering auto-grants them manager.
     vi.mocked(authApi.getMe)
       .mockResolvedValueOnce(user({ role: "member", is_director: true }))
@@ -62,12 +62,29 @@ describe("Home — registration", () => {
     await userEvent.click(button)
 
     const status = await screen.findByRole("status")
-    expect(status).toHaveTextContent(/now a\s+Buyback Manager/i)
+    // Confirms the corp is live on the default pricing…
+    expect(status).toHaveTextContent(/registered/i)
+    expect(status).toHaveTextContent(/90% Jita Buy/i)
+    // …announces the auto-granted manager role…
+    expect(status).toHaveTextContent(/granted\s+Buyback Manager/i)
+    // …and links the three setup pages.
+    expect(screen.getByRole("link", { name: /^Config$/ })).toHaveAttribute(
+      "href",
+      "/config",
+    )
+    expect(screen.getByRole("link", { name: /^Rules$/ })).toHaveAttribute(
+      "href",
+      "/rules",
+    )
+    expect(screen.getByRole("link", { name: /^Locations$/ })).toHaveAttribute(
+      "href",
+      "/locations",
+    )
     expect(authApi.registerCorporation).toHaveBeenCalledOnce()
   })
 
-  it("does not show the manager confirmation when a CEO registers", async () => {
-    // A CEO stays role "ceo" — there is no manager grant to announce.
+  it("orients a CEO too, but without the manager-grant line", async () => {
+    // A CEO stays role "ceo" — gets the orientation, but no role-change to announce.
     vi.mocked(authApi.getMe)
       .mockResolvedValueOnce(user({ role: "ceo" }))
       .mockResolvedValue(user({ role: "ceo", corporation_registered: true }))
@@ -84,13 +101,14 @@ describe("Home — registration", () => {
     const button = await screen.findByRole("button", { name: /register test corp/i })
     await userEvent.click(button)
 
-    // The appraisal CTA appears once registered…
-    await screen.findByRole("button", { name: /start an appraisal/i })
-    // …but no role-change confirmation.
-    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+    const status = await screen.findByRole("status")
+    expect(status).toHaveTextContent(/90% Jita Buy/i)
+    expect(screen.getByRole("link", { name: /^Config$/ })).toBeInTheDocument()
+    // No manager-grant line for a CEO.
+    expect(status).not.toHaveTextContent(/granted/i)
   })
 
-  it("shows no confirmation for a manager who is already registered", async () => {
+  it("shows no orientation for a manager who is already registered", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(
       user({ role: "manager", is_director: true, corporation_registered: true }),
     )

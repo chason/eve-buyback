@@ -20,21 +20,52 @@ function CorporationStatus({ user }: { user: SessionUser }) {
   })
 
   if (user.corporation_registered) {
-    return (
-      <>
-        {justRegistered && user.role === "manager" && (
-          <p role="status">
-            ✓ You registered <strong>{user.corporation_name}</strong> and are now a{" "}
-            <strong>{roleLabel(user.role)}</strong> — you can configure pricing,
-            rules, and drop-off locations from the menu above.
+    // Right after registering, orient the manager: the corp is already live on a
+    // sensible default, and the (optional) setup pages are one click away — so it
+    // doesn't feel half-finished. A normal revisit just shows the appraisal CTA.
+    if (justRegistered) {
+      return (
+        <article role="status">
+          <p>
+            ✓ <strong>{user.corporation_name}</strong> is registered — your buyback
+            is live on a default <strong>90% Jita Buy</strong>, so members can
+            appraise and contract items right away.
           </p>
-        )}
-        <p>
-          <Link to="/appraise" role="button">
-            Start an appraisal
-          </Link>
-        </p>
-      </>
+          {user.role === "manager" && (
+            <p>
+              You were granted <strong>{roleLabel(user.role)}</strong>, so you can
+              tune any of this whenever you like.
+            </p>
+          )}
+          <p>Fine-tune your buyback any time:</p>
+          <ul>
+            <li>
+              <Link to="/config">Config</Link> — market hub, buy/sell basis, and
+              percentage.
+            </li>
+            <li>
+              <Link to="/rules">Rules</Link> — per-item or per-group price overrides
+              (optional).
+            </li>
+            <li>
+              <Link to="/locations">Locations</Link> — drop-off stations for
+              contracts (optional).
+            </li>
+          </ul>
+          <p>
+            <Link to="/appraise" role="button">
+              Start an appraisal
+            </Link>
+          </p>
+        </article>
+      )
+    }
+    return (
+      <p>
+        <Link to="/appraise" role="button">
+          Start an appraisal
+        </Link>
+      </p>
     )
   }
 
