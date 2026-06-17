@@ -394,10 +394,44 @@ label:has(> .search-results) > input {
   color: var(--pico-primary-inverse);
 }
 
-/* Status rows ("Searching…", "No matches.") that aren't links. */
+/* Status rows ("Searching…", "No matches.") that aren't links — given a console
+   treatment (#86): uppercase letter-spaced mono with a cyan "// " prefix and a blinking
+   caret, so "No matches." reads as `// NO MATCHES. ▋` like a terminal prompt. The text
+   itself is unchanged (the prefix/caret are CSS pseudo-content); the ::before also
+   replaces Pico's aria-busy spinner on the loading row. */
 .search-results li:not(:has(a)) {
   padding: 0.4rem 0.75rem;
+  font-family: var(--bb-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--pico-muted-color);
+}
+
+.search-results li:not(:has(a))::before {
+  content: "// ";
+  color: var(--bb-cyan);
+  opacity: 0.7;
+}
+
+.search-results li:not(:has(a))::after {
+  content: "▋";
+  margin-left: 0.2em;
+  color: var(--bb-cyan);
+  animation: console-blink 1s step-end infinite;
+}
+
+@keyframes console-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Hold the caret steady under reduced-motion (#49, #86). */
+@media (prefers-reduced-motion: reduce) {
+  .search-results li:not(:has(a))::after {
+    animation: none;
+  }
 }
 
 /* Checkbox row in the rule editor: keep the boxes on one line, neatly aligned
