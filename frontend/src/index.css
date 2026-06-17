@@ -97,6 +97,11 @@ body {
     radial-gradient(ellipse 120% 80% at 50% 0%, #10202e 0%, var(--bb-void) 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
+  /* Always fill the viewport so the backdrop doesn't cut off with a hard line on a
+     short page (#105): the fixed gradient is clipped to the body box, and html's own
+     void background shows below it otherwise. dvh avoids the mobile URL-bar jump. */
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* A faint holographic glow lifts panels off the void: a cyan hairline outline plus
