@@ -6,6 +6,7 @@ from app.data.models.buyback_location import BuybackLocation
 from app.data.models.character import Character
 from app.data.models.corporation import Corporation
 from app.data.models.manager_assignment import ManagerAssignment
+from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
 from app.data.models.pricing_rule import PricingRule
 from app.data.models.sde_market_group import SdeMarketGroup
@@ -23,6 +24,7 @@ __all__ = [
     "Character",
     "Corporation",
     "ManagerAssignment",
+    "MarketHubRefresh",
     "MarketPrice",
     "PricingRule",
     "SdeMarketGroup",
