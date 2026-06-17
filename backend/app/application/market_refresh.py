@@ -243,11 +243,16 @@ async def _fetch_structure_book(
                 structure_id=group.hub_id, access_token=access_token
             )
         except StructureAccessDenied:
+            # The grant is valid but the character lost docking/market access — flag it
+            # so the manager sees "re-authorize" instead of a silent failure (#68), and
+            # so this corp sorts last next cycle. Cleared by the next successful fetch.
             log.warning(
-                "corp %s token denied access to structure %s; trying next corp",
+                "corp %s token denied access to structure %s; flagging + trying next",
                 corp_id,
                 group.hub_id,
             )
+            await tokens_repo.mark_failed(session, corporation_id=corp_id, at=now)
+            await session.commit()
             continue
         # Stamp the winning token so selection rotates to another corp next cycle (#88).
         await tokens_repo.mark_used(session, corporation_id=corp_id, at=now)

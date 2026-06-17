@@ -181,6 +181,28 @@ describe("Config", () => {
     expect(alert).toHaveTextContent("Old Pilot")
   })
 
+  it("warns a manager when structure access is failing, with the failing-since date", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
+      authorized: true,
+      character_name: "Capsuleer",
+      expired: true,
+      failed_since: "2026-06-15T00:00:00Z",
+    })
+
+    // ?authorized=structure forces the picker onto the structure slot (where the
+    // status + warning live), as in the post-authorization return.
+    renderConfig(["/config?authorized=structure"])
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/authorization is failing/i)
+    expect(alert).toHaveTextContent(/re-authorize/i)
+    // The failing-since timestamp is surfaced (formatted to the local locale).
+    expect(alert).toHaveTextContent("2026")
+  })
+
   it("shows a member a read-only view", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("member"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)

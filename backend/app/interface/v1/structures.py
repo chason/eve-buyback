@@ -48,6 +48,7 @@ def _status(
         character_name=record.character_name,
         scopes=record.scopes,
         expired=record.last_refresh_failed_at is not None,
+        failed_since=record.last_refresh_failed_at,
         created_at=record.created_at,
         replaced_character_name=replaced_character_name,
     )

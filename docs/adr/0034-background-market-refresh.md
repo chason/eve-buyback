@@ -58,6 +58,10 @@ hub whose source is **not Fuzzwork**. The wiring lives in
   is logged and skipped; the others still refresh. The job commits per hub (via the
   shared `persist_market_rows`), so partial progress survives a mid-cycle failure, and a
   top-level guard in `jobs.py` keeps the recurring job alive across anything unexpected.
+  A structure that returns **403** (the character lost docking/market access) flags that
+  corp's token (`last_refresh_failed_at`), which the structure-status DTO surfaces to
+  managers as a "re-authorize" warning instead of a silent failure (#68); a later
+  successful fetch clears the flag, so it self-heals without a re-auth.
 - **The DB stays the durable tier.** Refreshed prices are written through to
   `market_prices` (and promoted into L1), so a restart doesn't lose the warm set.
 - **Config.** `BUYBACK_MARKET_BACKGROUND_REFRESH_ENABLED` (default on, a kill switch),

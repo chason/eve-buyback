@@ -103,11 +103,13 @@ async def mark_used(
     session: AsyncSession, *, corporation_id: uuid.UUID, at: datetime
 ) -> None:
     """Record that this corp's token was just used to fetch a structure book (ADR-0034
-    rotation, #88), so least-recently-used selection moves to another corp next cycle."""
+    rotation, #88), so least-recently-used selection moves to another corp next cycle.
+    A successful fetch also **clears** any prior failure flag — access is healthy again
+    (#68), so the manager's "re-authorize" warning self-heals without a re-auth."""
     await session.execute(
         update(StructureMarketToken)
         .where(StructureMarketToken.corporation_id == corporation_id)
-        .values(last_used_at=at)
+        .values(last_used_at=at, last_refresh_failed_at=None)
     )
 
 

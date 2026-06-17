@@ -160,6 +160,18 @@ export default function Config() {
           </p>
         ) : (
           <>
+            {authorized && structureStatus.data?.expired && (
+              <p role="alert" className="error">
+                ⚠️ Structure market authorization is failing
+                {structureStatus.data.failed_since
+                  ? ` (since ${new Date(
+                      structureStatus.data.failed_since,
+                    ).toLocaleString()})`
+                  : ""}
+                . Prices from your structure hub may be stale or missing until you
+                re-authorize with a character that has docking + market access.
+              </p>
+            )}
             {authorized ? (
               <p>
                 <span

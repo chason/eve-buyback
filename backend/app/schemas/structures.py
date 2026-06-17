@@ -29,6 +29,8 @@ class StructureTokenStatus(BaseModel):
     scopes: str | None = None
     # True when the last refresh failed (revoked grant / lost docking) → re-authorize.
     expired: bool = False
+    # When that failure was first recorded, so the UI can say "failing since …" (#68).
+    failed_since: datetime | None = None
     created_at: datetime | None = None
     # Set only on the completion response when a re-authorization switched the
     # authorizing character (EVE can't pin the picker) — the *previous* character's
