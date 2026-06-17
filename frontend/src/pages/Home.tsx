@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 
 import { beginLogin, getMe, registerCorporation, type SessionUser } from "../api/auth"
@@ -6,18 +7,34 @@ import { roleLabel } from "../lib/roles"
 
 function CorporationStatus({ user }: { user: SessionUser }) {
   const queryClient = useQueryClient()
+  // A non-CEO Director who registers is auto-granted Buyback Manager; track the
+  // just-completed registration so we can announce the role change once (the `me`
+  // refetch otherwise flips the nav silently).
+  const [justRegistered, setJustRegistered] = useState(false)
   const register = useMutation({
     mutationFn: registerCorporation,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+    onSuccess: () => {
+      setJustRegistered(true)
+      queryClient.invalidateQueries({ queryKey: ["me"] })
+    },
   })
 
   if (user.corporation_registered) {
     return (
-      <p>
-        <Link to="/appraise" role="button">
-          Start an appraisal
-        </Link>
-      </p>
+      <>
+        {justRegistered && user.role === "manager" && (
+          <p role="status">
+            ✓ You registered <strong>{user.corporation_name}</strong> and are now a{" "}
+            <strong>{roleLabel(user.role)}</strong> — you can configure pricing,
+            rules, and drop-off locations from the menu above.
+          </p>
+        )}
+        <p>
+          <Link to="/appraise" role="button">
+            Start an appraisal
+          </Link>
+        </p>
+      </>
     )
   }
 
