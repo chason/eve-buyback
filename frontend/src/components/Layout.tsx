@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, Outlet } from "react-router-dom"
+import { Link, NavLink, Outlet } from "react-router-dom"
 
 import { getMe, logout } from "../api/auth"
 import { getVersion } from "../api/version"
 import { isManager } from "../lib/roles"
+
+// Console-tab treatment for the active route (#87): NavLink toggles `active`, styled
+// in index.css. `end` on Appraisals so it doesn't stay lit under detail routes.
+const navClass = ({ isActive }: { isActive: boolean }) =>
+  isActive ? "nav-link active" : "nav-link"
 
 export default function Layout() {
   const queryClient = useQueryClient()
@@ -41,25 +46,35 @@ export default function Layout() {
         {user && (
           <ul>
             <li>
-              <Link to="/appraise">Appraise</Link>
+              <NavLink to="/appraise" className={navClass}>
+                Appraise
+              </NavLink>
             </li>
             <li>
-              <Link to="/appraisals">Appraisals</Link>
+              <NavLink to="/appraisals" end className={navClass}>
+                Appraisals
+              </NavLink>
             </li>
             {showManagerLinks && (
               <>
                 <li>
-                  <Link to="/config">Config</Link>
+                  <NavLink to="/config" className={navClass}>
+                    Config
+                  </NavLink>
                 </li>
                 <li>
-                  <Link to="/rules">Rules</Link>
+                  <NavLink to="/rules" className={navClass}>
+                    Rules
+                  </NavLink>
                 </li>
                 <li>
-                  <Link to="/locations">Locations</Link>
+                  <NavLink to="/locations" className={navClass}>
+                    Locations
+                  </NavLink>
                 </li>
               </>
             )}
-            <li>{user.character_name}</li>
+            <li className="identity">{user.character_name}</li>
             <li>
               <a
                 href="#"
