@@ -219,10 +219,13 @@ async def _fetch_structure_book(
     group: _HubGroup,
 ) -> dict | None:
     """Fetch a structure's full order book using the first referencing corp whose token
-    can actually read it (ADR-0034). Corps are tried healthiest-first (a token flagged
-    `last_refresh_failed_at` last, otherwise most-recently-authorized first). Returns
-    the aggregates, or None if no corp could fetch it."""
-    for corp_id in await _corps_by_token_health(session, group.corp_ids):
+    can actually read it (ADR-0034). Corps are tried healthiest-first — tokens not
+    flagged `last_refresh_failed_at` before flagged ones, then least-recently-authorized
+    first so the job doesn't always lean on the newest grant (ordering done in SQL).
+    Returns the aggregates, or None if no corp could fetch it."""
+    for corp_id in await tokens_repo.list_corps_by_token_health(
+        session, group.corp_ids
+    ):
         try:
             access_token = await get_structure_access_token(
                 session, sso, corporation_uuid=corp_id, cipher=cipher
@@ -248,19 +251,3 @@ async def _fetch_structure_book(
         "no referencing corp could access structure %s; skipping", group.hub_id
     )
     return None
-
-
-async def _corps_by_token_health(
-    session: AsyncSession, corp_ids: list[uuid.UUID]
-) -> list[uuid.UUID]:
-    """Order the corps that have a structure token, healthiest first: not-yet-failed
-    before failed, then most-recently-authorized first. Corps without a token drop out."""
-    records = []
-    for corp_id in corp_ids:
-        token = await tokens_repo.get_for_corp(session, corp_id)
-        if token is not None:
-            records.append(token)
-    # Two stable passes: newest-first, then non-failed-first wins overall.
-    records.sort(key=lambda t: t.created_at, reverse=True)
-    records.sort(key=lambda t: t.last_refresh_failed_at is not None)
-    return [t.corporation_id for t in records]

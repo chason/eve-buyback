@@ -81,7 +81,11 @@ class FakeEsi:
 
 
 class FakeSso:
+    def __init__(self) -> None:
+        self.refresh_tokens_seen: list[str] = []
+
     async def refresh_access_token(self, refresh_token: str) -> OAuthToken:
+        self.refresh_tokens_seen.append(refresh_token)
         # Same refresh token back → no rotation/update path in get_structure_access_token.
         return OAuthToken(access_token="access-tok", refresh_token=refresh_token)
 
@@ -133,10 +137,10 @@ async def _grant_token(corp_id, *, eve_char_id=777, failed_at=None, refresh="rt"
         await session.commit()
 
 
-async def _run(esi, *, cache=None):
+async def _run(esi, *, cache=None, sso=None):
     async with SessionLocal() as session:
         return await market_refresh.refresh_due_prices(
-            session, esi_market=esi, sso=FakeSso(), cipher=_cipher(),
+            session, esi_market=esi, sso=sso or FakeSso(), cipher=_cipher(),
             cache=cache, settings=get_settings(), now=NOW,
         )
 
@@ -261,6 +265,23 @@ async def test_structure_picks_a_healthy_corp_token_over_a_failed_one():
 
     assert esi.structure_calls == 1  # one corp's token sufficed (only fetched once)
     assert summary.types_written == 1
+
+
+async def test_structure_prefers_least_recently_authorized_healthy_corp():
+    # Two healthy corps on one structure → the OLDER grant is tried first (and, with
+    # first-success-wins, is the only one used). Proves the SQL health ordering.
+    older = await _make_corp(98000012, name="Older")
+    newer = await _make_corp(98000013, name="Newer")
+    await _set_config(older.id, hub_id=STRUCT_HUB, kind="structure")
+    await _set_config(newer.id, hub_id=STRUCT_HUB, kind="structure")
+    await _grant_token(older.id, eve_char_id=801, refresh="rt-older")
+    await _grant_token(newer.id, eve_char_id=802, refresh="rt-newer")
+    esi = FakeEsi(structure={34: _book(buy="3.0", sell="4.0")})
+    sso = FakeSso()
+
+    await _run(esi, sso=sso)
+
+    assert sso.refresh_tokens_seen == ["rt-older"]
 
 
 # --- isolation + degrade across hubs ---
