@@ -34,6 +34,7 @@ from app.application.market import persist_market_rows
 from app.application.structure_tokens import get_structure_access_token
 from app.config import Settings
 from app.data.repositories import buyback_config as config_repo
+from app.data.repositories import market_hub_refresh as hub_refresh_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import structure_tokens as tokens_repo
@@ -193,20 +194,28 @@ async def _refresh_one_hub(
         )
         return len(records)
 
-    # esi_structure: the whole book dates from its freshest cached row; refresh the lot
-    # once that's due (or when nothing is cached yet → pre-warm).
+    # esi_structure: the whole book is one fetch. Its freshness is the most recent of the
+    # cached rows' fetched_at and the refresh marker — the marker advances even when the
+    # book comes back empty, so an illiquid structure isn't re-fetched every cycle (#70).
     latest = await prices_repo.latest_fetched_at(session, hub_id=group.hub_id)
-    if latest is not None and latest >= cutoff:
+    marker = await hub_refresh_repo.get_refreshed_at(session, hub_id=group.hub_id)
+    last_refresh = max((t for t in (latest, marker) if t is not None), default=None)
+    if last_refresh is not None and last_refresh >= cutoff:
         return 0
     aggregates = await _fetch_structure_book(
         session, esi_market=esi_market, sso=sso, cipher=cipher, group=group, now=now
     )
     if aggregates is None:
         return 0  # no referencing corp could fetch it (logged inside)
+    # Stamp the refresh (pending) so an empty book still records that we fetched; it
+    # commits together with any prices below, or on its own when the book was empty.
+    await hub_refresh_repo.mark_refreshed(session, hub_id=group.hub_id, at=now)
     records = await persist_market_rows(
         session, cache, hub_id=group.hub_id, aggregates=aggregates, now=now,
         l1_ttl=l1_ttl,
     )
+    if not records:
+        await session.commit()  # persist_market_rows no-ops on an empty book (#70)
     return len(records)
 
 
