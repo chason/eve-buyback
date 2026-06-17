@@ -130,6 +130,13 @@ def test_good_memcached_addr_accepted():
     assert _dev(cache_backend="memcached", memcached_addr="cache.host")  # host only
 
 
+def test_esi_overload_defaults():
+    # ADR-0035: a per-appraisal ESI-type cap and the (now process-wide) ESI concurrency cap.
+    s = _dev()
+    assert s.max_esi_types_per_appraisal == 100
+    assert s.esi_market_concurrency == 8
+
+
 def test_background_refresh_defaults():
     # On by default (ADR-0034) with a 10-minute cycle and a short initial delay.
     s = _dev()

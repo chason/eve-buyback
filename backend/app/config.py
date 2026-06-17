@@ -56,9 +56,16 @@ class Settings(BaseSettings):
     market_hub_id: int = 60003760
     # How long a cached market price stays fresh before re-fetch (ADR-0006).
     market_cache_ttl_seconds: int = 60 * 60  # 1 hour
-    # Max concurrent ESI region-order requests when pricing a non-Fuzzwork hub
-    # (one request per type; ADR-0028). Keep modest to respect ESI's error budget.
+    # Max concurrent ESI region-order requests (one request per type; ADR-0028). This is
+    # a **process-wide** cap shared by all in-flight appraisals + the background refresh
+    # (ADR-0035), so concurrent requests can't multiply outbound load. Keep modest to
+    # respect ESI's per-IP error budget.
     esi_market_concurrency: int = 8
+    # Cap on distinct non-Fuzzwork (ESI-priced) types in a single appraisal (ADR-0035).
+    # Each such type is a separate live ESI lookup, so this bounds the worst-case outbound
+    # fan-out of one request against the cold-type cache-miss attack (#23). Fuzzwork hubs
+    # batch into one request and are bounded only by the 1000-item cap.
+    max_esi_types_per_appraisal: int = 100
 
     # Background refresh of non-Fuzzwork hub prices (ADR-0034): a scheduled job keeps
     # ESI-priced hubs (non-Jita NPC stations, player structures) warm so appraisals

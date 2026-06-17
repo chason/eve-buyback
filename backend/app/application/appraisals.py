@@ -17,12 +17,14 @@ from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     AppraisalNotFound,
     AppraisalTooLarge,
+    AppraisalTooManyEsiTypes,
     DeliveryLocationInvalid,
     DeliveryLocationRequired,
     EmptyAppraisal,
     StructureMarketUnavailable,
 )
 from app.application.pricing import get_config
+from app.config import get_settings
 from app.data.records import (
     AppraisalRecord,
     AppraisalSummaryRecord,
@@ -39,7 +41,11 @@ from app.data.repositories import sde as sde_repo
 from app.data.repositories import structure_tokens as tokens_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
-from app.domain.market import FUZZWORK_HUB_NAMES, HubDescriptor
+from app.domain.market import (
+    FUZZWORK_HUB_NAMES,
+    HubDescriptor,
+    resolve_market_source,
+)
 from app.domain.paste import MAX_APPRAISAL_ITEMS, parse_paste
 from app.domain.roles import role_at_least
 from app.plugins.cache import Cache
@@ -189,6 +195,18 @@ async def create_appraisal(
             mineral_ids.add(mid)
     if mineral_ids:  # mineral names for the per-line breakdown
         types = {**types, **await sde_repo.get_types(session, list(mineral_ids))}
+
+    # Bound the worst-case outbound ESI fan-out (#23, ADR-0035): each distinct type at a
+    # non-Fuzzwork hub is its own live ESI lookup (the cold-type cache-miss path the
+    # background refresh can't pre-warm), so cap how many a single appraisal can trigger.
+    # Fuzzwork hubs batch into one request and are exempt (bounded by the 1000-item cap).
+    esi_type_count = sum(
+        len(ids)
+        for hub, ids in ids_by_hub.items()
+        if resolve_market_source(hub) != "fuzzwork"
+    )
+    if esi_type_count > get_settings().max_esi_types_per_appraisal:
+        raise AppraisalTooManyEsiTypes()
 
     # One corp-level structure token covers every structure hub (ADR-0029); the
     # provider is only invoked for esi_structure fetches, so pass it to all of them.

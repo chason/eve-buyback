@@ -27,7 +27,7 @@ async def run_market_refresh(app: FastAPI) -> None:
     case already degrades per hub; this top-level guard keeps the recurring job alive
     across any unexpected failure."""
     settings = get_settings()
-    esi_market = EsiMarketClient(app.state.http)
+    esi_market = EsiMarketClient(app.state.http, app.state.esi_semaphore)
     sso = EveSsoClient(settings, app.state.http)
     cipher = TokenCipher(settings.token_encryption_key)
     try:

@@ -36,8 +36,14 @@ class StructureAccessDenied(Exception):
 class EsiMarketClient:
     """Thin async wrapper over the shared httpx client for ESI market endpoints."""
 
-    def __init__(self, client: httpx.AsyncClient) -> None:
+    def __init__(
+        self, client: httpx.AsyncClient, semaphore: asyncio.Semaphore | None = None
+    ) -> None:
         self._client = client
+        # A **process-wide** ESI concurrency cap (ADR-0035) injected from app.state, so
+        # concurrent appraisals + the background refresh can't multiply outbound load.
+        # Falls back to a per-call semaphore when not provided (keeps unit tests simple).
+        self._semaphore = semaphore
 
     async def get_region_aggregates(
         self, *, region_id: int, station_id: str, type_ids: list[int]
@@ -46,7 +52,9 @@ class EsiMarketClient:
         by type id. One paginated request per type, fanned out under a concurrency
         cap; a single type's failure is logged and skipped (the cache simply keeps
         missing it), not fatal."""
-        sem = asyncio.Semaphore(get_settings().esi_market_concurrency)
+        sem = self._semaphore or asyncio.Semaphore(
+            get_settings().esi_market_concurrency
+        )
 
         async def one(type_id: int) -> tuple[int, OrderBookAggregate]:
             async with sem:
@@ -199,4 +207,7 @@ class EsiMarketClient:
 
 
 def get_esi_market_client(request: Request) -> EsiMarketClient:
-    return EsiMarketClient(request.app.state.http)
+    return EsiMarketClient(
+        request.app.state.http,
+        getattr(request.app.state, "esi_semaphore", None),
+    )
