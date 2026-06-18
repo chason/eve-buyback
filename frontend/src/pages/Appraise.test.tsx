@@ -114,12 +114,13 @@ describe("Appraise", () => {
   it("frames submission as a saved, corp-visible record (#31)", async () => {
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     renderAppraise()
-    expect(
-      await screen.findByText(/creates a saved appraisal record/i),
-    ).toBeInTheDocument()
+    const note = await screen.findByText(/creates a saved appraisal record/i)
+    expect(note).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: "Create appraisal" }),
     ).toBeInTheDocument()
+    // The whole flow sits in a HUD console panel (#81).
+    expect(note.closest(".panel")).toBeInTheDocument()
   })
 
   it("shows the live paste count and surfaces the cap inline (#37)", async () => {

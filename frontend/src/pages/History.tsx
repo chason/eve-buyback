@@ -32,6 +32,7 @@ export default function History() {
           No appraisals yet. <Link to="/appraise">Create one</Link>.
         </p>
       ) : (
+        <div className="panel">
         <table>
           <thead>
             <tr>
@@ -66,6 +67,7 @@ export default function History() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </>
   )

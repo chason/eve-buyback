@@ -121,6 +121,7 @@ export default function Config() {
       />
 
       <form
+        className="panel"
         onSubmit={(e) => {
           e.preventDefault()
           save.mutate()

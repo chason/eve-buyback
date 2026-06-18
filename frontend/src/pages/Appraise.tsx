@@ -85,6 +85,7 @@ export default function Appraise() {
     <>
       <h1>Appraise</h1>
 
+      <div className="panel">
       {hasLocations ? (
         <label>
           Drop-off location
@@ -227,6 +228,7 @@ export default function Appraise() {
       {appraise.isError && (
         <p className="error">{(appraise.error as Error).message}</p>
       )}
+      </div>
     </>
   )
 }

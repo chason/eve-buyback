@@ -76,6 +76,7 @@ export default function Locations() {
             : "Appraisals use the market hub until a manager adds one."}
         </p>
       ) : (
+        <div className="panel">
         <table>
           <thead>
             <tr>
@@ -110,6 +111,7 @@ export default function Locations() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {!canEdit && (
@@ -122,6 +124,7 @@ export default function Locations() {
         <>
           <h2>Add a location</h2>
 
+          <div className="panel">
           <label>
             NPC station
             <input
@@ -216,6 +219,7 @@ export default function Locations() {
           {add.isError && (
             <p className="error">{(add.error as Error).message}</p>
           )}
+          </div>
         </>
       )}
     </>

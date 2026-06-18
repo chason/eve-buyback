@@ -62,6 +62,9 @@ describe("History", () => {
     // A non-zero rejected count renders as a danger status chip (#83).
     const chip = screen.getByText("2")
     expect(chip).toHaveClass("status", "status--danger")
+
+    // The results table is framed in a HUD console panel (#81).
+    expect(screen.getByRole("table").closest(".panel")).toBeInTheDocument()
   })
 
   it("shows the creator's name (not id) to a manager", async () => {

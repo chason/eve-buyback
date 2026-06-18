@@ -100,6 +100,7 @@ export default function Rules() {
       {rules.data.length === 0 ? (
         <p>No rules yet — the corp defaults apply to everything.</p>
       ) : (
+        <div className="panel">
         <table>
           <thead>
             <tr>
@@ -176,6 +177,7 @@ export default function Rules() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {canEdit ? (
