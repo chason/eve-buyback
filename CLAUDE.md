@@ -28,7 +28,7 @@ domain model, auth flow, and pricing-rule resolution.
 | Backend     | Python + FastAPI + Pydantic v2 (async)   | REST/JSON API under `/api/v1` (ADR-0001)|
 | Persistence | SQLAlchemy 2.0 + Alembic on PostgreSQL (asyncpg) | Sole DB; UUID app-entity PKs (ADR-0024, 0025) |
 | Frontend    | TypeScript + React (Vite) + TanStack Query | SPA; types generated from OpenAPI (ADR-0011, 0013) |
-| Auth        | EVE SSO → backend session cookie         | No persisted EVE tokens (ADR-0004)      |
+| Auth        | EVE SSO → backend session cookie         | No persisted EVE tokens (ADR-0004); CEO/Director manager designation via a roster-sync SSO step-up (ADR-0036) |
 | Market data | Fuzzwork aggregates, cached; ESI orders for other hubs; background refresh keeps non-Fuzzwork hubs warm; per-appraisal ESI-type cap + global ESI concurrency cap | (ADR-0006, 0028, 0034, 0035) |
 | Tooling     | `uv`/`venv` (py), `npm` (front)          | Pin exact tooling once chosen           |
 
@@ -44,7 +44,7 @@ buyback/
 │   │   ├── main.py       # app factory + lifespan; wires middleware, routers, error handlers, background scheduler (ADR-0034)
 │   │   ├── config.py     # pydantic-settings (env, prefix BUYBACK_)
 │   │   ├── interface/    # INTERFACE: FastAPI routers (v1/) + deps, security, middleware, error mapping, background-job wiring (jobs.py)
-│   │   ├── application/  # APPLICATION: use cases (auth, corporations, sde, market, market_refresh, reference, pricing, appraisals, locations) + typed errors
+│   │   ├── application/  # APPLICATION: use cases (auth, corporations, corp_roster, sde, market, market_refresh, reference, pricing, appraisals, locations) + typed errors
 │   │   ├── domain/       # DOMAIN: small pure functions (roles, auth helpers, market TTL, pricing/resolution)
 │   │   ├── data/         # DATA: db engine, models/, records.py (pydantic), repositories/
 │   │   ├── plugins/      # PLUGINS: outside-resource gateways (EVE ESI, SSO, Fuzzwork, SDE source, cache); return pydantic

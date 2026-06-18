@@ -80,7 +80,8 @@ consumers can be added later (see [ADR-0011](adr/0011-api-contract-and-typescrip
 |--------|-----------|-------|
 | `Corporation` | `id` (UUID, PK), `eve_id` (EVE corp id, unique), `name`, `ceo_character_id`, `registered_at`, `registered_by` | The tenant. One row per registered corp. |
 | `Character` | `id` (UUID, PK), `eve_id` (EVE char id, unique), `name`, `last_login_at` | Persisted only because managers must be referenceable. |
-| `ManagerAssignment` | `id` (UUID, PK), `corporation_id`→corp, `character_id`→char (UUID FKs), `granted_by`, `granted_at` | Grants the Buyback Manager role. CEO is implicit (not stored here). |
+| `ManagerAssignment` | `id` (UUID, PK), `corporation_id`→corp, `character_id`→char (UUID FKs), `granted_by`, `granted_at` | Grants the Buyback Manager role. CEO is implicit (not stored here). A CEO or Director designates one by searching the synced roster ([ADR-0036](adr/0036-corp-roster-manager-designation.md)). |
+| `CorpRosterMember` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `character_eve_id` (BigInteger), `name`, `synced_at`; unique `(corporation_id, character_eve_id)` | Cached snapshot of a corp's members for the manager-designation picker, replaced wholesale on each CEO/Director roster sync. No EVE token persisted ([ADR-0036](adr/0036-corp-roster-manager-designation.md)). |
 | `BuybackConfig` | `id` (UUID, PK), `corporation_id`→corp (UUID FK, unique), `market_hub_id`, `default_basis`, `default_percentage`, `aggregate_field`, `default_accepted`, data-quality thresholds | Per-corp defaults = the "global" rule; `default_accepted=false` → whitelist-only buyback ([ADR-0007](adr/0007-pricing-rule-taxonomy.md)). |
 | `PricingRule` | `id` (UUID, PK), `corporation_id`→corp (UUID FK), `target_kind` (`market_group`\|`type`), `target_id` (EVE id), `basis?`, `percentage`, `enabled`, `accepted`, `reprocess`, `compressed_only`, `market_hub_id?`+kind/region/name | Overrides for a market group or a single type. `accepted=false` rejects matching items (blacklist, [ADR-0007](adr/0007-pricing-rule-taxonomy.md)); `reprocess`/`compressed_only` are ore flags ([ADR-0026](adr/0026-ore-reprocess-pricing.md)); the optional hub quartet prices matches at a different hub ([ADR-0031](adr/0031-per-rule-market-hub.md)). |
 | `MarketPrice` (cache) | `hub_id`, `type_id`, buy/sell aggregates, `volume`, `order_count`, `fetched_at` | Fuzzwork snapshot; EVE-keyed cache, TTL-expired. See [ADR-0006](adr/0006-market-data-fuzzwork.md). |
@@ -216,8 +217,11 @@ All under `/api/v1`. Auth via session cookie; manager/CEO gating noted.
 | PUT | `/corporations/me/config` | manager | Edit global defaults (data-quality thresholds: M7) |
 | GET | `/corporations/me/rules` | member | List pricing rules |
 | PUT/DELETE | `/corporations/me/rules/{target_kind}/{target_id}` | manager | Set (idempotent upsert) / remove the rule for a target — no surrogate id (ADR-0022) |
-| GET | `/corporations/me/managers` | CEO | List managers |
-| POST/DELETE | `/corporations/me/managers[/{character_id}]` | CEO | Grant/revoke manager |
+| GET | `/corporations/me/managers` | CEO/Director | List managers |
+| POST/DELETE | `/corporations/me/managers[/{character_id}]` | CEO/Director | Grant/revoke manager ([ADR-0036](adr/0036-corp-roster-manager-designation.md)) |
+| GET | `/corporations/me/roster` | CEO/Director | Roster sync status (synced?, when, member count) |
+| POST | `/corporations/me/roster/sync[/session]` | CEO/Director | Begin / complete the roster-sync SSO step-up ([ADR-0036](adr/0036-corp-roster-manager-designation.md)) |
+| GET | `/corporations/me/roster/members?q=` | CEO/Director | Search synced corp members (manager-designation typeahead) |
 | POST | `/appraisals` | member | Price a list of items → persist + return appraisal (the core endpoint) |
 | GET | `/appraisals/{public_id}` | member | Fetch a saved appraisal (corp-scoped; doubles as share link) |
 | GET | `/appraisals` | member | List appraisals (own; managers/CEO see the corp's) |

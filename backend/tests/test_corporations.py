@@ -169,9 +169,23 @@ async def test_add_manager_rejects_other_corp_character():
         assert resp.status_code == 400
 
 
-async def test_manager_cannot_manage_managers():
+async def test_director_can_manage_managers():
+    # A Director (not the CEO) may designate Buyback Managers (ADR-0036).
     async with _client(DirectorEsi()) as http:
         await _login(http)
-        await http.post("/api/v1/corporations")  # director becomes manager
+        await http.post("/api/v1/corporations")  # director registers
+
+        add = await http.post(
+            "/api/v1/corporations/me/managers", json={"character_id": 555}
+        )
+        assert add.status_code == 201
+        listed = await http.get("/api/v1/corporations/me/managers")
+        assert listed.status_code == 200
+        assert 555 in {m["character_id"] for m in listed.json()}
+
+
+async def test_plain_member_cannot_manage_managers():
+    async with _client(MemberEsi()) as http:
+        await _login(http)  # role member, not a director
         resp = await http.get("/api/v1/corporations/me/managers")
         assert resp.status_code == 403

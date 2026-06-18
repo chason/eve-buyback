@@ -38,6 +38,13 @@ class ManagerNotFound(ApplicationError):
     default_detail = "Manager not found"
 
 
+class RosterAccessDenied(ApplicationError):
+    default_detail = (
+        "EVE refused the corporation member list — the character you synced with must "
+        "be a Director (and grant the membership scope) to read the roster"
+    )
+
+
 class PricingRuleNotFound(ApplicationError):
     default_detail = "Pricing rule not found"
 

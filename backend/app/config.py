@@ -108,6 +108,10 @@ class Settings(BaseSettings):
         "publicData esi-markets.structure_markets.v1 "
         "esi-search.search_structures.v1 esi-universe.read_structures.v1"
     )
+    # Scope requested by the separate "sync corp roster" flow (ADR-0036) so a CEO or
+    # Director can pull the corporation's member list for the manager-designation
+    # picker. Kept off normal login so ordinary members never consent to it.
+    eve_roster_scopes: str = "publicData esi-corporations.read_corporation_membership.v1"
 
     # Fernet key encrypting persisted structure-market refresh tokens at rest
     # (ADR-0029). Required (a real value) to use structure hubs in production.

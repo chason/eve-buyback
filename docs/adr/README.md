@@ -45,5 +45,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0033](0033-pluggable-cache.md) | Pluggable cache (L1) in front of the market_prices DB cache | Accepted |
 | [0034](0034-background-market-refresh.md) | Background auto-refresh of non-Fuzzwork market prices | Accepted |
 | [0035](0035-esi-overload-protection.md) | ESI-overload protection: per-appraisal type cap + global concurrency cap | Accepted |
+| [0036](0036-corp-roster-manager-designation.md) | Designate Buyback Managers by searching a synced corp roster (SSO step-up, no persisted token) | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
