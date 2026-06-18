@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.models import StructureMarketToken
+from app.data.models import Corporation, StructureMarketToken
 from app.data.records import StructureMarketTokenRecord
 
 
@@ -44,6 +44,15 @@ async def list_corps_by_token_health(
             # then oldest grant as a stable tiebreak among the never-used.
             StructureMarketToken.created_at.asc(),
         )
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def list_corp_eve_ids_with_token(session: AsyncSession) -> list[int]:
+    """EVE corp ids of every corporation holding a corp-ESI token (ADR-0036). Joined to
+    `corporations` so the daily roster-refresh job can drive the EVE-id-keyed use case."""
+    stmt = select(Corporation.eve_id).join(
+        StructureMarketToken, StructureMarketToken.corporation_id == Corporation.id
     )
     return list((await session.execute(stmt)).scalars().all())
 

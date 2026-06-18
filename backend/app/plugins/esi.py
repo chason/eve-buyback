@@ -4,6 +4,15 @@ from pydantic import BaseModel
 
 ESI_BASE = "https://esi.evetech.net/latest"
 
+# ESI's bulk name-resolution endpoint accepts up to 1000 ids per request.
+_NAMES_CHUNK = 1000
+
+
+class CorporationMembersForbidden(Exception):
+    """ESI refused the corp member list (401/403): the authorizing character lacks the
+    in-game Director role or the membership scope (ADR-0036). Transport-level; the
+    application layer maps it to a semantic error."""
+
 
 class CorporationInfo(BaseModel):
     name: str
@@ -55,6 +64,34 @@ class EsiClient:
             return []  # scope not granted — fail closed (ADR-0015)
         resp.raise_for_status()
         return resp.json().get("roles", [])
+
+    async def get_corporation_members(
+        self, corporation_id: int, access_token: str
+    ) -> list[int]:
+        """The corp's member character ids (ADR-0036). Requires a token whose character
+        holds the in-game Director role and the membership scope; 401/403 means that
+        character can't read the roster (raised, not swallowed, so the sync can explain)."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/corporations/{corporation_id}/members/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code in (401, 403):
+            raise CorporationMembersForbidden()
+        resp.raise_for_status()
+        return resp.json()
+
+    async def resolve_universe_names(self, ids: list[int]) -> dict[int, str]:
+        """Resolve ids to names via the public bulk endpoint (ADR-0036), keeping only
+        the characters. Chunked at ESI's 1000-id limit; an empty input is a no-op."""
+        names: dict[int, str] = {}
+        for start in range(0, len(ids), _NAMES_CHUNK):
+            chunk = ids[start : start + _NAMES_CHUNK]
+            resp = await self._client.post(f"{ESI_BASE}/universe/names/", json=chunk)
+            resp.raise_for_status()
+            for entry in resp.json():
+                if entry.get("category") == "character":
+                    names[entry["id"]] = entry["name"]
+        return names
 
 
 def get_esi_client(request: Request) -> EsiClient:

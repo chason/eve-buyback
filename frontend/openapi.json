@@ -516,6 +516,25 @@
         "title": "ConfigUpdateRequest",
         "type": "object"
       },
+      "CorpMemberOut": {
+        "description": "A corp member matched by the manager-designation search.",
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character_id",
+          "name"
+        ],
+        "title": "CorpMemberOut",
+        "type": "object"
+      },
       "CorporationOut": {
         "properties": {
           "ceo_character_id": {
@@ -813,6 +832,37 @@
           "value"
         ],
         "title": "ReprocessMineralOut",
+        "type": "object"
+      },
+      "RosterStatusOut": {
+        "description": "The corp roster's sync state, shown on the Config panel + Managers page.",
+        "properties": {
+          "member_count": {
+            "default": 0,
+            "title": "Member Count",
+            "type": "integer"
+          },
+          "synced": {
+            "title": "Synced",
+            "type": "boolean"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          }
+        },
+        "required": [
+          "synced"
+        ],
+        "title": "RosterStatusOut",
         "type": "object"
       },
       "RuleOut": {
@@ -1314,7 +1364,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "31"
+    "version": "50"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1822,6 +1872,97 @@
         ]
       }
     },
+    "/api/v1/corporations/me/roster": {
+      "get": {
+        "operationId": "get_status_api_v1_corporations_me_roster_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RosterStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Status",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/roster/members": {
+      "get": {
+        "description": "Search the synced roster by name (empty until a Director connects the token).",
+        "operationId": "search_members_api_v1_corporations_me_roster_members_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CorpMemberOut"
+                  },
+                  "title": "Response Search Members Api V1 Corporations Me Roster Members Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Members",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/roster/refresh": {
+      "post": {
+        "description": "Manually re-pull the roster with the stored token (rate-limited; 429 if too soon).",
+        "operationId": "refresh_api_v1_corporations_me_roster_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RosterStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
     "/api/v1/corporations/me/rules": {
       "get": {
         "operationId": "list_rules_api_v1_corporations_me_rules_get",
@@ -1994,7 +2135,7 @@
     },
     "/api/v1/corporations/me/structure-token/authorize": {
       "post": {
-        "description": "Begin the structure-access grant: mint state + PKCE and return the SSO URL.",
+        "description": "Begin the corp ESI access grant: mint state + PKCE and return the SSO URL.",
         "operationId": "authorize_api_v1_corporations_me_structure_token_authorize_post",
         "responses": {
           "200": {
@@ -2064,7 +2205,7 @@
     },
     "/api/v1/corporations/me/structure-token/session": {
       "post": {
-        "description": "Complete the grant: validate state, exchange the code, store the token.",
+        "description": "Complete the grant: validate state, exchange the code, store the token, and\nbest-effort populate the roster (works if the connected character is a Director).",
         "operationId": "complete_api_v1_corporations_me_structure_token_session_post",
         "requestBody": {
           "content": {

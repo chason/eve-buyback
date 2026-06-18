@@ -76,6 +76,16 @@ class Settings(BaseSettings):
     market_refresh_interval_seconds: int = 600  # 10 minutes
     market_refresh_initial_delay_seconds: int = 30  # first run after boot
 
+    # Background refresh of corp rosters (ADR-0036): a daily job re-pulls each
+    # token-holding corp's member list (via the persisted Corp ESI token) so the
+    # manager-designation picker stays current without anyone clicking. The manual
+    # "Refresh roster" button is rate-limited to roster_manual_refresh_min_interval_seconds;
+    # the background job ignores that cooldown.
+    roster_background_refresh_enabled: bool = True
+    roster_refresh_interval_seconds: int = 86400  # 24 hours
+    roster_refresh_initial_delay_seconds: int = 60  # first run after boot
+    roster_manual_refresh_min_interval_seconds: int = 900  # 15 min manual cooldown
+
     # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
     # is an in-process LRU; set "memcached" + the address to share across processes.
     # SECURITY: memcached is UNAUTHENTICATED — bind it to loopback or a private/
@@ -108,6 +118,20 @@ class Settings(BaseSettings):
         "publicData esi-markets.structure_markets.v1 "
         "esi-search.search_structures.v1 esi-universe.read_structures.v1"
     )
+    # Scope requested by the separate "sync corp roster" flow (ADR-0036) so a CEO or
+    # Director can pull the corporation's member list for the manager-designation
+    # picker. Kept off normal login so ordinary members never consent to it.
+    eve_roster_scopes: str = "publicData esi-corporations.read_corporation_membership.v1"
+
+    @property
+    def eve_corp_token_scopes(self) -> str:
+        """The full scope set for the one persisted Corp ESI access token (ADR-0036):
+        structure-market access + corp-membership, requested in a single grant. Deduped,
+        order-preserving (both sets include `publicData`)."""
+        seen: dict[str, None] = {}
+        for scope in f"{self.eve_structure_scopes} {self.eve_roster_scopes}".split():
+            seen.setdefault(scope, None)
+        return " ".join(seen)
 
     # Fernet key encrypting persisted structure-market refresh tokens at rest
     # (ADR-0029). Required (a real value) to use structure hubs in production.

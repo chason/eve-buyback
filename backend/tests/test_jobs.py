@@ -1,10 +1,9 @@
-"""Background-job wiring (ADR-0034): the lifespan scheduler setup
-(`main._start_market_refresh`) and the interface adapter (`jobs.run_market_refresh`).
+"""Background-job wiring (ADR-0034, ADR-0036): the lifespan scheduler setup
+(`main._start_scheduler`) and the interface adapter (`jobs.run_market_refresh`).
 
-The use case itself (`refresh_due_prices`) is covered in test_market_refresh.py; here we
-test the glue that keeps the recurring job alive — the enable flag, the scheduler job's
-parameters, and the top-level guard that must swallow any failure so the job keeps
-firing.
+The use cases themselves are covered in test_market_refresh.py / test_corp_roster.py; here
+we test the glue that keeps the recurring jobs alive — the enable flags, the scheduler jobs'
+parameters, and the top-level guard that must swallow any failure so the job keeps firing.
 """
 
 from datetime import datetime
@@ -13,7 +12,7 @@ from types import SimpleNamespace
 from app.application import market_refresh
 from app.config import get_settings
 from app.interface import jobs
-from app.main import _start_market_refresh
+from app.main import _start_scheduler
 
 
 def _fake_app(cache=None) -> SimpleNamespace:
@@ -25,35 +24,60 @@ def _fake_app(cache=None) -> SimpleNamespace:
     )
 
 
-# --- lifespan scheduler setup (_start_market_refresh) ---
+# --- lifespan scheduler setup (_start_scheduler) ---
 
 
-def test_start_market_refresh_returns_none_when_disabled():
+def test_start_scheduler_returns_none_when_all_jobs_disabled():
     settings = get_settings().model_copy(
-        update={"market_background_refresh_enabled": False}
+        update={
+            "market_background_refresh_enabled": False,
+            "roster_background_refresh_enabled": False,
+        }
     )
-    assert _start_market_refresh(SimpleNamespace(), settings) is None
+    assert _start_scheduler(SimpleNamespace(), settings) is None
 
 
-async def test_start_market_refresh_configures_the_job_when_enabled():
+async def test_start_scheduler_configures_enabled_jobs():
     settings = get_settings().model_copy(
         update={
             "market_background_refresh_enabled": True,
             "market_refresh_interval_seconds": 600,
             "market_refresh_initial_delay_seconds": 30,
+            "roster_background_refresh_enabled": True,
+            "roster_refresh_interval_seconds": 86400,
+            "roster_refresh_initial_delay_seconds": 60,
         }
     )
 
-    scheduler = _start_market_refresh(SimpleNamespace(), settings)
+    scheduler = _start_scheduler(SimpleNamespace(), settings)
     try:
         assert scheduler is not None
-        job = scheduler.get_job("market_refresh")
-        assert job is not None
-        assert job.trigger.interval.total_seconds() == 600
-        assert job.max_instances == 1  # never overlap a slow run with the next tick
-        assert job.coalesce is True  # collapse missed ticks into one
-        # First run is deferred so a cold deploy warms soon without hammering ESI at boot.
-        assert job.next_run_time is not None
+        market = scheduler.get_job("market_refresh")
+        assert market is not None
+        assert market.trigger.interval.total_seconds() == 600
+        assert market.max_instances == 1  # never overlap a slow run with the next tick
+        assert market.coalesce is True  # collapse missed ticks into one
+        assert market.next_run_time is not None  # deferred first run
+        roster = scheduler.get_job("roster_refresh")
+        assert roster is not None
+        assert roster.trigger.interval.total_seconds() == 86400
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+
+async def test_start_scheduler_omits_a_disabled_job():
+    settings = get_settings().model_copy(
+        update={
+            "market_background_refresh_enabled": False,
+            "roster_background_refresh_enabled": True,
+        }
+    )
+    scheduler = _start_scheduler(SimpleNamespace(), settings)
+    try:
+        assert scheduler is not None
+        assert scheduler.get_job("market_refresh") is None
+        assert scheduler.get_job("roster_refresh") is not None
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

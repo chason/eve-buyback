@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.auth import AuthenticatedUser, LoginChallenge
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
+    AuthorizingCharacterNotInCorporation,
     NotAuthorizedToAuthorizeStructure,
     SsoNotConfigured,
     StructureEncryptionNotConfigured,
@@ -30,7 +31,7 @@ from app.data.records import StructureMarketTokenRecord
 from app.data.repositories import characters as characters_repo
 from app.data.repositories import structure_tokens as tokens_repo
 from app.domain import auth as auth_rules
-from app.domain.roles import role_at_least
+from app.plugins.esi import EsiClient
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
@@ -68,9 +69,10 @@ class StructureMatch(BaseModel):
 
 
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
-    """Mint the PKCE/state challenge for the structure-scope authorization. Fails
-    fast on a missing/malformed encryption key so the manager isn't sent through the
-    whole EVE round-trip only to have the completion refuse to store the token."""
+    """Mint the PKCE/state challenge for the **Corp ESI access** grant (ADR-0036): one
+    token carrying both the structure-market scopes and the corp-membership scope. Fails
+    fast on a missing/malformed encryption key so the admin isn't sent through the whole
+    EVE round-trip only to have the completion refuse to store the token."""
     if not sso.configured:
         raise SsoNotConfigured()
     if not get_settings().structure_tokens_configured:
@@ -80,7 +82,7 @@ def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
     url = sso.build_authorize_url(
         state=state,
         code_challenge=challenge,
-        scopes=get_settings().eve_structure_scopes,
+        scopes=get_settings().eve_corp_token_scopes,
     )
     return LoginChallenge(authorization_url=url, state=state, verifier=verifier)
 
@@ -88,17 +90,20 @@ def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
 async def complete_structure_authorize(
     session: AsyncSession,
     sso: EveSsoClient,
+    esi: EsiClient,
     *,
     code: str,
     verifier: str,
     user: AuthenticatedUser,
     cipher: TokenCipher,
 ) -> StructureAuthorizeResult:
-    """Exchange the code and store the (encrypted) refresh token for the caller's
-    corp. Only a Buyback Manager / CEO may authorize. A re-authorization replaces any
-    existing token; if it switched to a different character, the previous character's
-    name is returned so the caller can warn about the swap."""
-    if not role_at_least(user.role, "manager"):
+    """Exchange the code and store the (encrypted) refresh token for the caller's corp
+    (ADR-0036). Only the CEO or a Director may connect/revoke, but the authorizing
+    character can be any corp member (validated here) — commonly a Director service
+    character so the roster works too. A re-authorization replaces any existing token; if
+    it switched to a different character, the previous character's name is returned so the
+    caller can warn about the swap."""
+    if not (user.role == "ceo" or user.is_director):
         raise NotAuthorizedToAuthorizeStructure()
     if not get_settings().structure_tokens_configured:
         raise StructureEncryptionNotConfigured()
@@ -108,6 +113,12 @@ async def complete_structure_authorize(
     if not token.refresh_token:
         raise StructureTokenExpired("EVE did not return a refresh token")
     character = await sso.verify_token(token.access_token)
+
+    # The stored token must belong to a member of the connecting corp (it's the corp's
+    # credential). The EVE picker lets the admin land on any of their characters.
+    char_corp = await esi.get_character_corporation(character.character_id)
+    if char_corp != user.corporation_id:
+        raise AuthorizingCharacterNotInCorporation()
 
     # Note the outgoing character before we overwrite it — the picker is mandatory,
     # so a re-auth can silently land on a different character (warn, but allow).

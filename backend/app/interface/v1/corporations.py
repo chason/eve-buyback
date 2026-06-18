@@ -3,16 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.application import corporations as corp_app
-from app.application.auth import AuthenticatedUser
 from app.interface.deps import SessionDep
-from app.interface.security import RequireIdentity, RequireUser, require_role
+from app.interface.security import RequireCeoOrDirector, RequireIdentity, RequireUser
 from app.plugins.esi import EsiClient, get_esi_client
 from app.schemas.corporation import CorporationOut, ManagerCreateRequest, ManagerOut
 
 router = APIRouter(prefix="/corporations", tags=["corporations"])
 
 EsiDep = Annotated[EsiClient, Depends(get_esi_client)]
-CeoUser = Annotated[AuthenticatedUser, Depends(require_role("ceo"))]
 
 
 @router.post("", response_model=CorporationOut, status_code=status.HTTP_201_CREATED)
@@ -32,7 +30,7 @@ async def get_my_corporation(
 
 
 @router.get("/me/managers", response_model=list[ManagerOut])
-async def list_managers(user: CeoUser, session: SessionDep) -> list[ManagerOut]:
+async def list_managers(user: RequireCeoOrDirector, session: SessionDep) -> list[ManagerOut]:
     records = await corp_app.list_managers(session, user.corporation_id)
     return [ManagerOut(**r.model_dump()) for r in records]
 
@@ -41,7 +39,7 @@ async def list_managers(user: CeoUser, session: SessionDep) -> list[ManagerOut]:
     "/me/managers", response_model=ManagerOut, status_code=status.HTTP_201_CREATED
 )
 async def add_manager(
-    payload: ManagerCreateRequest, user: CeoUser, session: SessionDep, esi: EsiDep
+    payload: ManagerCreateRequest, user: RequireCeoOrDirector, session: SessionDep, esi: EsiDep
 ) -> ManagerOut:
     record = await corp_app.add_manager(
         session,
@@ -55,7 +53,7 @@ async def add_manager(
 
 @router.delete("/me/managers/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_manager(
-    character_id: int, user: CeoUser, session: SessionDep
+    character_id: int, user: RequireCeoOrDirector, session: SessionDep
 ) -> None:
     await corp_app.remove_manager(
         session, corporation_id=user.corporation_id, character_id=character_id
