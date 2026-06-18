@@ -120,6 +120,14 @@ export default function Layout() {
         <Link className="hud-link" to="/privacy">
           · Privacy
         </Link>
+        <a
+          className="hud-link"
+          href="https://github.com/chason/eve-buyback"
+          target="_blank"
+          rel="noreferrer"
+        >
+          · Source
+        </a>
         <span className="hud-clock" title="Current EVE time">
           EVE Time {eveTime}
         </span>

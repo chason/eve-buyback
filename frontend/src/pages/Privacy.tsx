@@ -4,9 +4,9 @@ import { Link } from "react-router-dom"
 // (#112). Kept accurate to the ADRs it cites — those are the source of truth for token
 // handling. Public (no auth) so members can read it before granting any access.
 
-// The cited ADRs, linked to their source on GitHub (public repo) for the full detail.
-const ADR_BASE =
-  "https://github.com/chason/eve-buyback/blob/main/docs/adr"
+// The app is open source; the cited ADRs link to their source on GitHub for full detail.
+const REPO_URL = "https://github.com/chason/eve-buyback"
+const ADR_BASE = `${REPO_URL}/blob/main/docs/adr`
 const ADRS: { id: string; file: string }[] = [
   { id: "ADR-0004", file: "0004-eve-sso-session-auth.md" },
   { id: "ADR-0015", file: "0015-corp-registration-ceo-or-director.md" },
@@ -36,7 +36,11 @@ export default function Privacy() {
               </a>
             </span>
           ))}
-          ).
+          ). The app is{" "}
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            open source on GitHub
+          </a>
+          .
         </p>
       </hgroup>
 
