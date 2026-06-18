@@ -30,6 +30,14 @@ describe("Privacy", () => {
     expect(screen.getByText(/one token per corporation/i)).toBeInTheDocument()
     // The roster snapshot caches only names + ids.
     expect(screen.getByText(/character names and ids only/i)).toBeInTheDocument()
+    // Contract tracking (ADR-0037): corp item-exchange contracts only, and only the
+    // matched contract id/status/timestamps are kept.
+    expect(
+      screen.getByRole("heading", { name: /contract tracking/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/contract id, its status, and the issue\/complete timestamps/i),
+    ).toBeInTheDocument()
   })
 
   it("links to the Config page for revoking access", () => {

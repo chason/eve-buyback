@@ -13,6 +13,7 @@ const ADRS: { id: string; file: string }[] = [
   { id: "ADR-0016", file: "0016-per-request-role-resolution.md" },
   { id: "ADR-0029", file: "0029-encrypted-refresh-token-structures.md" },
   { id: "ADR-0036", file: "0036-corp-roster-manager-designation.md" },
+  { id: "ADR-0037", file: "0037-corp-contract-watcher.md" },
 ]
 
 export default function Privacy() {
@@ -85,7 +86,8 @@ export default function Privacy() {
             <li>
               It&apos;s <strong>one token per corporation</strong>, carrying the scopes
               to read a structure&apos;s market orders, search and resolve structures,
-              and read the corporation&apos;s member list.
+              read the corporation&apos;s member list, and read the corporation&apos;s
+              contracts.
             </li>
             <li>
               The <strong>refresh token is encrypted at rest</strong> (Fernet) before it
@@ -116,6 +118,26 @@ export default function Privacy() {
         </section>
 
         <section>
+          <h2>Contract tracking</h2>
+          <p>
+            When the corp ESI token can read contracts, the app checks the
+            corporation&apos;s <strong>item-exchange contracts</strong> in the background
+            (about every 15 minutes) and matches each to its appraisal — by the appraisal
+            id a member pastes into the contract description — so an appraisal can show
+            whether its contract is in progress, completed, or doesn&apos;t match. It
+            reads contracts made to or by the <strong>corporation</strong>, not your
+            personal contracts elsewhere.
+          </p>
+          <p>
+            All it keeps per appraisal is the matched{" "}
+            <strong>contract id, its status, and the issue/complete timestamps</strong> —
+            no extra item or ISK detail beyond what the appraisal already holds. If the
+            token lacks the contracts scope, or the character lacks the in-game role to
+            read corp contracts, the app simply skips this and tracks nothing.
+          </p>
+        </section>
+
+        <section>
           <h2>Market price data</h2>
           <p>
             Quote prices come from <strong>Fuzzwork aggregates and EVE ESI</strong>,
@@ -130,7 +152,9 @@ export default function Privacy() {
           <p>Except for what&apos;s detailed above, we never:</p>
           <ul>
             <li>store your EVE login or access tokens;</li>
-            <li>read your wallet, contracts, assets, mail, or skills;</li>
+            <li>read your wallet, assets, mail, or skills;</li>
+            <li>read your personal contracts — only the corporation&apos;s item-exchange
+              contracts, via the opt-in corp token described above;</li>
             <li>sell your data or share it with third parties.</li>
           </ul>
         </section>
@@ -140,7 +164,8 @@ export default function Privacy() {
           <ul>
             <li>
               Disconnect corp ESI access from the <Link to="/config">Config</Link> page —
-              structure pricing stops and the roster snapshot goes stale.
+              structure pricing stops, the roster snapshot goes stale, and contract
+              tracking stops.
             </li>
             <li>
               Removing the application from your EVE account management (Authorized
