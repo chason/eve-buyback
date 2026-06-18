@@ -140,7 +140,12 @@ async def persist_market_rows(
     because `upsert_prices` is idempotent and a hub's price is identical for every corp:
     a crash after this commit but before the caller's leaves only a warm cache (benign),
     never a half-written appraisal. Committing here also lets the background refresh
-    persist per hub, so one hub's failure can't roll back the others."""
+    persist per hub, so one hub's failure can't roll back the others.
+
+    Mid-flight callers must hold the invariant that no *other* write is pending on the
+    session when they invoke the read-through (the commit is connection-wide, so it would
+    flush anything pending). `create_appraisal` guards this explicitly: it does all of its
+    business writes after pricing, and asserts the session is write-clean before the loop."""
     if not aggregates:
         return {}
     rows = [_row_from_aggregate(tid, agg, now) for tid, agg in aggregates.items()]

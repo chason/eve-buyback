@@ -225,11 +225,21 @@ async def create_appraisal(
                 session, sso, corporation_uuid=corp.id, cipher=cipher
             )
 
+    # The read-through cache commits each hub's price fill in its OWN unit of work (#21),
+    # mid-flight, before this appraisal's commit below — the market cache is shared
+    # infrastructure, the upsert is idempotent, and a warm cache without a saved appraisal
+    # is benign. That independence is only safe while nothing business-related is pending
+    # on `session`: every business write (the appraisal row) happens *after* this loop, so
+    # each cache commit flushes only its own cache rows. Guard the invariant so a write
+    # accidentally added above can't be silently swept into the cache's commit. (The cache
+    # upsert is a Core statement, not ORM, so it never registers here itself.)
+    assert not (session.new or session.dirty or session.deleted), (
+        "pending business writes before market pricing would be committed by the "
+        "read-through cache's independent unit of work (#21)"
+    )
+
     # One read-through-cached fetch per hub; a failing hub degrades to its own cache
     # (its unpriced lines reject as "No market data") without affecting the others.
-    # Each fetch commits its cache fill in its own unit of work (#21), independent of
-    # this appraisal's commit below — the market cache is shared infrastructure, the
-    # upsert is idempotent, and a warm cache without a saved appraisal is benign.
     # Merged (not assigned) per hub_id: two rules can reference the same hub through
     # descriptors that differ only in their save-time-cached region_id (SDE drift
     # between saves) — they bucket separately but must land in one price map.
