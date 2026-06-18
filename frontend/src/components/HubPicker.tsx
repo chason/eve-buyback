@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 
 import { searchStations } from "../api/sde"
 import { getStructureStatus, searchStructures } from "../api/structures"
@@ -32,13 +32,6 @@ interface HubPickerProps {
   /** The currently-saved hub to seed the picker with; null selects the default
    * option (or the first preset when there is none). */
   initial?: { hubId: string; kind: HubKind; name: string | null } | null
-  /** Open on "Player structure" even when `initial` isn't one — used by Config
-   * right after the structure-authorization round-trip. */
-  forceStructureChoice?: boolean
-  /** Rendered above the structure search when "Player structure" is chosen —
-   * Config injects its authorize/revoke panel here. Without it, an unauthorized
-   * user gets a hint pointing at the Config page. */
-  structureSlot?: ReactNode
 }
 
 /** The market-hub selector shared by the corp config and the rule editor
@@ -50,11 +43,8 @@ export default function HubPicker({
   disabled,
   defaultOption,
   initial,
-  forceStructureChoice,
-  structureSlot,
 }: HubPickerProps) {
   const [choice, setChoice] = useState<string>(() => {
-    if (forceStructureChoice) return STRUCTURE
     if (!initial) return defaultOption ? DEFAULT : FUZZWORK_HUBS[0].id
     if (initial.kind === "structure") return STRUCTURE
     if (isFuzzworkHub(initial.hubId)) return initial.hubId
@@ -219,12 +209,12 @@ export default function HubPicker({
 
       {choice === STRUCTURE && structuresAvailable && (
         <>
-          {structureSlot ??
-            (!authorized && (
-              <small className="field-hint">
-                Authorize structure access on the Config page first.
-              </small>
-            ))}
+          {!authorized && (
+            <small className="field-hint">
+              Connect corp ESI access in the panel above first — then a structure
+              search appears here.
+            </small>
+          )}
 
           {authorized && (
             <label>
