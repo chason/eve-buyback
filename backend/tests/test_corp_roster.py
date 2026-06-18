@@ -7,8 +7,8 @@ import uuid
 import pytest
 from cryptography.fernet import Fernet
 
+from app.application import corp_esi_token as corp_esi_token_app
 from app.application import corp_roster as roster_app
-from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.application.errors import (
     CorpEsiTokenMissing,
@@ -112,7 +112,7 @@ async def _connect(esi: RosterEsi) -> uuid.UUID:
     the interface endpoint's job; here we drive `refresh_roster` explicitly)."""
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        await structures_app.complete_corp_esi_authorize(
+        await corp_esi_token_app.complete_corp_esi_authorize(
             session, FakeSso(), esi, code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )

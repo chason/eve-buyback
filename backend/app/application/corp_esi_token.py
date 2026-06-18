@@ -5,9 +5,8 @@ token per corp — covering both structure-market reads and corp-membership (the
 The normal login stays token-free (ADR-0004). Access tokens are never persisted —
 they're refreshed server-side at point of use and held only transiently.
 
-(This application module keeps the `structure_tokens` filename for now; the data layer
-— `CorpEsiToken` model, `corp_esi_tokens` table, `corp_esi_token` repo — and the use-case
-functions were renamed to corp-ESI naming in ADR-0036.)
+Use cases here orchestrate the SSO grant + server-side refresh; the persisted credential
+lives in the `corp_esi_tokens` table (`CorpEsiToken` model + `corp_esi_token` repo).
 """
 
 import asyncio

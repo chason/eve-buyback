@@ -9,8 +9,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from app.application import corp_esi_token as corp_esi_token_app
 from app.application import corp_roster as roster_app
-from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
 from app.data.records import CorpEsiTokenRecord
@@ -64,7 +64,7 @@ def _status(
 
 @router.get("", response_model=StructureTokenStatus)
 async def get_status(user: ManagerUser, session: SessionDep) -> StructureTokenStatus:
-    record = await structures_app.get_status(session, corporation_id=user.corporation_id)
+    record = await corp_esi_token_app.get_status(session, corporation_id=user.corporation_id)
     return _status(record)
 
 
@@ -78,7 +78,7 @@ async def search(
     q: Annotated[str, Query(min_length=3)],
 ) -> list[StructureSearchResult]:
     """Search the corp's accessible structures by name (requires prior authorization)."""
-    results = await structures_app.search_structures(
+    results = await corp_esi_token_app.search_structures(
         session, sso, esi_market, corporation_id=user.corporation_id, query=q, cipher=cipher
     )
     return [
@@ -91,7 +91,7 @@ async def authorize(
     request: Request, user: RequireCeoOrDirector, sso: SsoDep
 ) -> StructureAuthorizeResponse:
     """Begin the corp ESI access grant: mint state + PKCE and return the SSO URL."""
-    challenge = structures_app.begin_corp_esi_authorize(sso)
+    challenge = corp_esi_token_app.begin_corp_esi_authorize(sso)
     request.session[STRUCT_OAUTH_STATE_KEY] = challenge.state
     request.session[STRUCT_PKCE_VERIFIER_KEY] = challenge.verifier
     return StructureAuthorizeResponse(
@@ -118,7 +118,7 @@ async def complete(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state",
         )
-    result = await structures_app.complete_corp_esi_authorize(
+    result = await corp_esi_token_app.complete_corp_esi_authorize(
         session, sso, esi, code=payload.code, verifier=verifier, user=user, cipher=cipher
     )
     request.session.pop(STRUCT_OAUTH_STATE_KEY, None)
@@ -145,6 +145,6 @@ async def complete(
 async def revoke(
     user: RequireCeoOrDirector, session: SessionDep, sso: SsoDep, cipher: CipherDep
 ) -> None:
-    await structures_app.revoke(
+    await corp_esi_token_app.revoke(
         session, sso, corporation_id=user.corporation_id, cipher=cipher
     )
