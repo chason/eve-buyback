@@ -358,6 +358,11 @@ tr.reprocess-detail td {
   color: var(--bb-muted);
 }
 
+/* An active categorical flag (reprocess, structure) — cyan, like the console accents. */
+.status--info {
+  color: var(--bb-cyan);
+}
+
 /* The rejection reason sits next to a REJECTED chip — muted so the chip leads. */
 .status-reason {
   color: var(--bb-muted);

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 
 import { listAppraisals } from "../api/appraisals"
 import { getMe } from "../api/auth"
+import { StatusChip } from "../components/StatusChip"
 import { formatIsk } from "../lib/format"
 import { isManager } from "../lib/roles"
 
@@ -51,7 +52,13 @@ export default function History() {
                 )}
                 <td>{a.delivery_location_name ?? "—"}</td>
                 <td className="num isk">{formatIsk(a.accepted_total)}</td>
-                <td className="num">{a.rejected_count}</td>
+                <td className="num">
+                  {a.rejected_count > 0 ? (
+                    <StatusChip variant="danger">{a.rejected_count}</StatusChip>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td>
                   <Link to={`/a/${a.public_id}`}>View</Link>
                 </td>

@@ -6,6 +6,7 @@ import { getMe } from "../api/auth"
 import { addLocation, listLocations, removeLocation } from "../api/locations"
 import { searchStations } from "../api/sde"
 import { getStructureStatus, searchStructures } from "../api/structures"
+import { StatusChip } from "../components/StatusChip"
 import { isManager } from "../lib/roles"
 
 export default function Locations() {
@@ -88,7 +89,11 @@ export default function Locations() {
               <tr key={loc.location_id}>
                 <td>{loc.name}</td>
                 <td>
-                  {loc.kind === "structure" ? "Structure" : "NPC station"}
+                  {loc.kind === "structure" ? (
+                    <StatusChip variant="info">Structure</StatusChip>
+                  ) : (
+                    <StatusChip variant="muted">NPC station</StatusChip>
+                  )}
                 </td>
                 {canEdit && (
                   <td>
