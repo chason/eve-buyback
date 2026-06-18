@@ -22,6 +22,12 @@ export type StructureTokenStatus = Schemas["StructureTokenStatus"]
 export type StructureAuthorizeResponse = Schemas["StructureAuthorizeResponse"]
 export type StructureSearchResult = Schemas["StructureSearchResult"]
 
+// Corp ESI access token also powers the manager-designation roster (ADR-0036).
+export type RosterStatusOut = Schemas["RosterStatusOut"]
+export type CorpMemberOut = Schemas["CorpMemberOut"]
+export type ManagerOut = Schemas["ManagerOut"]
+export type ManagerCreateRequest = Schemas["ManagerCreateRequest"]
+
 // Accepted buyback drop-off locations (ADR-0030).
 export type LocationOut = Schemas["LocationOut"]
 export type LocationCreateRequest = Schemas["LocationCreateRequest"]

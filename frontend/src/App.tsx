@@ -9,6 +9,7 @@ import Config from "./pages/Config"
 import History from "./pages/History"
 import Home from "./pages/Home"
 import Locations from "./pages/Locations"
+import Managers from "./pages/Managers"
 import Rules from "./pages/Rules"
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/config" element={<Config />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/locations" element={<Locations />} />
+          <Route path="/managers" element={<Managers />} />
         </Route>
       </Route>
     </Routes>

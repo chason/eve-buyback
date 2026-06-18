@@ -223,6 +223,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_v1_corporations_me_roster_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/roster/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Members
+         * @description Search the synced roster by name (empty until a Director connects the token).
+         */
+        get: operations["search_members_api_v1_corporations_me_roster_members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/roster/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh
+         * @description Manually re-pull the roster with the stored token (rate-limited; 429 if too soon).
+         */
+        post: operations["refresh_api_v1_corporations_me_roster_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/rules": {
         parameters: {
             query?: never;
@@ -291,7 +348,7 @@ export interface paths {
         put?: never;
         /**
          * Authorize
-         * @description Begin the structure-access grant: mint state + PKCE and return the SSO URL.
+         * @description Begin the corp ESI access grant: mint state + PKCE and return the SSO URL.
          */
         post: operations["authorize_api_v1_corporations_me_structure_token_authorize_post"];
         delete?: never;
@@ -331,7 +388,8 @@ export interface paths {
         put?: never;
         /**
          * Complete
-         * @description Complete the grant: validate state, exchange the code, store the token.
+         * @description Complete the grant: validate state, exchange the code, store the token, and
+         *     best-effort populate the roster (works if the connected character is a Director).
          */
         post: operations["complete_api_v1_corporations_me_structure_token_session_post"];
         delete?: never;
@@ -605,6 +663,16 @@ export interface components {
             /** Market Hub Name */
             market_hub_name?: string | null;
         };
+        /**
+         * CorpMemberOut
+         * @description A corp member matched by the manager-designation search.
+         */
+        CorpMemberOut: {
+            /** Character Id */
+            character_id: number;
+            /** Name */
+            name: string;
+        };
         /** CorporationOut */
         CorporationOut: {
             /** Ceo Character Id */
@@ -727,6 +795,21 @@ export interface components {
             unit_value: string | null;
             /** Value */
             value: string;
+        };
+        /**
+         * RosterStatusOut
+         * @description The corp roster's sync state, shown on the Config panel + Managers page.
+         */
+        RosterStatusOut: {
+            /**
+             * Member Count
+             * @default 0
+             */
+            member_count: number;
+            /** Synced */
+            synced: boolean;
+            /** Synced At */
+            synced_at?: string | null;
         };
         /** RuleOut */
         RuleOut: {
@@ -1362,6 +1445,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_v1_corporations_me_roster_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RosterStatusOut"];
+                };
+            };
+        };
+    };
+    search_members_api_v1_corporations_me_roster_members_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorpMemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_api_v1_corporations_me_roster_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RosterStatusOut"];
                 };
             };
         };
