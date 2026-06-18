@@ -44,15 +44,30 @@ zkillboard/Dotlan) because those are static, public, and need no API round-trip.
 
 | Service | Base URL | Purpose |
 |---------|----------|---------|
-| ESI | `https://esi.evetech.net/latest/` | Official EVE API |
+| ESI | `https://esi.evetech.net/` | Official EVE API — unversioned paths + an `X-Compatibility-Date` header (see below) |
 | zkillboard RedisQ | `https://zkillredisq.stream/listen.php` | Real-time killmail feed |
 | zkillboard | `https://zkillboard.com/` | Killmail browser |
 | Fuzzwork | `https://www.fuzzwork.co.uk/api/` | Third-party celestial data |
 | EVE SSO | `https://login.eveonline.com/` | OAuth authentication |
 | EVE Images | `https://images.evetech.net/` | Character/ship/alliance icons |
 
+> **Authoritative spec:** the OpenAPI 3 document at
+> <https://esi.evetech.net/meta/openapi.json>, browsable in the interactive API explorer
+> at <https://developers.eveonline.com/api-explorer>. These supersede the old Swagger 2.0
+> UI (`esi.evetech.net/ui/`, `/latest/swagger.json`); `esi.evetech.net/` now redirects to
+> the explorer. **Always confirm paths, scopes, and required in-game roles against this
+> live spec — they change.**
+>
+> **Versioning = compatibility date (not URL versions).** Send an
+> `X-Compatibility-Date: YYYY-MM-DD` header (or `?compatibility_date=YYYY-MM-DD`) — the
+> date your integration was last validated against the ESI changelog — and use
+> **unversioned** paths (`/characters/{id}/`, not `/latest/` or `/v5/`). Legacy versioned
+> routes still work for now but are the old style. Pin a fixed date and bump it
+> deliberately. A route flagged for removal returns a `warning: 299 …` header (ESI aims for
+> ~1 year of backwards compatibility) — watch for it and migrate.
+>
 > **User-Agent:** ESI requires a descriptive `User-Agent` (app name + contact).
-> Set it once on the shared client.
+> Set it (and the compatibility-date header) once on the shared client.
 
 ---
 
@@ -63,7 +78,13 @@ zkillboard/Dotlan) because those are static, public, and need no API round-trip.
 ```python
 import httpx
 
-ESI_URL = "https://esi.evetech.net/latest/"
+ESI_URL = "https://esi.evetech.net/"  # unversioned paths; version via the header below
+
+# The date your ESI integration was last reviewed against the changelog. ESI serves the
+# API behaviour as it was on this date, so behaviour only changes when *you* bump it. The
+# spec's `CompatibilityDate` enum lists the valid dates (the explorer shows them); newer
+# dates opt into newer behaviour. 2020-01-01 is the conservative baseline.
+ESI_COMPATIBILITY_DATE = "2020-01-01"
 
 
 class EsiClient:
@@ -73,7 +94,10 @@ class EsiClient:
         self._client = client or httpx.AsyncClient(
             base_url=ESI_URL,
             timeout=httpx.Timeout(30.0),
-            headers={"User-Agent": "buyback/1.0 (you@example.com)"},
+            headers={
+                "User-Agent": "buyback/1.0 (you@example.com)",
+                "X-Compatibility-Date": ESI_COMPATIBILITY_DATE,
+            },
         )
 
     async def aclose(self) -> None:
