@@ -97,7 +97,7 @@ export default function Appraisal() {
     return (
       <button
         type="button"
-        className="secondary outline"
+        className="secondary outline copy-btn"
         onClick={() => copy(fieldKey, text)}
       >
         {label}
