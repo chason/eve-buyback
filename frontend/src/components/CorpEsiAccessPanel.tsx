@@ -8,6 +8,7 @@ import {
   revokeStructure,
 } from "../api/structures"
 import { refreshCooldownRemaining, relativeTime } from "../lib/roster"
+import { ConfirmButton } from "./ConfirmButton"
 
 interface Props {
   /** CEO/Director: may connect, revoke, and refresh the roster. Others see it
@@ -121,13 +122,13 @@ export default function CorpEsiAccessPanel({
                 {canManage && (
                   <>
                     {" — "}
-                    <button
-                      type="button"
+                    <ConfirmButton
                       className="linkbtn"
-                      onClick={() => revoke.mutate()}
-                    >
-                      Revoke
-                    </button>
+                      label="Revoke"
+                      confirmPrompt="Revoke — stops structure pricing & roster sync?"
+                      confirmLabel="Yes, revoke"
+                      onConfirm={() => revoke.mutate()}
+                    />
                   </>
                 )}
               </p>

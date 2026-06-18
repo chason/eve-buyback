@@ -5,6 +5,7 @@ import { getMe } from "../api/auth"
 import { deleteRule, listRules, putRule } from "../api/pricing"
 import { listMarketGroups, searchTypes } from "../api/sde"
 import type { Basis, RuleOut, TargetKind } from "../api/types"
+import { ConfirmButton } from "../components/ConfirmButton"
 import HubPicker, { type HubSelection } from "../components/HubPicker"
 import { StatusChip } from "../components/StatusChip"
 import { hubName } from "../lib/hubs"
@@ -164,13 +165,12 @@ export default function Rules() {
                 </td>
                 {canEdit && (
                   <td>
-                    <button
-                      type="button"
+                    <ConfirmButton
                       className="linkbtn"
-                      onClick={() => remove.mutate(rule)}
-                    >
-                      Remove
-                    </button>
+                      label="Remove"
+                      confirmPrompt="Remove rule?"
+                      onConfirm={() => remove.mutate(rule)}
+                    />
                   </td>
                 )}
               </tr>

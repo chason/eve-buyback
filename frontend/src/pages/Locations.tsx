@@ -6,6 +6,7 @@ import { getMe } from "../api/auth"
 import { addLocation, listLocations, removeLocation } from "../api/locations"
 import { searchStations } from "../api/sde"
 import { getStructureStatus, searchStructures } from "../api/structures"
+import { ConfirmButton } from "../components/ConfirmButton"
 import { StatusChip } from "../components/StatusChip"
 import { isManager } from "../lib/roles"
 
@@ -98,13 +99,12 @@ export default function Locations() {
                 </td>
                 {canEdit && (
                   <td>
-                    <button
-                      type="button"
+                    <ConfirmButton
                       className="linkbtn"
-                      onClick={() => remove.mutate(loc.location_id)}
-                    >
-                      Remove
-                    </button>
+                      label="Remove"
+                      confirmPrompt="Remove location?"
+                      onConfirm={() => remove.mutate(loc.location_id)}
+                    />
                   </td>
                 )}
               </tr>
