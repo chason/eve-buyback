@@ -68,8 +68,8 @@ describe("Layout nav", () => {
 
     renderAt("/appraise")
 
-    const clock = await screen.findByTitle("Current EVE time (UTC)")
-    expect(clock).toHaveTextContent(/^EVE \d{2}:\d{2}:\d{2} UTC$/)
+    const clock = await screen.findByTitle("Current EVE time")
+    expect(clock).toHaveTextContent(/^EVE Time \d{2}:\d{2}:\d{2}$/)
   })
 
   it("exposes Log out as a button, not a link (#80)", async () => {
