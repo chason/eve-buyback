@@ -72,6 +72,16 @@ describe("Layout nav", () => {
     expect(clock).toHaveTextContent(/^EVE Time \d{2}:\d{2}:\d{2}$/)
   })
 
+  it("links to the privacy page from the footer (#112)", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(member())
+    vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })
+
+    renderAt("/appraise")
+
+    const link = await screen.findByRole("link", { name: /privacy/i })
+    expect(link).toHaveAttribute("href", "/privacy")
+  })
+
   it("exposes Log out as a button, not a link (#80)", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(member())
     vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })
