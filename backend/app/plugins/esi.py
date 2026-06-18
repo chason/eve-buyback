@@ -2,7 +2,9 @@ import httpx
 from fastapi import Request
 from pydantic import BaseModel
 
-ESI_BASE = "https://esi.evetech.net/latest"
+# Unversioned ESI base — versioning is by the `X-Compatibility-Date` header, set once on
+# the shared httpx client (main.py); paths carry no `/latest/` or `/vN/` prefix.
+ESI_BASE = "https://esi.evetech.net"
 
 # ESI's bulk name-resolution endpoint accepts up to 1000 ids per request.
 _NAMES_CHUNK = 1000

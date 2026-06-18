@@ -26,7 +26,9 @@ from app.domain.aggregates import (
     aggregate_orders,
 )
 
-ESI_BASE = "https://esi.evetech.net/latest"
+# Unversioned ESI base — versioning is by the `X-Compatibility-Date` header set on the
+# shared httpx client (main.py); paths carry no `/latest/` or `/vN/` prefix.
+ESI_BASE = "https://esi.evetech.net"
 # Back off when ESI's sliding error budget drops to/below this many remaining.
 _ERROR_LIMIT_FLOOR = 5
 
