@@ -956,6 +956,17 @@
             "title": "Target Kind",
             "type": "string"
           },
+          "target_market_group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Market Group Id"
+          },
           "target_name": {
             "anyOf": [
               {
@@ -1364,7 +1375,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "50"
+    "version": "68"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1895,7 +1906,7 @@
     },
     "/api/v1/corporations/me/roster/members": {
       "get": {
-        "description": "Search the synced roster by name (empty until a Director connects the token).",
+        "description": "Search the synced roster by name (empty until the corp roster has been synced).",
         "operationId": "search_members_api_v1_corporations_me_roster_members_get",
         "parameters": [
           {
@@ -2205,7 +2216,7 @@
     },
     "/api/v1/corporations/me/structure-token/session": {
       "post": {
-        "description": "Complete the grant: validate state, exchange the code, store the token, and\nbest-effort populate the roster (works if the connected character is a Director).",
+        "description": "Complete the grant: validate state, exchange the code, store the token, and\nbest-effort populate the roster (works if the connected character can read it).",
         "operationId": "complete_api_v1_corporations_me_structure_token_session_post",
         "requestBody": {
           "content": {

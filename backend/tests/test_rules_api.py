@@ -72,6 +72,31 @@ async def test_put_rule_lifecycle():
         assert (await http.get("/api/v1/corporations/me/rules")).json() == []
 
 
+async def test_rule_resolves_target_market_group_for_folders():
+    # The UI files rules under category folders, so each rule resolves the market group
+    # it belongs to: a type uses its own group; a market-group rule uses itself.
+    await _seed_sde()  # type 34 (Tritanium) sits in market group 1 (Ore)
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+
+        type_rule = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "90"}
+        )
+        assert type_rule.json()["target_market_group_id"] == 1  # the type's group
+
+        group_rule = await http.put(
+            "/api/v1/corporations/me/rules/market_group/1", json={"percentage": "90"}
+        )
+        assert group_rule.json()["target_market_group_id"] == 1  # itself
+
+        listed = {
+            (r["target_kind"], r["target_id"]): r["target_market_group_id"]
+            for r in (await http.get("/api/v1/corporations/me/rules")).json()
+        }
+        assert listed == {("type", 34): 1, ("market_group", 1): 1}
+
+
 @pytest.mark.parametrize("pct", ["-1", "100000"])
 async def test_put_rule_rejects_out_of_range_percentage(pct: str):
     # A rule's percentage is bounded [0, MAX_PERCENTAGE] (#28), same as the config
