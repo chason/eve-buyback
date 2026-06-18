@@ -390,6 +390,29 @@ tr.reprocess-detail td {
   margin-left: 0.4rem;
 }
 
+/* The config Save acknowledgment (#38): a brief inline confirmation by the Save button
+   that fades in, then auto-clears after a few seconds (the timer lives in Config.tsx). */
+.save-confirm {
+  animation: save-confirm-in 0.2s ease-out;
+}
+
+@keyframes save-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-confirm {
+    animation: none;
+  }
+}
+
 /* Fixed HUD status line pinned to the bottom of the viewport (#44): the app version
    and serving node in mono, with a pulsing cyan "online" dot. */
 .hud-status {
