@@ -47,4 +47,10 @@ describe("Privacy", () => {
     )
     expect(adr).toHaveAttribute("target", "_blank")
   })
+
+  it("links to the open-source repo (#112)", () => {
+    renderPrivacy()
+    const repo = screen.getByRole("link", { name: /open source on GitHub/i })
+    expect(repo).toHaveAttribute("href", "https://github.com/chason/eve-buyback")
+  })
 })

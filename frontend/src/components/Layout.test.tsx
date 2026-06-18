@@ -80,6 +80,11 @@ describe("Layout nav", () => {
 
     const link = await screen.findByRole("link", { name: /privacy/i })
     expect(link).toHaveAttribute("href", "/privacy")
+
+    // …and to the open-source repo (#112).
+    const source = screen.getByRole("link", { name: /source/i })
+    expect(source).toHaveAttribute("href", "https://github.com/chason/eve-buyback")
+    expect(source).toHaveAttribute("target", "_blank")
   })
 
   it("exposes Log out as a button, not a link (#80)", async () => {
