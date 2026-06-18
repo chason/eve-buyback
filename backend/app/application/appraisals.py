@@ -6,7 +6,7 @@ the appraisals repository. Owns the commit."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -497,19 +497,24 @@ def _compute_line(
     } | hub_snapshot
 
 
+_CENT = Decimal("0.01")  # 2dp quantum for the reprocess-breakdown snapshot
+
+
 def _decimal_str(d: Decimal) -> str:
-    """A Decimal as a plain fixed-point string (ADR-0020). `format(d, "f")` — never bare
-    `str()`, which emits scientific notation for extreme exponents (e.g. an unpriced
-    mineral's `0E+29`), and the frontend money formatter expects plain decimals (it would
-    render "0E29.00 ISK" otherwise)."""
-    return format(d, "f")
+    """A breakdown Decimal serialized as a plain string, rounded to 2 places with **banker's
+    rounding** (`ROUND_HALF_EVEN`, explicit — the same mode `round_isk` uses for line totals,
+    ADR-0021). Rounding to 2dp keeps the persisted breakdown free of scientific notation (an
+    unpriced mineral's `0E+29`, which bare `str()` emits and the frontend would render as
+    "0E29.00 ISK") and of long fractional tails, and matches the precision the rest of the
+    appraisal's money is stored and shown at."""
+    return f"{d.quantize(_CENT, rounding=ROUND_HALF_EVEN)}"
 
 
 def _reprocess_breakdown(
     result: pricing_domain.ReprocessResult, types: dict[int, SdeTypeRecord]
 ) -> dict:
     """JSON-serializable snapshot of a reprocess result for the appraisal line. Money
-    and quantities are Decimal strings (ADR-0020), always plain fixed-point."""
+    and quantities are Decimal strings (ADR-0020), rounded to 2dp (banker's rounding)."""
     return {
         "minerals": [
             {

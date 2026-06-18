@@ -164,25 +164,29 @@ async def test_appraisal_reprocess_sub_batch_uses_ore_price():
         assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
 
 
-def test_reprocess_breakdown_serializes_plain_decimals():
-    # A mineral whose market price is an extreme-exponent zero (an unpriced mineral)
-    # yields a value Decimal like 0E+29, whose bare str() is scientific notation — which
-    # the frontend money formatter renders as "0E29.00 ISK". The snapshot must serialize
-    # plain fixed-point so no 'E' ever reaches the client.
+def test_reprocess_breakdown_rounds_to_two_decimals_bankers():
+    # The breakdown is serialized rounded to 2dp with banker's rounding (ROUND_HALF_EVEN):
+    # no scientific notation (an unpriced mineral's 0E+29, whose bare str() the frontend
+    # would render "0E29.00 ISK"), and no long fractional tails.
     import types as _types
 
     from app.application.appraisals import _decimal_str, _reprocess_breakdown
     from app.domain.pricing import ReprocessMineral, ReprocessResult
 
-    assert _decimal_str(Decimal("0E+29")) == "0"
-    assert _decimal_str(Decimal("0E-7")) == "0.0000000"
-    assert "E" not in _decimal_str(Decimal("1E-8"))
+    # Extreme exponents collapse to plain 2dp; long tails are trimmed.
+    assert _decimal_str(Decimal("0E+29")) == "0.00"
+    assert _decimal_str(Decimal("0E-7")) == "0.00"
+    assert _decimal_str(Decimal("1E-8")) == "0.00"
+    assert _decimal_str(Decimal("228387.600000")) == "228387.60"
+    # Banker's rounding: half rounds to the nearest *even* last digit.
+    assert _decimal_str(Decimal("0.125")) == "0.12"  # 2 is even → down
+    assert _decimal_str(Decimal("0.135")) == "0.14"  # 3 is odd → up
 
     result = ReprocessResult(
         total=Decimal("100.00"),
         minerals=[
             ReprocessMineral(
-                type_id=39, quantity=Decimal("0E-4"),
+                type_id=39, quantity=Decimal("362.5200"),
                 unit_value=Decimal("0E+33"), value=Decimal("0E+29"),
             )
         ],
@@ -192,8 +196,8 @@ def test_reprocess_breakdown_serializes_plain_decimals():
     bd = _reprocess_breakdown(result, {39: _types.SimpleNamespace(name="Silicates")})
     m = bd["minerals"][0]
     assert "E" not in m["value"] and "E" not in m["quantity"]
-    assert "E" not in (m["unit_value"] or "")
-    assert m["value"] == "0"
+    assert m["value"] == "0.00"
+    assert m["quantity"] == "362.52"
 
 
 async def test_appraisal_whitelist_mode_rejects_unruled_items():
