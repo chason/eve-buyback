@@ -94,6 +94,30 @@ describe("Config", () => {
     })
   })
 
+  it("shows the active hub prominently and flags unsaved edits (#34)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+
+    renderConfig()
+
+    // The hub in effect is a prominent confirmation line, not muted hint text.
+    const active = await screen.findByText(/Pricing at/)
+    expect(active).toHaveClass("active-hub")
+
+    const saveBtn = screen.getByRole("button", { name: "Save config" })
+    expect(saveBtn).not.toHaveClass("dirty")
+    expect(screen.queryByText("Unsaved changes.")).not.toBeInTheDocument()
+
+    // Editing any default marks the form dirty — the required Save is signalled.
+    const pct = screen.getByLabelText("Default percentage")
+    await u.clear(pct)
+    await u.type(pct, "85")
+
+    expect(saveBtn).toHaveClass("dirty")
+    expect(screen.getByText("Unsaved changes.")).toBeInTheDocument()
+  })
+
   it("confirms a successful save with an inline acknowledgment (#38)", async () => {
     const u = userEvent.setup()
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
@@ -148,6 +172,10 @@ describe("Config", () => {
     await u.type(screen.getByLabelText("Search station"), "korsiki")
     // Pick the match from the dropdown ("System - Station").
     await u.click(await screen.findByText(/Korsiki - Korsiki VII/))
+
+    // Picking a hub that differs from the saved Jita flags the required final Save (#34).
+    expect(await screen.findByText(/Not saved yet/i)).toBeInTheDocument()
+
     await u.click(screen.getByRole("button", { name: "Save config" }))
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())

@@ -413,6 +413,33 @@ tr.reprocess-detail td {
   }
 }
 
+/* The hub currently in effect (#34) — a prominent confirmation, not muted hint text, so
+   a CEO can't mistake an authorized-but-unsaved structure for the live pricing hub. */
+.active-hub {
+  margin: -0.25rem 0 var(--pico-spacing);
+}
+
+.active-hub strong {
+  color: var(--bb-cyan);
+}
+
+/* The "not saved yet" cue when the picked hub differs from the saved one, and the Save
+   button's matching unsaved state (#34) — a soft cyan glow makes the required final Save
+   unmissable so setup isn't abandoned one click early. */
+.unsaved-cue {
+  margin: calc(var(--pico-spacing) * -0.5) 0 var(--pico-spacing);
+  color: var(--bb-cyan);
+}
+
+button.dirty {
+  filter: drop-shadow(0 0 8px rgba(51, 194, 255, 0.5));
+}
+
+.dirty-hint {
+  margin-left: 0.6rem;
+  color: var(--bb-cyan);
+}
+
 /* Fixed HUD status line pinned to the bottom of the viewport (#44): the app version
    and serving node in mono, with a pulsing cyan "online" dot. */
 .hud-status {
