@@ -16,9 +16,9 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.errors import (
+    CorpEsiTokenExpired,
+    CorpEsiTokenMissing,
     StructureEncryptionNotConfigured,
-    StructureTokenExpired,
-    StructureTokenMissing,
 )
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
@@ -98,8 +98,8 @@ async def _fetch_aggregates(
             structure_id=hub.hub_id, type_ids=type_ids, access_token=access_token
         )
     except (
-        StructureTokenMissing,
-        StructureTokenExpired,
+        CorpEsiTokenMissing,
+        CorpEsiTokenExpired,
         StructureAccessDenied,
         StructureEncryptionNotConfigured,
     ):
