@@ -9,7 +9,6 @@ Use cases here orchestrate the SSO grant + server-side refresh; the persisted cr
 lives in the `corp_esi_tokens` table (`CorpEsiToken` model + `corp_esi_token` repo).
 """
 
-import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -229,20 +228,16 @@ async def search_structures(
     structure_ids = await esi_market.search_structures(
         character_id=token.character_eve_id, query=query, access_token=access_token
     )
-    # Resolve names concurrently — this is a typeahead path, so the per-id round
-    # trips fan out rather than running serially. gather preserves order.
-    names = await asyncio.gather(
-        *(
-            esi_market.resolve_structure_name(
-                structure_id=structure_id, access_token=access_token
-            )
-            for structure_id in structure_ids
-        )
+    # Resolve names with the per-id fan-out **bounded by the shared ESI concurrency cap**
+    # (#26) — a rapid typeahead must not multiply outbound ESI calls. Keep ESI's relevance
+    # order; inaccessible structures are dropped (absent from the returned map).
+    names = await esi_market.resolve_structure_names(
+        structure_ids=structure_ids, access_token=access_token
     )
     return [
-        StructureMatch(structure_id=str(structure_id), name=name)
-        for structure_id, name in zip(structure_ids, names, strict=True)
-        if name
+        StructureMatch(structure_id=str(structure_id), name=names[structure_id])
+        for structure_id in structure_ids
+        if structure_id in names
     ]
 
 

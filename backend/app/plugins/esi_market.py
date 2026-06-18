@@ -124,6 +124,37 @@ class EsiMarketClient:
         resp.raise_for_status()
         return resp.json().get("name")
 
+    async def resolve_structure_names(
+        self, *, structure_ids: list[int], access_token: str
+    ) -> dict[int, str]:
+        """Resolve many structure names (one ESI request each), fanned out under the
+        **shared** ESI concurrency cap (ADR-0035) so a rapid typeahead can't multiply
+        outbound calls and burn the error budget (#26). Inaccessible structures
+        (403/404 → None) are dropped; a single failure is logged, not fatal."""
+        sem = self._semaphore or asyncio.Semaphore(
+            get_settings().esi_market_concurrency
+        )
+
+        async def one(structure_id: int) -> tuple[int, str | None]:
+            async with sem:
+                name = await self.resolve_structure_name(
+                    structure_id=structure_id, access_token=access_token
+                )
+            return structure_id, name
+
+        results = await asyncio.gather(
+            *(one(sid) for sid in structure_ids), return_exceptions=True
+        )
+        names: dict[int, str] = {}
+        for result in results:
+            if isinstance(result, Exception):
+                log.warning("ESI structure-name resolve failed: %r", result)
+                continue
+            structure_id, name = result
+            if name is not None:
+                names[structure_id] = name
+        return names
+
     async def get_structure_aggregates(
         self, *, structure_id: str, type_ids: list[int], access_token: str
     ) -> dict[int, BuySellAggregate]:
