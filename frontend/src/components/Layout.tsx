@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet } from "react-router-dom"
 
 import { getMe, logout } from "../api/auth"
 import { getVersion } from "../api/version"
-import { isManager } from "../lib/roles"
+import { canManageCorp, isManager } from "../lib/roles"
 
 // Console-tab treatment for the active route (#87): NavLink toggles `active`, styled
 // in index.css. `end` on Appraisals so it doesn't stay lit under detail routes.
@@ -24,6 +24,8 @@ export default function Layout() {
   })
   const user = me.data
   const showManagerLinks = user?.corporation_registered && isManager(user.role)
+  // CEO/Director can designate managers even if they aren't managers themselves (ADR-0036).
+  const showManagersLink = canManageCorp(user)
 
   return (
     <>
@@ -73,6 +75,13 @@ export default function Layout() {
                   </NavLink>
                 </li>
               </>
+            )}
+            {showManagersLink && (
+              <li>
+                <NavLink to="/managers" className={navClass}>
+                  Managers
+                </NavLink>
+              </li>
             )}
             <li className="identity">{user.character_name}</li>
             <li>

@@ -141,9 +141,8 @@ describe("Config", () => {
     })
   })
 
-  it("keeps the structure hub selected after returning from authorization", async () => {
+  it("shows the connected character in the Corp ESI access panel", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
-    // Saved config still points at Jita — the structure isn't picked/saved yet.
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
     vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
       configured: true,
@@ -152,14 +151,9 @@ describe("Config", () => {
       expired: false,
     })
 
-    // Callback redirects here with this param after the SSO round-trip.
-    renderConfig(["/config?authorized=structure"])
+    renderConfig()
 
-    const hub = (await screen.findByLabelText("Market hub")) as HTMLSelectElement
-    // Picker stays on "Player structure" instead of snapping back to Jita…
-    await waitFor(() => expect(hub.value).toBe("structure"))
-    // …and the connected status resolves (no longer the not-authorized prompt).
-    expect(await screen.findByText(/connected as/)).toBeInTheDocument()
+    expect(await screen.findByText(/Connected as/)).toBeInTheDocument()
     expect(screen.getByText("Capsuleer")).toBeInTheDocument()
   })
 
@@ -198,7 +192,7 @@ describe("Config", () => {
     expect(alert).toHaveTextContent("Old Pilot")
   })
 
-  it("warns a manager when structure access is failing, with the failing-since date", async () => {
+  it("warns when corp ESI access is failing, with the failing-since date", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
     vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
@@ -209,13 +203,11 @@ describe("Config", () => {
       failed_since: "2026-06-15T00:00:00Z",
     })
 
-    // ?authorized=structure forces the picker onto the structure slot (where the
-    // status + warning live), as in the post-authorization return.
-    renderConfig(["/config?authorized=structure"])
+    renderConfig()
 
     const alert = await screen.findByRole("alert")
-    expect(alert).toHaveTextContent(/authorization is failing/i)
-    expect(alert).toHaveTextContent(/re-authorize/i)
+    expect(alert).toHaveTextContent(/is failing/i)
+    expect(alert).toHaveTextContent(/reconnect/i)
     // The failing-since timestamp is surfaced (formatted to the local locale).
     expect(alert).toHaveTextContent("2026")
   })

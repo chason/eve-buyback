@@ -14,10 +14,10 @@ export default function Callback() {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const handled = useRef(false)
-  // The same SSO callback completes either a login or a structure-access grant.
-  // Route on the OAuth `state` echoed back by EVE (the structure flow's state
+  // The same SSO callback completes either a login or a Corp ESI access grant.
+  // Route on the OAuth `state` echoed back by EVE (the corp-ESI flow's state
   // carries a prefix) — reliable across the redirect, unlike client-side storage.
-  const isStructure = (params.get("state") ?? "").startsWith(STRUCTURE_STATE_PREFIX)
+  const isCorpEsi = (params.get("state") ?? "").startsWith(STRUCTURE_STATE_PREFIX)
 
   useEffect(() => {
     if (handled.current) return
@@ -30,19 +30,20 @@ export default function Callback() {
       return
     }
 
-    if (isStructure) {
+    if (isCorpEsi) {
       completeStructureAuthorize(code, state)
         .then(async (status) => {
+          // Connecting also (best-effort) populates the roster server-side, so
+          // refresh both panels' data on return to Config.
           await queryClient.invalidateQueries({ queryKey: ["structureStatus"] })
-          // Carry the intent so Config re-selects the structure hub (the saved
-          // config still points at the old hub until they pick + save a structure).
+          await queryClient.invalidateQueries({ queryKey: ["rosterStatus"] })
           // If the picker switched the authorizing character, pass the previous
-          // name so Config can warn about the swap.
+          // name so the Corp ESI access panel can warn about the swap.
           const replaced = status?.replaced_character_name
           const q = replaced
             ? `&replaced=${encodeURIComponent(replaced)}`
             : ""
-          navigate(`/config?authorized=structure${q}`, { replace: true })
+          navigate(`/config?authorized=corp-esi${q}`, { replace: true })
         })
         .catch((e) => setError((e as Error).message))
       return
@@ -52,9 +53,9 @@ export default function Callback() {
       .then(() => queryClient.invalidateQueries({ queryKey: ["me"] }))
       .then(() => navigate("/", { replace: true }))
       .catch((e) => setError((e as Error).message))
-  }, [params, navigate, queryClient, isStructure])
+  }, [params, navigate, queryClient, isCorpEsi])
 
-  const verb = isStructure ? "Authorizing structure access" : "Signing you in"
+  const verb = isCorpEsi ? "Connecting corp ESI access" : "Signing you in"
   return (
     <main className="container">
       <section className="login-hero">
