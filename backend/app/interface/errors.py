@@ -11,6 +11,8 @@ from app.application.errors import (
     AppraisalTooManyEsiTypes,
     AuthorizingCharacterNotInCorporation,
     CharacterNotInCorporation,
+    CorpEsiTokenExpired,
+    CorpEsiTokenMissing,
     CorporationAlreadyRegistered,
     CorporationNotRegistered,
     DeliveryLocationInvalid,
@@ -30,8 +32,6 @@ from app.application.errors import (
     SsoNotConfigured,
     StructureEncryptionNotConfigured,
     StructureMarketUnavailable,
-    StructureTokenExpired,
-    StructureTokenMissing,
 )
 
 _STATUS: dict[type[ApplicationError], int] = {
@@ -54,8 +54,8 @@ _STATUS: dict[type[ApplicationError], int] = {
     MarketHubInvalid: 422,
     NotAuthorizedToAuthorizeStructure: 403,
     StructureEncryptionNotConfigured: 503,
-    StructureTokenMissing: 409,
-    StructureTokenExpired: 409,
+    CorpEsiTokenMissing: 409,
+    CorpEsiTokenExpired: 409,
     StructureMarketUnavailable: 409,
     LocationInvalid: 422,
     LocationNotFound: 404,

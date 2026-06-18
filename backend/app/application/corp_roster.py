@@ -72,7 +72,7 @@ async def refresh_roster(
     the cached roster (no EVE round-trip). `enforce_cooldown` (the manual path) rejects a
     refresh within `roster_manual_refresh_min_interval_seconds` of the last sync with
     `RosterRefreshTooSoon`; the daily background job passes `False`. Raises
-    `StructureTokenMissing` if no token is connected (via `get_structure_access_token`) and
+    `CorpEsiTokenMissing` if no token is connected (via `get_structure_access_token`) and
     `RosterAccessDenied` if the connected character can't read membership (not a Director).
     A members-403 is **not** treated as a token-refresh failure — it leaves the token
     healthy for structure pricing."""
@@ -85,7 +85,7 @@ async def refresh_roster(
         if synced_at is not None and now - synced_at < timedelta(seconds=cooldown):
             raise RosterRefreshTooSoon()
 
-    # Refreshes the access token server-side; raises StructureTokenMissing/Expired.
+    # Refreshes the access token server-side; raises CorpEsiTokenMissing/Expired.
     access_token = await structure_tokens_app.get_structure_access_token(
         session, sso, corporation_uuid=corp.id, cipher=cipher
     )

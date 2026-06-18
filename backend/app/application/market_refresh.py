@@ -26,9 +26,9 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.errors import (
+    CorpEsiTokenExpired,
+    CorpEsiTokenMissing,
     StructureEncryptionNotConfigured,
-    StructureTokenExpired,
-    StructureTokenMissing,
 )
 from app.application.market import persist_market_rows
 from app.application.structure_tokens import get_structure_access_token
@@ -49,8 +49,8 @@ log = logging.getLogger(__name__)
 # Token/access failures that mean "this hub can't be priced right now" — skip it and
 # serve whatever cache exists, exactly as the lazy path does.
 _SKIP_HUB_ERRORS = (
-    StructureTokenMissing,
-    StructureTokenExpired,
+    CorpEsiTokenMissing,
+    CorpEsiTokenExpired,
     StructureAccessDenied,
     StructureEncryptionNotConfigured,
     httpx.HTTPError,
@@ -242,8 +242,8 @@ async def _fetch_structure_book(
                 session, sso, corporation_uuid=corp_id, cipher=cipher
             )
         except (
-            StructureTokenMissing,
-            StructureTokenExpired,
+            CorpEsiTokenMissing,
+            CorpEsiTokenExpired,
             StructureEncryptionNotConfigured,
         ):
             continue  # this corp's grant is unusable; try the next

@@ -20,11 +20,11 @@ from app.application.auth import AuthenticatedUser, LoginChallenge
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     AuthorizingCharacterNotInCorporation,
+    CorpEsiTokenExpired,
+    CorpEsiTokenMissing,
     NotAuthorizedToAuthorizeStructure,
     SsoNotConfigured,
     StructureEncryptionNotConfigured,
-    StructureTokenExpired,
-    StructureTokenMissing,
 )
 from app.config import get_settings
 from app.data.records import StructureMarketTokenRecord
@@ -111,7 +111,7 @@ async def complete_structure_authorize(
     corp = await get_registered_corporation(session, user.corporation_id)
     token = await sso.exchange_code(code, verifier)
     if not token.refresh_token:
-        raise StructureTokenExpired("EVE did not return a refresh token")
+        raise CorpEsiTokenExpired("EVE did not return a refresh token")
     character = await sso.verify_token(token.access_token)
 
     # The stored token must belong to a member of the connecting corp (it's the corp's
@@ -176,7 +176,7 @@ async def revoke(
     corp = await get_registered_corporation(session, corporation_id)
     token = await tokens_repo.get_for_corp(session, corp.id)
     if token is None:
-        raise StructureTokenMissing()
+        raise CorpEsiTokenMissing()
     old_refresh = _decrypt_or_none(cipher, token.encrypted_refresh_token)
     if old_refresh is not None:
         await _revoke_at_eve(sso, old_refresh)
@@ -217,7 +217,7 @@ async def search_structures(
     corp = await get_registered_corporation(session, corporation_id)
     token = await tokens_repo.get_for_corp(session, corp.id)
     if token is None:
-        raise StructureTokenMissing()
+        raise CorpEsiTokenMissing()
     access_token = await get_structure_access_token(
         session, sso, corporation_uuid=corp.id, cipher=cipher
     )
@@ -250,7 +250,7 @@ async def get_structure_access_token(
 ) -> str:
     """Return a fresh access token for the corp's structure authorization, refreshing
     server-side. Persists a rotated refresh token (EVE may rotate it); on a revoked
-    grant, flags the row and raises `StructureTokenExpired`. Used by the structure
+    grant, flags the row and raises `CorpEsiTokenExpired`. Used by the structure
     pricing path (Phase B2)."""
     if not get_settings().structure_tokens_configured:
         # The stored ciphertext can't be (safely) decrypted with a missing/malformed
@@ -258,7 +258,7 @@ async def get_structure_access_token(
         raise StructureEncryptionNotConfigured()
     token = await tokens_repo.get_for_corp(session, corporation_uuid)
     if token is None:
-        raise StructureTokenMissing()
+        raise CorpEsiTokenMissing()
     refresh_token = cipher.decrypt(token.encrypted_refresh_token)
     try:
         refreshed = await sso.refresh_access_token(refresh_token)
@@ -268,7 +268,7 @@ async def get_structure_access_token(
                 session, corporation_id=corporation_uuid, at=datetime.now(UTC)
             )
             await session.commit()
-            raise StructureTokenExpired() from exc
+            raise CorpEsiTokenExpired() from exc
         raise
     if refreshed.refresh_token and refreshed.refresh_token != refresh_token:
         await tokens_repo.update_refresh_token(
