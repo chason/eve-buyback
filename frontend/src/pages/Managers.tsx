@@ -6,6 +6,7 @@ import { getMe } from "../api/auth"
 import { addManager, listManagers, removeManager } from "../api/managers"
 import { getRosterStatus, refreshRoster, searchMembers } from "../api/roster"
 import { getStructureStatus } from "../api/structures"
+import { ConfirmButton } from "../components/ConfirmButton"
 import { canManageCorp } from "../lib/roles"
 import { refreshCooldownRemaining, relativeTime } from "../lib/roster"
 
@@ -171,13 +172,12 @@ export default function Managers() {
                 <td>{m.character_name}</td>
                 <td>{new Date(m.granted_at).toLocaleDateString()}</td>
                 <td>
-                  <button
-                    type="button"
+                  <ConfirmButton
                     className="linkbtn"
-                    onClick={() => revoke.mutate(m.character_id)}
-                  >
-                    Remove
-                  </button>
+                    label="Remove"
+                    confirmPrompt="Remove manager?"
+                    onConfirm={() => revoke.mutate(m.character_id)}
+                  />
                 </td>
               </tr>
             ))}

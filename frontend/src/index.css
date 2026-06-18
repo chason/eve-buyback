@@ -435,6 +435,18 @@ button.dirty {
   color: var(--bb-cyan);
 }
 
+/* Inline confirm for a destructive action (#36): the trigger swaps to a red prompt with
+   Yes/Cancel rather than firing immediately. The prompt + "Yes" read danger-red so the
+   destructive choice is unmistakable; Cancel stays a normal (cyan) link. */
+.confirm-inline {
+  color: var(--bb-danger);
+}
+
+.confirm-inline .confirm-yes {
+  color: var(--bb-danger);
+  font-weight: 600;
+}
+
 /* Fixed HUD status line pinned to the bottom of the viewport (#44): the app version
    and serving node in mono, with a pulsing cyan "online" dot. */
 .hud-status {
