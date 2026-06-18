@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application import structure_tokens as structure_tokens_app
+from app.application import corp_esi_token as corp_esi_token_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import RosterAccessDenied, RosterRefreshTooSoon
 from app.config import get_settings
@@ -86,7 +86,7 @@ async def refresh_roster(
             raise RosterRefreshTooSoon()
 
     # Refreshes the access token server-side; raises CorpEsiTokenMissing/Expired.
-    access_token = await structure_tokens_app.get_corp_esi_access_token(
+    access_token = await corp_esi_token_app.get_corp_esi_access_token(
         session, sso, corporation_uuid=corp.id, cipher=cipher
     )
     try:
