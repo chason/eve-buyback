@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     roster_refresh_initial_delay_seconds: int = 60  # first run after boot
     roster_manual_refresh_min_interval_seconds: int = 900  # 15 min manual cooldown
 
+    # Background contract watcher (ADR-0037): a job polls each token-holding corp's EVE
+    # contracts (via the Corp ESI token) and reflects matched-contract status on appraisals.
+    contracts_background_refresh_enabled: bool = True
+    contracts_refresh_interval_seconds: int = 900  # 15 minutes
+    contracts_refresh_initial_delay_seconds: int = 90  # first run after boot
+
     # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
     # is an in-process LRU; set "memcached" + the address to share across processes.
     # SECURITY: memcached is UNAUTHENTICATED — bind it to loopback or a private/
@@ -129,14 +135,22 @@ class Settings(BaseSettings):
     # roster can be pulled for the manager-designation picker. Kept off normal login so
     # ordinary members never consent to it.
     eve_roster_scopes: str = "publicData esi-corporations.read_corporation_membership.v1"
+    # Corp-contracts scope, folded into the Corp ESI access grant (ADR-0037) so the
+    # background watcher can read the corp's contracts. Existing tokens granted before
+    # this must reconnect to gain it.
+    eve_contracts_scopes: str = "esi-contracts.read_corporation_contracts.v1"
 
     @property
     def eve_corp_token_scopes(self) -> str:
-        """The full scope set for the one persisted Corp ESI access token (ADR-0036):
-        structure-market access + corp-membership, requested in a single grant. Deduped,
-        order-preserving (both sets include `publicData`)."""
+        """The full scope set for the one persisted Corp ESI access token (ADR-0036,
+        0037): structure-market access + corp-membership + corp-contracts, requested in a
+        single grant. Deduped, order-preserving (the sets share `publicData`)."""
         seen: dict[str, None] = {}
-        for scope in f"{self.eve_structure_scopes} {self.eve_roster_scopes}".split():
+        combined = (
+            f"{self.eve_structure_scopes} {self.eve_roster_scopes} "
+            f"{self.eve_contracts_scopes}"
+        )
+        for scope in combined.split():
             seen.setdefault(scope, None)
         return " ".join(seen)
 

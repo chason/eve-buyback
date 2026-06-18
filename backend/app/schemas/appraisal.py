@@ -83,6 +83,9 @@ class AppraisalOut(BaseModel):
     accepted_total: Decimal
     rejected_count: int
     lines: list[AppraisalLineOut]
+    # The matched-contract status (ADR-0037): in_progress | completed | rejected |
+    # cancelled | expired | failed | mismatch; null when no contract is matched.
+    contract_status: str | None = None
 
 
 class AppraisalSummaryOut(BaseModel):
@@ -97,3 +100,5 @@ class AppraisalSummaryOut(BaseModel):
     delivery_location_name: str | None = None
     accepted_total: Decimal
     rejected_count: int
+    # Matched-contract status (ADR-0037); null when no contract is matched.
+    contract_status: str | None = None

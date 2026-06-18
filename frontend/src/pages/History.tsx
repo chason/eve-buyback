@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 
 import { listAppraisals } from "../api/appraisals"
 import { getMe } from "../api/auth"
+import { ContractStatusChip } from "../components/ContractStatusChip"
 import { StatusChip } from "../components/StatusChip"
 import { formatIsk } from "../lib/format"
 import { isManager } from "../lib/roles"
@@ -41,6 +42,7 @@ export default function History() {
               <th>Drop-off</th>
               <th>Accepted</th>
               <th>Rejected</th>
+              <th>Contract</th>
               <th />
             </tr>
           </thead>
@@ -59,6 +61,9 @@ export default function History() {
                   ) : (
                     "—"
                   )}
+                </td>
+                <td>
+                  <ContractStatusChip status={a.contract_status} />
                 </td>
                 <td>
                   <Link to={`/a/${a.public_id}`}>View</Link>

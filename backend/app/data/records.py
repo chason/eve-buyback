@@ -224,6 +224,9 @@ class AppraisalRecord(BaseModel):
     delivery_location_id: str | None = None
     delivery_location_name: str | None = None
     lines: list[AppraisalLineRecord]
+    # The current matched-contract status (ADR-0037), resolved by a LEFT JOIN on
+    # `appraisal_contracts`; None when no contract is matched.
+    contract_status: str | None = None
 
 
 class AppraisalSummaryRecord(BaseModel):
@@ -240,6 +243,20 @@ class AppraisalSummaryRecord(BaseModel):
     rejected_count: int
     delivery_location_id: str | None = None
     delivery_location_name: str | None = None
+    # Matched-contract status (ADR-0037); None when no contract is matched.
+    contract_status: str | None = None
+
+
+class AppraisalContractRecord(BaseModel):
+    """The current best contract matched to an appraisal (ADR-0037)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    appraisal_id: uuid.UUID
+    contract_id: int
+    status: str
+    issued_at: datetime
+    completed_at: datetime | None = None
 
 
 class CorpEsiTokenRecord(BaseModel):
