@@ -497,11 +497,19 @@ def _compute_line(
     } | hub_snapshot
 
 
+def _decimal_str(d: Decimal) -> str:
+    """A Decimal as a plain fixed-point string (ADR-0020). `format(d, "f")` — never bare
+    `str()`, which emits scientific notation for extreme exponents (e.g. an unpriced
+    mineral's `0E+29`), and the frontend money formatter expects plain decimals (it would
+    render "0E29.00 ISK" otherwise)."""
+    return format(d, "f")
+
+
 def _reprocess_breakdown(
     result: pricing_domain.ReprocessResult, types: dict[int, SdeTypeRecord]
 ) -> dict:
     """JSON-serializable snapshot of a reprocess result for the appraisal line. Money
-    and quantities are Decimal strings (ADR-0020)."""
+    and quantities are Decimal strings (ADR-0020), always plain fixed-point."""
     return {
         "minerals": [
             {
@@ -509,14 +517,16 @@ def _reprocess_breakdown(
                 "type_name": types[m.type_id].name
                 if m.type_id in types
                 else f"Type {m.type_id}",
-                "quantity": str(m.quantity),
-                "unit_value": str(m.unit_value) if m.unit_value is not None else None,
-                "value": str(m.value),
+                "quantity": _decimal_str(m.quantity),
+                "unit_value": _decimal_str(m.unit_value)
+                if m.unit_value is not None
+                else None,
+                "value": _decimal_str(m.value),
             }
             for m in result.minerals
         ],
         "leftover_units": result.leftover_units,
-        "leftover_value": str(result.leftover_value),
+        "leftover_value": _decimal_str(result.leftover_value),
     }
 
 

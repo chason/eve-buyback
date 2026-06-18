@@ -14,4 +14,16 @@ describe("formatIsk", () => {
     // 9007199254740993 is beyond Number's safe integer range.
     expect(formatIsk("9007199254740993.00")).toBe("9,007,199,254,740,993.00 ISK")
   })
+
+  it("handles scientific-notation Decimal strings (no '0E29.00 ISK')", () => {
+    // Python's Decimal serializes extreme exponents this way (an unpriced mineral's value).
+    expect(formatIsk("0E+29")).toBe("0.00 ISK")
+    expect(formatIsk("0E-7")).toBe("0.00 ISK")
+    expect(formatIsk("1E-8")).toBe("0.00 ISK")
+    expect(formatIsk("1.5E+10")).toBe("15,000,000,000.00 ISK")
+    expect(formatIsk("-2.5E+3")).toBe("-2,500.00 ISK")
+    expect(formatIsk("1.2345E+2")).toBe("123.45 ISK")
+    // No stray exponent marker survives to the output.
+    expect(formatIsk("0E+29")).not.toContain("E")
+  })
 })

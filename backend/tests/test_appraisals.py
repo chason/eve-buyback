@@ -164,6 +164,38 @@ async def test_appraisal_reprocess_sub_batch_uses_ore_price():
         assert Decimal(resp.json()["lines"][0]["line_total"]) == Decimal("100.00")
 
 
+def test_reprocess_breakdown_serializes_plain_decimals():
+    # A mineral whose market price is an extreme-exponent zero (an unpriced mineral)
+    # yields a value Decimal like 0E+29, whose bare str() is scientific notation — which
+    # the frontend money formatter renders as "0E29.00 ISK". The snapshot must serialize
+    # plain fixed-point so no 'E' ever reaches the client.
+    import types as _types
+
+    from app.application.appraisals import _decimal_str, _reprocess_breakdown
+    from app.domain.pricing import ReprocessMineral, ReprocessResult
+
+    assert _decimal_str(Decimal("0E+29")) == "0"
+    assert _decimal_str(Decimal("0E-7")) == "0.0000000"
+    assert "E" not in _decimal_str(Decimal("1E-8"))
+
+    result = ReprocessResult(
+        total=Decimal("100.00"),
+        minerals=[
+            ReprocessMineral(
+                type_id=39, quantity=Decimal("0E-4"),
+                unit_value=Decimal("0E+33"), value=Decimal("0E+29"),
+            )
+        ],
+        leftover_units=50,
+        leftover_value=Decimal("100.00"),
+    )
+    bd = _reprocess_breakdown(result, {39: _types.SimpleNamespace(name="Silicates")})
+    m = bd["minerals"][0]
+    assert "E" not in m["value"] and "E" not in m["quantity"]
+    assert "E" not in (m["unit_value"] or "")
+    assert m["value"] == "0"
+
+
 async def test_appraisal_whitelist_mode_rejects_unruled_items():
     await _seed_sde()
     _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
