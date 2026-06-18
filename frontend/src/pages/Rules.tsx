@@ -168,7 +168,9 @@ export default function Rules() {
                     <ConfirmButton
                       className="linkbtn"
                       label="Remove"
-                      confirmPrompt="Remove rule?"
+                      title="Remove rule?"
+                      prompt="This pricing rule will be deleted."
+                      confirmLabel="Remove rule"
                       onConfirm={() => remove.mutate(rule)}
                     />
                   </td>

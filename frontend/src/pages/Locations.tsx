@@ -102,7 +102,9 @@ export default function Locations() {
                     <ConfirmButton
                       className="linkbtn"
                       label="Remove"
-                      confirmPrompt="Remove location?"
+                      title="Remove location?"
+                      prompt="This drop-off location will be removed."
+                      confirmLabel="Remove location"
                       onConfirm={() => remove.mutate(loc.location_id)}
                     />
                   </td>

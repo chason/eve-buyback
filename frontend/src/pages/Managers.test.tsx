@@ -124,9 +124,9 @@ describe("Managers", () => {
     expect(await screen.findByText("Grunt")).toBeInTheDocument()
     // Remove is an action button, not an anchor (#80)…
     await u.click(screen.getByRole("button", { name: "Remove" }))
-    // …and it's destructive, so it confirms before firing (#36).
+    // …and it's destructive, so it opens a confirm popup before firing (#36).
     expect(managersApi.removeManager).not.toHaveBeenCalled()
-    await u.click(screen.getByRole("button", { name: "Yes" }))
+    await u.click(screen.getByRole("button", { name: "Remove manager" }))
     await waitFor(() =>
       expect(managersApi.removeManager).toHaveBeenCalledWith(555),
     )

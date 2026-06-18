@@ -5,38 +5,55 @@ import { describe, expect, it, vi } from "vitest"
 import { ConfirmButton } from "./ConfirmButton"
 
 describe("ConfirmButton", () => {
-  it("fires onConfirm only after a confirm step (#36)", async () => {
+  it("opens a popup and fires onConfirm only after confirming (#36)", async () => {
     const u = userEvent.setup()
     const onConfirm = vi.fn()
     render(
       <ConfirmButton
         label="Remove"
-        confirmPrompt="Remove rule?"
+        title="Remove rule?"
+        prompt="This pricing rule will be deleted."
+        confirmLabel="Remove rule"
         onConfirm={onConfirm}
       />,
     )
 
-    // First click doesn't fire — it swaps to the prompt.
-    await u.click(screen.getByRole("button", { name: "Remove" }))
-    expect(onConfirm).not.toHaveBeenCalled()
-    expect(screen.getByText("Remove rule?")).toBeInTheDocument()
+    // No dialog until the trigger is clicked.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
 
-    // Confirming fires it.
-    await u.click(screen.getByRole("button", { name: "Yes" }))
+    await u.click(screen.getByRole("button", { name: "Remove" }))
+    const dialog = screen.getByRole("dialog")
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText("This pricing rule will be deleted.")).toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    // The distinct confirm button (not the trigger) fires it and closes the popup.
+    await u.click(screen.getByRole("button", { name: "Remove rule" }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 
-  it("cancelling returns to the trigger without firing", async () => {
+  it("Cancel and Escape close the popup without firing", async () => {
     const u = userEvent.setup()
     const onConfirm = vi.fn()
-    render(<ConfirmButton label="Revoke" onConfirm={onConfirm} />)
+    render(
+      <ConfirmButton
+        label="Revoke"
+        prompt="This stops pricing."
+        confirmLabel="Revoke"
+        onConfirm={onConfirm}
+      />,
+    )
 
     await u.click(screen.getByRole("button", { name: "Revoke" }))
     await u.click(screen.getByRole("button", { name: "Cancel" }))
-
     expect(onConfirm).not.toHaveBeenCalled()
-    // Back to the trigger, no prompt lingering.
-    expect(screen.getByRole("button", { name: "Revoke" })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+
+    // Re-open, then Escape cancels.
+    await u.click(screen.getByRole("button", { name: "Revoke" }))
+    await u.keyboard("{Escape}")
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 })
