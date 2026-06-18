@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -120,5 +120,35 @@ describe("Appraise", () => {
     expect(
       screen.getByRole("button", { name: "Create appraisal" }),
     ).toBeInTheDocument()
+  })
+
+  it("shows the live paste count and surfaces the cap inline (#37)", async () => {
+    const user = userEvent.setup()
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([])
+    renderAppraise()
+
+    // The cap is stated even before typing.
+    expect(
+      await screen.findByText(/up to 1,000 items per appraisal/i),
+    ).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText("Paste items"), "Tritanium\nPyerite")
+    expect(screen.getByText(/2 from paste/i)).toBeInTheDocument()
+  })
+
+  it("blocks submit and warns when the paste exceeds the cap (#37)", async () => {
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([])
+    renderAppraise()
+
+    // 1001 non-blank lines tips over EVE's 1000-stack contract limit.
+    const tooMany = Array.from({ length: 1001 }, (_, i) => `Item ${i}`).join("\n")
+    fireEvent.change(await screen.findByLabelText("Paste items"), {
+      target: { value: tooMany },
+    })
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/over the 1,000-item limit/i)
+    expect(
+      screen.getByRole("button", { name: "Create appraisal" }),
+    ).toBeDisabled()
   })
 })
