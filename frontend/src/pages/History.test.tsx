@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -95,5 +96,35 @@ describe("History", () => {
     renderHistory()
 
     expect(await screen.findByText(/No appraisals yet/)).toBeInTheDocument()
+  })
+
+  it("offers Open in EVE per row only for matched contracts (ADR-0038)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      ...user("manager"),
+      can_open_contract: true,
+    })
+    vi.mocked(appraisalsApi.openContract).mockResolvedValue()
+    vi.mocked(appraisalsApi.listAppraisals).mockResolvedValue([
+      {
+        public_id: "matched1", created_by_character_id: 1,
+        created_at: "2026-06-07T00:00:00Z", market_hub_id: "60003760",
+        accepted_total: "100.00", rejected_count: 0, contract_status: "in_progress",
+      },
+      {
+        public_id: "nocontract", created_by_character_id: 1,
+        created_at: "2026-06-07T00:00:00Z", market_hub_id: "60003760",
+        accepted_total: "50.00", rejected_count: 0,
+      },
+    ])
+
+    renderHistory()
+
+    // Exactly one row (the matched one) gets the action.
+    const buttons = await screen.findAllByRole("button", { name: "Open in EVE" })
+    expect(buttons).toHaveLength(1)
+
+    await u.click(buttons[0])
+    expect(appraisalsApi.openContract).toHaveBeenCalledWith("matched1")
   })
 })

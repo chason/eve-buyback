@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 
-import { listAppraisals } from "../api/appraisals"
+import { listAppraisals, openContract } from "../api/appraisals"
 import { getMe } from "../api/auth"
 import { ContractStatusChip } from "../components/ContractStatusChip"
 import { StatusChip } from "../components/StatusChip"
@@ -15,6 +15,10 @@ export default function History() {
     queryFn: listAppraisals,
   })
   const corpWide = isManager(me.data?.role)
+  // "Open in EVE" (ADR-0038), keyed by public_id so only the clicked row shows state.
+  const openInEve = useMutation({
+    mutationFn: (publicId: string) => openContract(publicId),
+  })
 
   if (appraisals.isLoading) return <p aria-busy="true">Loading…</p>
   if (appraisals.isError || !appraisals.data) {
@@ -64,6 +68,31 @@ export default function History() {
                 </td>
                 <td>
                   <ContractStatusChip status={a.contract_status} />
+                  {me.data?.can_open_contract && a.contract_status && (
+                    <>
+                      <br />
+                      <button
+                        type="button"
+                        className="linkbtn"
+                        disabled={
+                          openInEve.isPending &&
+                          openInEve.variables === a.public_id
+                        }
+                        onClick={() => openInEve.mutate(a.public_id)}
+                      >
+                        {openInEve.isPending &&
+                        openInEve.variables === a.public_id
+                          ? "Opening…"
+                          : "Open in EVE"}
+                      </button>
+                      {openInEve.isError &&
+                        openInEve.variables === a.public_id && (
+                          <small className="error">
+                            {(openInEve.error as Error).message}
+                          </small>
+                        )}
+                    </>
+                  )}
                 </td>
                 <td>
                   <Link to={`/a/${a.public_id}`}>View</Link>
