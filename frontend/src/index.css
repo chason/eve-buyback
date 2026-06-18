@@ -686,6 +686,13 @@ label:has(> .search-results) > input {
   text-decoration: none;
 }
 
+/* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
+   stable width so the wider state doesn't reflow the table column (and shift the row). */
+.copy-btn {
+  min-width: 6.5rem;
+  text-align: center;
+}
+
 /* Pricing rules organised into collapsible category folders (top-level market group):
    each folder is a <details> within the rules panel, with a console-style header. */
 .rule-folder + .rule-folder {
