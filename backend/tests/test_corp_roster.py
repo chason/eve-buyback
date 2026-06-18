@@ -112,7 +112,7 @@ async def _connect(esi: RosterEsi) -> uuid.UUID:
     the interface endpoint's job; here we drive `refresh_roster` explicitly)."""
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        await structures_app.complete_structure_authorize(
+        await structures_app.complete_corp_esi_authorize(
             session, FakeSso(), esi, code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )

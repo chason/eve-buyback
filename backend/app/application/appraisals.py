@@ -210,7 +210,7 @@ async def create_appraisal(
 
     # One corp-level structure token covers every structure hub (ADR-0029); the
     # provider is only invoked for esi_structure fetches, so pass it to all of them.
-    structure_token_provider = None
+    corp_esi_token_provider = None
     if any(h.kind == "structure" for h in ids_by_hub):
         # If the corp's structure token isn't working (never authorized, or flagged
         # failing — revoked grant / lost docking access, #68), block the appraisal with
@@ -220,8 +220,8 @@ async def create_appraisal(
         if token is None or token.last_refresh_failed_at is not None:
             raise StructureMarketUnavailable()
 
-        async def structure_token_provider() -> str:
-            return await structure_tokens_app.get_structure_access_token(
+        async def corp_esi_token_provider() -> str:
+            return await structure_tokens_app.get_corp_esi_access_token(
                 session, sso, corporation_uuid=corp.id, cipher=cipher
             )
 
@@ -252,7 +252,7 @@ async def create_appraisal(
             hub=bucket_hub,
             type_ids=sorted(ids),
             now=now,
-            structure_token_provider=structure_token_provider,
+            corp_esi_token_provider=corp_esi_token_provider,
             cache=cache,
         )
         price_maps.setdefault(bucket_hub.hub_id, {}).update(

@@ -143,7 +143,7 @@ class Settings(BaseSettings):
         return self.environment != "development"
 
     @property
-    def structure_tokens_configured(self) -> bool:
+    def corp_esi_token_configured(self) -> bool:
         """Whether a real token-encryption key is set. Structure auth is refused
         outside development while this is the public placeholder (ADR-0029). The
         key's structural validity is enforced at boot (`_require_valid_token_key`),
