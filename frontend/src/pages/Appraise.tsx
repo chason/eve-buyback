@@ -7,6 +7,7 @@ import { listLocations } from "../api/locations"
 import { getConfig } from "../api/pricing"
 import { searchTypes } from "../api/sde"
 import { hubName } from "../lib/hubs"
+import { countPasteItems, MAX_APPRAISAL_ITEMS } from "../lib/paste"
 
 interface PickedItem {
   type_id: number
@@ -62,8 +63,15 @@ export default function Appraise() {
     setItems((prev) => prev.filter((i) => i.type_id !== typeId))
   }
 
+  // Live feedback on what the paste will contribute — one line item per non-blank
+  // line, mirroring the server parser — combined with the picked items, so a member
+  // sees the count (and the cap) before submitting, not via a post-submit 422 (#37).
+  const pasteCount = countPasteItems(paste)
+  const totalCount = items.length + pasteCount
+  const overCap = totalCount > MAX_APPRAISAL_ITEMS
+
   const hasItems = items.length > 0 || paste.trim().length > 0
-  const canSubmit = hasItems && (!hasLocations || location !== "")
+  const canSubmit = hasItems && !overCap && (!hasLocations || location !== "")
 
   function submit() {
     appraise.mutate({
@@ -115,8 +123,32 @@ export default function Appraise() {
           onChange={(e) => setPaste(e.target.value)}
           placeholder={"Tritanium\t1000\nPyerite 500"}
           rows={6}
+          aria-describedby="paste-help"
         />
       </label>
+      <small id="paste-help" className="field-hint">
+        One item per line — name, then an optional quantity. Up to{" "}
+        {MAX_APPRAISAL_ITEMS.toLocaleString()} items per appraisal.
+        {paste.trim() && (
+          <>
+            {" "}
+            <strong>
+              {pasteCount.toLocaleString()} from paste
+              {items.length > 0 &&
+                ` · ${totalCount.toLocaleString()} total with your picks`}
+            </strong>
+            .
+          </>
+        )}
+      </small>
+      {overCap && (
+        <p className="error" role="alert">
+          That&apos;s {totalCount.toLocaleString()} items — over the{" "}
+          {MAX_APPRAISAL_ITEMS.toLocaleString()}-item limit (EVE&apos;s contract
+          cap). Remove {(totalCount - MAX_APPRAISAL_ITEMS).toLocaleString()} to
+          continue.
+        </p>
+      )}
 
       <label>
         Add an item
