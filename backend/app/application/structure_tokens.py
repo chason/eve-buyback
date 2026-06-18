@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 
 import httpx
 from cryptography.fernet import InvalidToken
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.auth import AuthenticatedUser, LoginChallenge
@@ -53,6 +53,18 @@ class StructureAuthorizeResult(BaseModel):
 
     token: StructureMarketTokenRecord
     replaced_character_name: str | None = None
+
+
+class StructureMatch(BaseModel):
+    """A structure the authorizing character can access, matched by a name search
+    (ADR-0029). The use case returns these (not loose dicts) so the interface maps a
+    typed object to the API DTO. `structure_id` is stringified to match the API's
+    string-id convention for EVE location ids."""
+
+    model_config = ConfigDict(frozen=True)
+
+    structure_id: str
+    name: str
 
 
 def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
@@ -188,9 +200,9 @@ async def search_structures(
     corporation_id: int,
     query: str,
     cipher: TokenCipher,
-) -> list[dict]:
+) -> list[StructureMatch]:
     """Search the corp's accessible structures by name (ADR-0029), using the stored
-    token's character. Returns `[{structure_id, name}]`. Requires prior authorization."""
+    token's character. Returns typed `StructureMatch`es. Requires prior authorization."""
     corp = await get_registered_corporation(session, corporation_id)
     token = await tokens_repo.get_for_corp(session, corp.id)
     if token is None:
@@ -212,7 +224,7 @@ async def search_structures(
         )
     )
     return [
-        {"structure_id": str(structure_id), "name": name}
+        StructureMatch(structure_id=str(structure_id), name=name)
         for structure_id, name in zip(structure_ids, names, strict=True)
         if name
     ]

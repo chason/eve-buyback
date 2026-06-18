@@ -314,8 +314,12 @@ async def test_search_structures_returns_named_results():
         results = await structures_app.search_structures(
             session, FakeSso(), esi, corporation_id=CORP_EVE_ID, query="pal", cipher=CIPHER
         )
-    # Only the resolvable structure is returned, id as a string.
-    assert results == [{"structure_id": "1035000000001", "name": "1DQ1-A - Palace"}]
+    # Only the resolvable structure is returned, typed, id as a string.
+    assert results == [
+        structures_app.StructureMatch(
+            structure_id="1035000000001", name="1DQ1-A - Palace"
+        )
+    ]
 
 
 async def test_search_structures_requires_authorization():
