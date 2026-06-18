@@ -35,10 +35,10 @@ from app.data.records import (
 )
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import buyback_locations as locations_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.domain import pricing as pricing_domain
 from app.domain.ids import generate_appraisal_id
 from app.domain.market import (

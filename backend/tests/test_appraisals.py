@@ -8,10 +8,10 @@ from app.data.db import SessionLocal
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import characters as characters_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.main import app
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide, get_fuzzwork_client
 from app.plugins.token_cipher import TokenCipher

@@ -16,9 +16,9 @@ from app.application.errors import (
 from app.config import get_settings
 from app.data.records import BuybackConfigRecord, PricingRuleRecord
 from app.data.repositories import buyback_config as config_repo
+from app.data.repositories import corp_esi_token as corp_esi_token_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
-from app.data.repositories import structure_tokens as structure_tokens_repo
 from app.domain.market import (
     FUZZWORK_HUB_NAMES,
     HubDescriptor,
@@ -104,7 +104,7 @@ async def _resolve_hub(
         # pricing, so reject anything that could inject a path (e.g. "1/../x").
         if not hub_id.isdigit():
             raise MarketHubInvalid(f"Invalid structure id {hub_id!r}")
-        token = await structure_tokens_repo.get_for_corp(session, corporation_uuid)
+        token = await corp_esi_token_repo.get_for_corp(session, corporation_uuid)
         if token is None:
             raise MarketHubInvalid(
                 "Authorize structure access before selecting a structure hub"

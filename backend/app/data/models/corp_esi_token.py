@@ -7,14 +7,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.data.db import Base
 
 
-class StructureMarketToken(Base):
-    """A persisted, Fernet-encrypted EVE refresh token authorizing structure-market
-    reads for a corp's structure hub (ADR-0029). One per corporation. Only the
-    ciphertext is stored; access tokens are never persisted. The authorizing
-    character is recorded (UUID FK + denormalized eve id/name) for display + audit.
+class CorpEsiToken(Base):
+    """A persisted, Fernet-encrypted EVE refresh token — the corp's one ESI credential
+    (ADR-0029, ADR-0036), authorizing both structure-market reads and corp-membership
+    (the roster). One per corporation. Only the ciphertext is stored; access tokens are
+    never persisted. The authorizing character is recorded (UUID FK + denormalized eve
+    id/name) for display + audit.
     """
 
-    __tablename__ = "structure_market_tokens"
+    __tablename__ = "corp_esi_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     corporation_id: Mapped[uuid.UUID] = mapped_column(

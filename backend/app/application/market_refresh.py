@@ -34,10 +34,10 @@ from app.application.market import persist_market_rows
 from app.application.structure_tokens import get_corp_esi_access_token
 from app.config import Settings
 from app.data.repositories import buyback_config as config_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import market_hub_refresh as hub_refresh_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.domain.market import HubDescriptor, refresh_cutoff, resolve_market_source
 from app.plugins.cache import Cache
 from app.plugins.esi_market import EsiMarketClient, StructureAccessDenied
