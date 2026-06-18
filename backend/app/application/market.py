@@ -32,7 +32,7 @@ from app.plugins.fuzzwork import FuzzworkClient
 log = logging.getLogger(__name__)
 
 # Provides a fresh structure-market access token (refreshing server-side, ADR-0029).
-StructureTokenProvider = Callable[[], Awaitable[str]]
+CorpEsiTokenProvider = Callable[[], Awaitable[str]]
 
 
 def _l1_key(hub_id: str, type_id: int) -> str:
@@ -74,7 +74,7 @@ async def _fetch_aggregates(
     esi_market: EsiMarketClient,
     hub: HubDescriptor,
     type_ids: list[int],
-    structure_token_provider: StructureTokenProvider | None,
+    corp_esi_token_provider: CorpEsiTokenProvider | None,
 ) -> dict[int, BuySellAggregate]:
     """Fetch buy/sell aggregates for the cache misses from the hub's source. Returns
     `{}` on any outage so the caller falls back to cached prices."""
@@ -90,10 +90,10 @@ async def _fetch_aggregates(
                 region_id=hub.region_id, station_id=hub.hub_id, type_ids=type_ids
             )
         # esi_structure (ADR-0029): needs a per-corp access token.
-        if structure_token_provider is None:
+        if corp_esi_token_provider is None:
             log.warning("no structure token provider for hub %s", hub.hub_id)
             return {}
-        access_token = await structure_token_provider()
+        access_token = await corp_esi_token_provider()
         return await esi_market.get_structure_aggregates(
             structure_id=hub.hub_id, type_ids=type_ids, access_token=access_token
         )
@@ -168,7 +168,7 @@ async def get_market_prices(
     hub: HubDescriptor,
     type_ids: list[int],
     now: datetime,
-    structure_token_provider: StructureTokenProvider | None = None,
+    corp_esi_token_provider: CorpEsiTokenProvider | None = None,
     cache: Cache | None = None,
 ) -> list[MarketPriceRecord]:
     """Read prices through three tiers (ADR-0033): the pluggable L1 cache (in-memory
@@ -220,7 +220,7 @@ async def get_market_prices(
     refreshed: dict[int, MarketPriceRecord] = {}
     if to_fetch:
         aggregates = await _fetch_aggregates(
-            fuzzwork, esi_market, hub, to_fetch, structure_token_provider
+            fuzzwork, esi_market, hub, to_fetch, corp_esi_token_provider
         )
         refreshed = await persist_market_rows(
             session, cache, hub_id=hub.hub_id, aggregates=aggregates, now=now,

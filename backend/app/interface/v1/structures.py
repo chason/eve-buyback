@@ -47,7 +47,7 @@ def _status(
     *,
     replaced_character_name: str | None = None,
 ) -> StructureTokenStatus:
-    configured = get_settings().structure_tokens_configured
+    configured = get_settings().corp_esi_token_configured
     if record is None:
         return StructureTokenStatus(configured=configured, authorized=False)
     return StructureTokenStatus(
@@ -91,7 +91,7 @@ async def authorize(
     request: Request, user: RequireCeoOrDirector, sso: SsoDep
 ) -> StructureAuthorizeResponse:
     """Begin the corp ESI access grant: mint state + PKCE and return the SSO URL."""
-    challenge = structures_app.begin_structure_authorize(sso)
+    challenge = structures_app.begin_corp_esi_authorize(sso)
     request.session[STRUCT_OAUTH_STATE_KEY] = challenge.state
     request.session[STRUCT_PKCE_VERIFIER_KEY] = challenge.verifier
     return StructureAuthorizeResponse(
@@ -118,7 +118,7 @@ async def complete(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state",
         )
-    result = await structures_app.complete_structure_authorize(
+    result = await structures_app.complete_corp_esi_authorize(
         session, sso, esi, code=payload.code, verifier=verifier, user=user, cipher=cipher
     )
     request.session.pop(STRUCT_OAUTH_STATE_KEY, None)

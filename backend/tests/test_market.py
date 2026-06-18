@@ -191,7 +191,7 @@ async def test_structure_hub_prices_via_provider_token():
     async with SessionLocal() as session:
         result = await get_market_prices(
             session, FakeFuzzwork(), esi, hub=STRUCT_HUB, type_ids=[34], now=NOW,
-            structure_token_provider=provider,
+            corp_esi_token_provider=provider,
         )
     assert calls["token"] == 1
     assert esi.structure_calls == 1
@@ -209,7 +209,7 @@ async def test_structure_missing_token_degrades_to_unpriced():
     async with SessionLocal() as session:
         result = await get_market_prices(
             session, FakeFuzzwork(), esi, hub=STRUCT_HUB, type_ids=[34], now=NOW,
-            structure_token_provider=provider,
+            corp_esi_token_provider=provider,
         )
     # No token + no cache → the type is simply omitted; the appraisal never errors.
     assert result == []
