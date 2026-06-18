@@ -31,18 +31,18 @@ subsystem (or a transient roster-only SSO step-up) would duplicate all of that.
 **Broaden the one persisted structure-market token into the corp's single "Corp ESI
 access" token, carrying both scope sets, and fetch the roster server-side with it.**
 
-- **One grant, both scopes.** `begin_structure_authorize` requests
+- **One grant, both scopes.** `begin_corp_esi_authorize` requests
   `eve_corp_token_scopes` = structure-market scopes **+** the membership scope (deduped).
   The grant stays **off normal login** (ADR-0004), so ordinary members never consent to it.
 - **CEO/Director gate the connect/revoke; the token character can be any corp member.**
   A new `require_ceo_or_director` dependency gates connect/revoke (and the manager
-  endpoints). `complete_structure_authorize` validates the authorizing character is in the
+  endpoints). `complete_corp_esi_authorize` validates the authorizing character is in the
   corp (`AuthorizingCharacterNotInCorporation`). The **roster only populates if that
   character is a Director** — `get_corporation_members` 403s otherwise, surfaced as
   `RosterAccessDenied`; the token still works for structure pricing. **Status + structure
   search stay manager-visible** (managers configure structure hubs).
 - **Server-side roster fetch, no EVE round-trip.** `corp_roster.refresh_roster` reuses
-  `get_structure_access_token` (server-side refresh), calls `get_corporation_members`,
+  `get_corp_esi_access_token` (server-side refresh), calls `get_corporation_members`,
   resolves names via the public bulk `/universe/names/`, and replaces a cached snapshot in
   `corp_roster_members`. The picker searches that table server-side (`ILIKE`, limited).
 - **Fresh automatically + on demand.** A daily background job (on the ADR-0034 scheduler)

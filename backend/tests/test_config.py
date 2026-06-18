@@ -81,7 +81,7 @@ def test_real_token_key_boots_and_is_configured_in_production():
         token_encryption_key=key,
         _env_file=None,
     )
-    assert settings.structure_tokens_configured is True
+    assert settings.corp_esi_token_configured is True
 
 
 def test_placeholder_token_key_boots_but_is_not_configured_in_production():
@@ -93,7 +93,7 @@ def test_placeholder_token_key_boots_but_is_not_configured_in_production():
         token_encryption_key=INSECURE_TOKEN_KEY,
         _env_file=None,
     )
-    assert settings.structure_tokens_configured is False
+    assert settings.corp_esi_token_configured is False
 
 
 # --- cache config validators (ADR-0033) ---

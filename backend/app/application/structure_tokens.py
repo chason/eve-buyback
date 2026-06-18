@@ -1,9 +1,12 @@
-"""Structure-market access authorization (ADR-0029).
+"""Corp ESI access token (ADR-0029, ADR-0036).
 
-A separate, **manager-gated** SSO flow that persists an **encrypted** EVE refresh
-token so the backend can read a player structure's market orders on the corp's
-behalf. The normal login stays token-free (ADR-0004). Access tokens are never
-persisted — they're refreshed server-side at point of use and held only transiently.
+A separate, **CEO/Director-gated** SSO flow that persists one **encrypted** EVE refresh
+token per corp — covering both structure-market reads and corp-membership (the roster).
+The normal login stays token-free (ADR-0004). Access tokens are never persisted —
+they're refreshed server-side at point of use and held only transiently.
+
+(The module/file keep the `structure_tokens` name to match the `structure_market_tokens`
+table; the corp-ESI-token *functions* were renamed in ADR-0036.)
 """
 
 import asyncio
@@ -47,7 +50,7 @@ log = logging.getLogger(__name__)
 STRUCTURE_STATE_PREFIX = "structure."
 
 
-class StructureAuthorizeResult(BaseModel):
+class CorpEsiAuthorizeResult(BaseModel):
     """Outcome of completing a structure-access grant. `replaced_character_name` is
     set when a re-authorization switched the authorizing character (EVE can't pin the
     SSO picker), so the interface can warn that the token now belongs to someone else."""
@@ -68,14 +71,14 @@ class StructureMatch(BaseModel):
     name: str
 
 
-def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
+def begin_corp_esi_authorize(sso: EveSsoClient) -> LoginChallenge:
     """Mint the PKCE/state challenge for the **Corp ESI access** grant (ADR-0036): one
     token carrying both the structure-market scopes and the corp-membership scope. Fails
     fast on a missing/malformed encryption key so the admin isn't sent through the whole
     EVE round-trip only to have the completion refuse to store the token."""
     if not sso.configured:
         raise SsoNotConfigured()
-    if not get_settings().structure_tokens_configured:
+    if not get_settings().corp_esi_token_configured:
         raise StructureEncryptionNotConfigured()
     state = STRUCTURE_STATE_PREFIX + auth_rules.generate_state()
     verifier, challenge = auth_rules.generate_pkce()
@@ -87,7 +90,7 @@ def begin_structure_authorize(sso: EveSsoClient) -> LoginChallenge:
     return LoginChallenge(authorization_url=url, state=state, verifier=verifier)
 
 
-async def complete_structure_authorize(
+async def complete_corp_esi_authorize(
     session: AsyncSession,
     sso: EveSsoClient,
     esi: EsiClient,
@@ -96,7 +99,7 @@ async def complete_structure_authorize(
     verifier: str,
     user: AuthenticatedUser,
     cipher: TokenCipher,
-) -> StructureAuthorizeResult:
+) -> CorpEsiAuthorizeResult:
     """Exchange the code and store the (encrypted) refresh token for the caller's corp
     (ADR-0036). Only the CEO or a Director may connect/revoke, but the authorizing
     character can be any corp member (validated here) — commonly a Director service
@@ -105,7 +108,7 @@ async def complete_structure_authorize(
     caller can warn about the swap."""
     if not (user.role == "ceo" or user.is_director):
         raise NotAuthorizedToAuthorizeStructure()
-    if not get_settings().structure_tokens_configured:
+    if not get_settings().corp_esi_token_configured:
         raise StructureEncryptionNotConfigured()
 
     corp = await get_registered_corporation(session, user.corporation_id)
@@ -148,10 +151,11 @@ async def complete_structure_authorize(
         character_eve_id=character.character_id,
         character_name=character.name,
         encrypted_refresh_token=cipher.encrypt(token.refresh_token),
-        scopes=get_settings().eve_structure_scopes,
+        # Record the full granted set (structure + membership), not just structures.
+        scopes=get_settings().eve_corp_token_scopes,
     )
     await session.commit()
-    return StructureAuthorizeResult(
+    return CorpEsiAuthorizeResult(
         token=record, replaced_character_name=replaced_character_name
     )
 
@@ -218,7 +222,7 @@ async def search_structures(
     token = await tokens_repo.get_for_corp(session, corp.id)
     if token is None:
         raise CorpEsiTokenMissing()
-    access_token = await get_structure_access_token(
+    access_token = await get_corp_esi_access_token(
         session, sso, corporation_uuid=corp.id, cipher=cipher
     )
     structure_ids = await esi_market.search_structures(
@@ -241,7 +245,7 @@ async def search_structures(
     ]
 
 
-async def get_structure_access_token(
+async def get_corp_esi_access_token(
     session: AsyncSession,
     sso: EveSsoClient,
     *,
@@ -252,7 +256,7 @@ async def get_structure_access_token(
     server-side. Persists a rotated refresh token (EVE may rotate it); on a revoked
     grant, flags the row and raises `CorpEsiTokenExpired`. Used by the structure
     pricing path (Phase B2)."""
-    if not get_settings().structure_tokens_configured:
+    if not get_settings().corp_esi_token_configured:
         # The stored ciphertext can't be (safely) decrypted with a missing/malformed
         # key — refuse cleanly instead of raising from inside Fernet.
         raise StructureEncryptionNotConfigured()

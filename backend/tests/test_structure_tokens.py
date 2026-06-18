@@ -92,7 +92,7 @@ class FakeSso:
 def test_begin_authorize_state_is_prefixed():
     # The shared /auth/callback routes on this prefix; login states never carry it,
     # so a structure round-trip can't be misrouted to the login completion (400).
-    challenge = structures_app.begin_structure_authorize(FakeSso())
+    challenge = structures_app.begin_corp_esi_authorize(FakeSso())
     assert challenge.state.startswith(structures_app.STRUCTURE_STATE_PREFIX)
 
 
@@ -103,14 +103,14 @@ def test_begin_authorize_state_is_prefixed():
 
 def _unconfigured_settings():
     # model_copy skips validators, which is exactly what we want here: a settings
-    # object whose structure_tokens_configured is False (prod + placeholder key).
+    # object whose corp_esi_token_configured is False (prod + placeholder key).
     return get_settings().model_copy(update={"environment": "production"})
 
 
 def test_begin_authorize_refuses_unconfigured_key(monkeypatch):
     monkeypatch.setattr(structures_app, "get_settings", _unconfigured_settings)
     with pytest.raises(StructureEncryptionNotConfigured):
-        structures_app.begin_structure_authorize(FakeSso())
+        structures_app.begin_corp_esi_authorize(FakeSso())
 
 
 async def test_access_token_refuses_unconfigured_key(monkeypatch):
@@ -118,7 +118,7 @@ async def test_access_token_refuses_unconfigured_key(monkeypatch):
     monkeypatch.setattr(structures_app, "get_settings", _unconfigured_settings)
     async with SessionLocal() as session:
         with pytest.raises(StructureEncryptionNotConfigured):
-            await structures_app.get_structure_access_token(
+            await structures_app.get_corp_esi_access_token(
                 session, FakeSso(), corporation_uuid=corp_uuid, cipher=CIPHER
             )
 
@@ -147,7 +147,7 @@ async def test_member_cannot_authorize():
     await _register_corp()
     async with SessionLocal() as session:
         with pytest.raises(NotAuthorizedToAuthorizeStructure):
-            await structures_app.complete_structure_authorize(
+            await structures_app.complete_corp_esi_authorize(
                 session, FakeSso(), MemberEsi(), code="c", verifier="v",
                 user=_user("member"), cipher=CIPHER,
             )
@@ -159,7 +159,7 @@ async def test_plain_manager_cannot_authorize():
     await _register_corp()
     async with SessionLocal() as session:
         with pytest.raises(NotAuthorizedToAuthorizeStructure):
-            await structures_app.complete_structure_authorize(
+            await structures_app.complete_corp_esi_authorize(
                 session, FakeSso(), CeoEsi(), code="c", verifier="v",
                 user=_user("manager"), cipher=CIPHER,
             )
@@ -174,7 +174,7 @@ async def test_out_of_corp_character_rejected():
 
     async with SessionLocal() as session:
         with pytest.raises(AuthorizingCharacterNotInCorporation):
-            await structures_app.complete_structure_authorize(
+            await structures_app.complete_corp_esi_authorize(
                 session, FakeSso(), OtherCorpEsi(), code="c", verifier="v",
                 user=_user("ceo"), cipher=CIPHER,
             )
@@ -190,7 +190,7 @@ def test_connect_requests_both_scope_sets():
 async def test_director_authorize_stores_encrypted_token():
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        result = await structures_app.complete_structure_authorize(
+        result = await structures_app.complete_corp_esi_authorize(
             session, FakeSso(refresh="refresh-secret"), CeoEsi(), code="c", verifier="v",
             user=_user("member", is_director=True), cipher=CIPHER,
         )
@@ -207,7 +207,7 @@ async def test_reauthorize_with_different_character_warns():
     await _register_corp()
     # First authorize as Boss (the default FakeSso character), refresh "refresh-1".
     async with SessionLocal() as session:
-        first = await structures_app.complete_structure_authorize(
+        first = await structures_app.complete_corp_esi_authorize(
             session, FakeSso(), CeoEsi(), code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )
@@ -220,7 +220,7 @@ async def test_reauthorize_with_different_character_warns():
 
     reauth = OtherCharSso(refresh="refresh-2")
     async with SessionLocal() as session:
-        again = await structures_app.complete_structure_authorize(
+        again = await structures_app.complete_corp_esi_authorize(
             session, reauth, CeoEsi(), code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )
@@ -234,7 +234,7 @@ async def test_reauthorize_with_different_character_warns():
     # revokes the now-superseded refresh token.
     reauth2 = OtherCharSso(refresh="refresh-3")
     async with SessionLocal() as session:
-        same = await structures_app.complete_structure_authorize(
+        same = await structures_app.complete_corp_esi_authorize(
             session, reauth2, CeoEsi(), code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )
@@ -263,13 +263,13 @@ async def test_revoke_without_token_raises():
             )
 
 
-# --- get_structure_access_token (refresh / rotation / expiry / missing) ---
+# --- get_corp_esi_access_token (refresh / rotation / expiry / missing) ---
 
 
 async def _authorize(corp_refresh: str = "r1") -> uuid.UUID:
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        await structures_app.complete_structure_authorize(
+        await structures_app.complete_corp_esi_authorize(
             session, FakeSso(refresh=corp_refresh), CeoEsi(), code="c", verifier="v",
             user=_user("ceo"), cipher=CIPHER,
         )
@@ -279,7 +279,7 @@ async def _authorize(corp_refresh: str = "r1") -> uuid.UUID:
 async def test_get_access_token_refreshes():
     corp_uuid = await _authorize()
     async with SessionLocal() as session:
-        access = await structures_app.get_structure_access_token(
+        access = await structures_app.get_corp_esi_access_token(
             session, FakeSso(new_access="fresh-access"),
             corporation_uuid=corp_uuid, cipher=CIPHER,
         )
@@ -289,7 +289,7 @@ async def test_get_access_token_refreshes():
 async def test_refresh_rotation_persists_new_token():
     corp_uuid = await _authorize("r1")
     async with SessionLocal() as session:
-        await structures_app.get_structure_access_token(
+        await structures_app.get_corp_esi_access_token(
             session, FakeSso(new_refresh="r2-rotated"),
             corporation_uuid=corp_uuid, cipher=CIPHER,
         )
@@ -307,7 +307,7 @@ async def test_invalid_grant_marks_expired_and_raises():
     )
     async with SessionLocal() as session:
         with pytest.raises(CorpEsiTokenExpired):
-            await structures_app.get_structure_access_token(
+            await structures_app.get_corp_esi_access_token(
                 session, FakeSso(refresh_error=err),
                 corporation_uuid=corp_uuid, cipher=CIPHER,
             )
@@ -320,7 +320,7 @@ async def test_missing_token_raises():
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
         with pytest.raises(CorpEsiTokenMissing):
-            await structures_app.get_structure_access_token(
+            await structures_app.get_corp_esi_access_token(
                 session, FakeSso(), corporation_uuid=corp_uuid, cipher=CIPHER,
             )
 

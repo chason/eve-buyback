@@ -86,7 +86,7 @@ class FakeSso:
 
     async def refresh_access_token(self, refresh_token: str) -> OAuthToken:
         self.refresh_tokens_seen.append(refresh_token)
-        # Same refresh token back → no rotation/update path in get_structure_access_token.
+        # Same refresh token back → no rotation/update path in get_corp_esi_access_token.
         return OAuthToken(access_token="access-tok", refresh_token=refresh_token)
 
 

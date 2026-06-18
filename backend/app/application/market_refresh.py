@@ -31,7 +31,7 @@ from app.application.errors import (
     StructureEncryptionNotConfigured,
 )
 from app.application.market import persist_market_rows
-from app.application.structure_tokens import get_structure_access_token
+from app.application.structure_tokens import get_corp_esi_access_token
 from app.config import Settings
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import market_hub_refresh as hub_refresh_repo
@@ -238,7 +238,7 @@ async def _fetch_structure_book(
         session, group.corp_ids
     ):
         try:
-            access_token = await get_structure_access_token(
+            access_token = await get_corp_esi_access_token(
                 session, sso, corporation_uuid=corp_id, cipher=cipher
             )
         except (
