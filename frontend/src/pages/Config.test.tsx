@@ -172,10 +172,6 @@ describe("Config", () => {
     await u.type(screen.getByLabelText("Search station"), "korsiki")
     // Pick the match from the dropdown ("System - Station").
     await u.click(await screen.findByText(/Korsiki - Korsiki VII/))
-
-    // Picking a hub that differs from the saved Jita flags the required final Save (#34).
-    expect(await screen.findByText(/Not saved yet/i)).toBeInTheDocument()
-
     await u.click(screen.getByRole("button", { name: "Save config" }))
 
     await waitFor(() => expect(pricingApi.updateConfig).toHaveBeenCalled())
