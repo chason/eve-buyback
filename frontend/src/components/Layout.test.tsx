@@ -61,4 +61,19 @@ describe("Layout nav", () => {
     // The signed-in character renders as the muted identity tag, not a link.
     expect(screen.getByText("Boss")).toHaveClass("identity")
   })
+
+  it("exposes Log out as a button, not a link (#80)", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(member())
+    vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })
+
+    renderAt("/appraise")
+
+    // It's an action, so it must carry button — not link — semantics for AT/keyboard.
+    expect(
+      await screen.findByRole("button", { name: "Log out" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("link", { name: "Log out" }),
+    ).not.toBeInTheDocument()
+  })
 })

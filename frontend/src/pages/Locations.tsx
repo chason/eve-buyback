@@ -92,15 +92,13 @@ export default function Locations() {
                 </td>
                 {canEdit && (
                   <td>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        remove.mutate(loc.location_id)
-                      }}
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => remove.mutate(loc.location_id)}
                     >
                       Remove
-                    </a>
+                    </button>
                   </td>
                 )}
               </tr>
@@ -135,18 +133,17 @@ export default function Locations() {
                 )}
                 {stationResults.data?.map((s) => (
                   <li key={s.station_id}>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
+                    <button
+                      type="button"
+                      onClick={() =>
                         add.mutate({
                           location_id: String(s.station_id),
                           kind: "npc_station",
                         })
-                      }}
+                      }
                     >
                       {s.system_name} - {s.name}
-                    </a>
+                    </button>
                   </li>
                 ))}
                 {stationResults.data?.length === 0 && <li>No matches.</li>}
@@ -182,19 +179,18 @@ export default function Locations() {
                     )}
                     {structureResults.data?.map((s) => (
                       <li key={s.structure_id}>
-                        <a
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault()
+                        <button
+                          type="button"
+                          onClick={() =>
                             add.mutate({
                               location_id: s.structure_id,
                               kind: "structure",
                               name: s.name,
                             })
-                          }}
+                          }
                         >
                           {s.name}
-                        </a>
+                        </button>
                       </li>
                     ))}
                     {structureResults.data?.length === 0 && <li>No matches.</li>}

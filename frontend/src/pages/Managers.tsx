@@ -98,21 +98,18 @@ export default function Managers() {
           {connected && (
             <>
               {" — "}
-              <a
-                href="#"
-                aria-disabled={!canRefresh}
-                style={!canRefresh ? { opacity: 0.5 } : undefined}
-                onClick={(e) => {
-                  e.preventDefault()
-                  if (canRefresh) refresh.mutate()
-                }}
+              <button
+                type="button"
+                className="linkbtn"
+                disabled={!canRefresh}
+                onClick={() => refresh.mutate()}
               >
                 {refresh.isPending
                   ? "Refreshing…"
                   : cooldownMs > 0
                     ? `Refresh (available in ${cooldownMin} min)`
                     : "Refresh roster"}
-              </a>
+              </button>
             </>
           )}
         </small>
@@ -140,15 +137,12 @@ export default function Managers() {
               ?.filter((m) => !managerIds.has(m.character_id))
               .map((m) => (
                 <li key={m.character_id}>
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      grant.mutate(m.character_id)
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => grant.mutate(m.character_id)}
                   >
                     {m.name}
-                  </a>
+                  </button>
                 </li>
               ))}
             {results.data?.length === 0 && (
@@ -177,15 +171,13 @@ export default function Managers() {
                 <td>{m.character_name}</td>
                 <td>{new Date(m.granted_at).toLocaleDateString()}</td>
                 <td>
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      revoke.mutate(m.character_id)
-                    }}
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    onClick={() => revoke.mutate(m.character_id)}
                   >
                     Remove
-                  </a>
+                  </button>
                 </td>
               </tr>
             ))}
