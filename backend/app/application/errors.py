@@ -40,8 +40,9 @@ class ManagerNotFound(ApplicationError):
 
 class RosterAccessDenied(ApplicationError):
     default_detail = (
-        "EVE refused the corporation member list — the connected character must be a "
-        "Director (with the membership scope) to read the roster"
+        "EVE wouldn't return your corporation's member list for the connected character "
+        "— it doesn't have permission to read the roster. Reconnect with a character "
+        "that can (e.g. one with the in-game roles to view corp members)."
     )
 
 
