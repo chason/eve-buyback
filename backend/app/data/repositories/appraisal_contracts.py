@@ -4,7 +4,6 @@ the application owns the commit."""
 
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +33,6 @@ async def reconcile_for_corp(
     *,
     corporation_id: uuid.UUID,
     links: Sequence[ContractLink],
-    now: datetime,  # noqa: ARG001 — `updated_at` is server-stamped onupdate; kept for symmetry
 ) -> None:
     """Make the corp's `appraisal_contracts` rows match `links` (one per appraisal): upsert
     each desired link by `appraisal_id`, and delete the corp's rows whose appraisal is no

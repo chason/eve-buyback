@@ -115,7 +115,7 @@ async def refresh_contracts(
 
     best = resolve_best_links(observations, facts)
     await links_repo.reconcile_for_corp(
-        session, corporation_id=corp.id, links=list(best.values()), now=now
+        session, corporation_id=corp.id, links=list(best.values())
     )
     await session.commit()
     if best:
