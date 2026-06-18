@@ -62,6 +62,16 @@ describe("Layout nav", () => {
     expect(screen.getByText("Boss")).toHaveClass("identity")
   })
 
+  it("shows the live EVE/UTC clock in the footer (#114)", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(member())
+    vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })
+
+    renderAt("/appraise")
+
+    const clock = await screen.findByTitle("Current EVE time (UTC)")
+    expect(clock).toHaveTextContent(/^EVE \d{2}:\d{2}:\d{2} UTC$/)
+  })
+
   it("exposes Log out as a button, not a link (#80)", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(member())
     vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })

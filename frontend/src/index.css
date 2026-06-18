@@ -442,6 +442,30 @@ tr.reprocess-detail td {
   animation: hud-pulse 2s ease-in-out infinite;
 }
 
+/* Keep each status segment on one line; the node is the only one allowed to shrink
+   (below), so at narrow widths it truncates instead of the row wrapping (#114). */
+.hud-status > span {
+  white-space: nowrap;
+}
+
+/* The node/host segment yields first at narrow widths — truncate it so the version and
+   the live EVE clock stay readable (#114). */
+.hud-status .hud-node {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Live EVE-time clock (#114), pinned to the right of the status bar like console
+   telemetry; slightly brighter than the muted status text so it reads as the live value. */
+.hud-status .hud-clock {
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--bb-cyan);
+}
+
 @keyframes hud-pulse {
   0%,
   100% {
