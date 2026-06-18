@@ -123,13 +123,11 @@ export default function Privacy() {
 
         <section>
           <h2>What we never do</h2>
+          <p>Except for what&apos;s detailed above, we never:</p>
           <ul>
-            <li>We never store your EVE login or access token.</li>
-            <li>
-              We never read your wallet, contracts, assets, mail, or skills — only the
-              scopes listed above.
-            </li>
-            <li>We never sell your data or share it with third parties.</li>
+            <li>store your EVE login or access tokens;</li>
+            <li>read your wallet, contracts, assets, mail, or skills;</li>
+            <li>sell your data or share it with third parties.</li>
           </ul>
         </section>
 
