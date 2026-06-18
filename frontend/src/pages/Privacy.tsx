@@ -2,8 +2,19 @@ import { Link } from "react-router-dom"
 
 // A user-facing, plain-language summary of how the app handles EVE data and tokens
 // (#112). Kept accurate to the ADRs it cites — those are the source of truth for token
-// handling (docs/adr/0004, 0015, 0016, 0029, 0036). Public (no auth) so members can
-// read it before granting any access.
+// handling. Public (no auth) so members can read it before granting any access.
+
+// The cited ADRs, linked to their source on GitHub (public repo) for the full detail.
+const ADR_BASE =
+  "https://github.com/chason/eve-buyback/blob/main/docs/adr"
+const ADRS: { id: string; file: string }[] = [
+  { id: "ADR-0004", file: "0004-eve-sso-session-auth.md" },
+  { id: "ADR-0015", file: "0015-corp-registration-ceo-or-director.md" },
+  { id: "ADR-0016", file: "0016-per-request-role-resolution.md" },
+  { id: "ADR-0029", file: "0029-encrypted-refresh-token-structures.md" },
+  { id: "ADR-0036", file: "0036-corp-roster-manager-designation.md" },
+]
+
 export default function Privacy() {
   return (
     <>
@@ -12,7 +23,20 @@ export default function Privacy() {
         <p>
           What EVE data this app reads, what it stores, and for how long. The
           authoritative details live in the project&apos;s architecture decision
-          records (ADR-0004, 0015, 0016, 0029, 0036).
+          records (
+          {ADRS.map((adr, i) => (
+            <span key={adr.id}>
+              {i > 0 && ", "}
+              <a
+                href={`${ADR_BASE}/${adr.file}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {adr.id}
+              </a>
+            </span>
+          ))}
+          ).
         </p>
       </hgroup>
 

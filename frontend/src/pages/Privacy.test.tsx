@@ -37,4 +37,14 @@ describe("Privacy", () => {
     const link = screen.getByRole("link", { name: "Config" })
     expect(link).toHaveAttribute("href", "/config")
   })
+
+  it("links each cited ADR to its source on GitHub (#112)", () => {
+    renderPrivacy()
+    const adr = screen.getByRole("link", { name: "ADR-0036" })
+    expect(adr).toHaveAttribute(
+      "href",
+      "https://github.com/chason/eve-buyback/blob/main/docs/adr/0036-corp-roster-manager-designation.md",
+    )
+    expect(adr).toHaveAttribute("target", "_blank")
+  })
 })
