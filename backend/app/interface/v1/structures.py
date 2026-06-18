@@ -73,7 +73,9 @@ async def search(
     results = await structures_app.search_structures(
         session, sso, esi_market, corporation_id=user.corporation_id, query=q, cipher=cipher
     )
-    return [StructureSearchResult(**r) for r in results]
+    return [
+        StructureSearchResult(structure_id=r.structure_id, name=r.name) for r in results
+    ]
 
 
 @router.post("/authorize", response_model=StructureAuthorizeResponse)
