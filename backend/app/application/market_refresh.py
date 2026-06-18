@@ -25,13 +25,13 @@ from datetime import datetime
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.corp_esi_token import get_corp_esi_access_token
 from app.application.errors import (
     CorpEsiTokenExpired,
     CorpEsiTokenMissing,
     StructureEncryptionNotConfigured,
 )
 from app.application.market import persist_market_rows
-from app.application.structure_tokens import get_corp_esi_access_token
 from app.config import Settings
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corp_esi_token as tokens_repo

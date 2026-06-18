@@ -10,8 +10,8 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application import corp_esi_token as corp_esi_token_app
 from app.application import market
-from app.application import structure_tokens as structure_tokens_app
 from app.application.auth import AuthenticatedUser
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
@@ -221,7 +221,7 @@ async def create_appraisal(
             raise StructureMarketUnavailable()
 
         async def corp_esi_token_provider() -> str:
-            return await structure_tokens_app.get_corp_esi_access_token(
+            return await corp_esi_token_app.get_corp_esi_access_token(
                 session, sso, corporation_uuid=corp.id, cipher=cipher
             )
 
