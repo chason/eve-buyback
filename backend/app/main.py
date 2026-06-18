@@ -41,10 +41,15 @@ def _warn_on_insecure_defaults(settings: Settings) -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     _warn_on_insecure_defaults(settings)
-    # Shared async HTTP client for outbound EVE SSO / ESI calls (eve-esi skill).
+    # Shared async HTTP client for outbound EVE SSO / ESI / Fuzzwork calls (eve-esi skill).
+    # `X-Compatibility-Date` pins ESI to a reviewed API behaviour (ESI versions by date, not
+    # URL route); SSO/Fuzzwork ignore the unknown header, so it's safe to set globally here.
     app.state.http = httpx.AsyncClient(
         timeout=httpx.Timeout(20.0),
-        headers={"User-Agent": f"{settings.app_name}/{app.version} (EVE buyback)"},
+        headers={
+            "User-Agent": f"{settings.app_name}/{app.version} (EVE buyback)",
+            "X-Compatibility-Date": settings.esi_compatibility_date,
+        },
     )
     # Process-wide cache backing the market-price L1 tier (ADR-0033).
     app.state.cache = build_cache(settings)

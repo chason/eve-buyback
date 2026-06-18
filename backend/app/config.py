@@ -52,6 +52,13 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback"
     )
 
+    # ESI compatibility date (YYYY-MM-DD): ESI now versions behaviour by date rather than
+    # by URL route. We send this as the `X-Compatibility-Date` header on every ESI call and
+    # use unversioned paths (no `/latest/` or `/vN/`). It pins the API behaviour to the date
+    # our integration was last validated against the changelog — bump it deliberately after
+    # reviewing changes, never silently. See the eve-esi skill.
+    esi_compatibility_date: str = "2026-06-01"
+
     # Default market hub: Jita 4-4 station (ADR-0006).
     market_hub_id: int = 60003760
     # How long a cached market price stays fresh before re-fetch (ADR-0006).
