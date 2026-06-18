@@ -131,32 +131,35 @@ export default function Managers() {
           aria-label="Search corp members"
           disabled={!connected}
         />
-      </label>
-      {connected && q.length >= 2 && (
-        <ul className="search-results">
-          {results.isLoading && <li aria-busy="true">Searching…</li>}
-          {results.data
-            ?.filter((m) => !managerIds.has(m.character_id))
-            .map((m) => (
-              <li key={m.character_id}>
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    grant.mutate(m.character_id)
-                  }}
-                >
-                  {m.name}
-                </a>
+        {/* Inside the label so the results panel attaches to the input (index.css
+            `label:has(> .search-results) > input`). */}
+        {connected && q.length >= 2 && (
+          <ul className="search-results">
+            {results.isLoading && <li aria-busy="true">Searching…</li>}
+            {results.data
+              ?.filter((m) => !managerIds.has(m.character_id))
+              .map((m) => (
+                <li key={m.character_id}>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      grant.mutate(m.character_id)
+                    }}
+                  >
+                    {m.name}
+                  </a>
+                </li>
+              ))}
+            {results.data?.length === 0 && (
+              <li>
+                No matches
+                {roster.data?.synced ? "" : " — try refreshing the roster"}.
               </li>
-            ))}
-          {results.data?.length === 0 && (
-            <li>
-              No matches{roster.data?.synced ? "" : " — try refreshing the roster"}.
-            </li>
-          )}
-        </ul>
-      )}
+            )}
+          </ul>
+        )}
+      </label>
       {grant.isError && <p className="error">{(grant.error as Error).message}</p>}
 
       {managers.data && managers.data.length > 0 ? (
