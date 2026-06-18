@@ -18,8 +18,8 @@ from app.application.errors import (
 )
 from app.config import get_settings
 from app.data.db import SessionLocal
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.domain.roles import Role
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import TokenCipher

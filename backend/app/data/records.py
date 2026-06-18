@@ -238,7 +238,7 @@ class AppraisalSummaryRecord(BaseModel):
     delivery_location_name: str | None = None
 
 
-class StructureMarketTokenRecord(BaseModel):
+class CorpEsiTokenRecord(BaseModel):
     """A corp's structure-market authorization (ADR-0029). Carries the ciphertext for
     internal refresh use; the API schema (`StructureTokenStatus`) omits it."""
 

@@ -13,7 +13,7 @@ from app.application import corp_roster as roster_app
 from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
-from app.data.records import StructureMarketTokenRecord
+from app.data.records import CorpEsiTokenRecord
 from app.interface.deps import SessionDep
 from app.interface.security import RequireCeoOrDirector, require_role
 from app.plugins.esi import EsiClient, get_esi_client
@@ -43,7 +43,7 @@ STRUCT_PKCE_VERIFIER_KEY = "struct_pkce_verifier"
 
 
 def _status(
-    record: StructureMarketTokenRecord | None,
+    record: CorpEsiTokenRecord | None,
     *,
     replaced_character_name: str | None = None,
 ) -> StructureTokenStatus:

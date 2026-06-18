@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from app.application import corp_roster, market_refresh
 from app.config import get_settings
 from app.data.db import SessionLocal
-from app.data.repositories import structure_tokens as tokens_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.plugins.esi import EsiClient
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient

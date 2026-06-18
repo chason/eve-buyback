@@ -9,16 +9,16 @@ from datetime import datetime
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.models import Corporation, StructureMarketToken
-from app.data.records import StructureMarketTokenRecord
+from app.data.models import CorpEsiToken, Corporation
+from app.data.records import CorpEsiTokenRecord
 
 
 async def get_for_corp(
     session: AsyncSession, corporation_id: uuid.UUID
-) -> StructureMarketTokenRecord | None:
+) -> CorpEsiTokenRecord | None:
     row = await _row(session, corporation_id)
     return (
-        StructureMarketTokenRecord.model_validate(row) if row is not None else None
+        CorpEsiTokenRecord.model_validate(row) if row is not None else None
     )
 
 
@@ -33,16 +33,16 @@ async def list_corps_by_token_health(
     if not corporation_ids:
         return []
     stmt = (
-        select(StructureMarketToken.corporation_id)
-        .where(StructureMarketToken.corporation_id.in_(corporation_ids))
+        select(CorpEsiToken.corporation_id)
+        .where(CorpEsiToken.corporation_id.in_(corporation_ids))
         .order_by(
             # False (healthy) sorts before True (failed);
-            StructureMarketToken.last_refresh_failed_at.is_not(None),
+            CorpEsiToken.last_refresh_failed_at.is_not(None),
             # then least-recently-used first (never-used first), so the fetching token
             # rotates across corps each cycle (ADR-0034, #88);
-            StructureMarketToken.last_used_at.asc().nulls_first(),
+            CorpEsiToken.last_used_at.asc().nulls_first(),
             # then oldest grant as a stable tiebreak among the never-used.
-            StructureMarketToken.created_at.asc(),
+            CorpEsiToken.created_at.asc(),
         )
     )
     return list((await session.execute(stmt)).scalars().all())
@@ -52,7 +52,7 @@ async def list_corp_eve_ids_with_token(session: AsyncSession) -> list[int]:
     """EVE corp ids of every corporation holding a corp-ESI token (ADR-0036). Joined to
     `corporations` so the daily roster-refresh job can drive the EVE-id-keyed use case."""
     stmt = select(Corporation.eve_id).join(
-        StructureMarketToken, StructureMarketToken.corporation_id == Corporation.id
+        CorpEsiToken, CorpEsiToken.corporation_id == Corporation.id
     )
     return list((await session.execute(stmt)).scalars().all())
 
@@ -66,11 +66,11 @@ async def upsert_token(
     character_name: str,
     encrypted_refresh_token: bytes,
     scopes: str,
-) -> StructureMarketTokenRecord:
+) -> CorpEsiTokenRecord:
     """Create or replace the corp's structure-market authorization."""
     row = await _row(session, corporation_id)
     if row is None:
-        row = StructureMarketToken(corporation_id=corporation_id)
+        row = CorpEsiToken(corporation_id=corporation_id)
         session.add(row)
     row.character_id = character_id
     row.character_eve_id = character_eve_id
@@ -80,7 +80,7 @@ async def upsert_token(
     row.last_refresh_failed_at = None  # a fresh authorization clears any failure
     await session.flush()
     await session.refresh(row)
-    return StructureMarketTokenRecord.model_validate(row)
+    return CorpEsiTokenRecord.model_validate(row)
 
 
 async def update_refresh_token(
@@ -91,8 +91,8 @@ async def update_refresh_token(
 ) -> None:
     """Persist a rotated refresh token (EVE may rotate it on refresh)."""
     await session.execute(
-        update(StructureMarketToken)
-        .where(StructureMarketToken.corporation_id == corporation_id)
+        update(CorpEsiToken)
+        .where(CorpEsiToken.corporation_id == corporation_id)
         .values(encrypted_refresh_token=encrypted_refresh_token)
     )
 
@@ -102,8 +102,8 @@ async def mark_failed(
 ) -> None:
     """Record that a refresh failed (revoked grant / lost docking access)."""
     await session.execute(
-        update(StructureMarketToken)
-        .where(StructureMarketToken.corporation_id == corporation_id)
+        update(CorpEsiToken)
+        .where(CorpEsiToken.corporation_id == corporation_id)
         .values(last_refresh_failed_at=at)
     )
 
@@ -116,8 +116,8 @@ async def mark_used(
     A successful fetch also **clears** any prior failure flag — access is healthy again
     (#68), so the manager's "re-authorize" warning self-heals without a re-auth."""
     await session.execute(
-        update(StructureMarketToken)
-        .where(StructureMarketToken.corporation_id == corporation_id)
+        update(CorpEsiToken)
+        .where(CorpEsiToken.corporation_id == corporation_id)
         .values(last_used_at=at, last_refresh_failed_at=None)
     )
 
@@ -127,8 +127,8 @@ async def delete_for_corp(
 ) -> bool:
     """Revoke (delete) the corp's authorization. Returns whether a row was removed."""
     result = await session.execute(
-        delete(StructureMarketToken).where(
-            StructureMarketToken.corporation_id == corporation_id
+        delete(CorpEsiToken).where(
+            CorpEsiToken.corporation_id == corporation_id
         )
     )
     return result.rowcount > 0
@@ -136,8 +136,8 @@ async def delete_for_corp(
 
 async def _row(
     session: AsyncSession, corporation_id: uuid.UUID
-) -> StructureMarketToken | None:
-    stmt = select(StructureMarketToken).where(
-        StructureMarketToken.corporation_id == corporation_id
+) -> CorpEsiToken | None:
+    stmt = select(CorpEsiToken).where(
+        CorpEsiToken.corporation_id == corporation_id
     )
     return (await session.execute(stmt)).scalar_one_or_none()
