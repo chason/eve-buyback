@@ -125,6 +125,27 @@ export default function Config() {
     return <p className="error">Could not load the buyback config.</p>
   }
 
+  // Unsaved-changes detection (#34): the picked hub or any default differs from what's
+  // saved, so the required final Save is signalled (a cue + a dirty Save button) — the
+  // structure flow authorizes the token but doesn't persist the hub until Save.
+  const c = config.data
+  const selectedHubName =
+    selection.state === "hub" ? (selection.name ?? hubName(selection.hubId)) : null
+  const hubDirty =
+    selection.state === "hub" &&
+    (selection.hubId !== c.market_hub_id || selection.kind !== c.market_hub_kind)
+  const dirty =
+    hubDirty ||
+    basis !== c.default_basis ||
+    percentage !== c.default_percentage ||
+    aggregate !== c.aggregate_field ||
+    defaultAccepted !== c.default_accepted
+  // Suppress the cues while a save is in flight / just landed, so "unsaved" never flashes
+  // alongside the "Saved" acknowledgment before the config refetch settles.
+  const showUnsaved = !save.isPending && !showSaved
+  const hubDirtyVisible = hubDirty && showUnsaved
+  const dirtyVisible = dirty && showUnsaved
+
   return (
     <>
       <hgroup>
@@ -155,13 +176,17 @@ export default function Config() {
           onChange={setSelection}
         />
 
-        <small className="field-hint">
-          Currently pricing at{" "}
-          <strong>
-            {config.data.market_hub_name ?? hubName(config.data.market_hub_id)}
-          </strong>{" "}
-          ({isFuzzworkHub(config.data.market_hub_id) ? "Fuzzwork" : "EVE ESI"}).
-        </small>
+        <p className="active-hub">
+          Pricing at{" "}
+          <strong>{c.market_hub_name ?? hubName(c.market_hub_id)}</strong> (
+          {isFuzzworkHub(c.market_hub_id) ? "Fuzzwork" : "EVE ESI"}).
+        </p>
+        {hubDirtyVisible && (
+          <p className="unsaved-cue" role="status">
+            Not saved yet — click <strong>Save config</strong> to price at{" "}
+            <strong>{selectedHubName}</strong>.
+          </p>
+        )}
 
         <label>
           Default basis
@@ -234,13 +259,17 @@ export default function Config() {
         </small>
 
         {canEdit ? (
-          <button
-            type="submit"
-            aria-busy={save.isPending}
-            disabled={selection.state !== "hub"}
-          >
-            Save config
-          </button>
+          <>
+            <button
+              type="submit"
+              aria-busy={save.isPending}
+              disabled={selection.state !== "hub"}
+              className={dirtyVisible ? "dirty" : undefined}
+            >
+              Save config
+            </button>
+            {dirtyVisible && <small className="dirty-hint">Unsaved changes.</small>}
+          </>
         ) : (
           <p>
             <small>Only a Buyback Manager can change these.</small>
