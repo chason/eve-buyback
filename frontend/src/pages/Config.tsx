@@ -7,6 +7,7 @@ import { getConfig, updateConfig } from "../api/pricing"
 import type { AggregateField, Basis } from "../api/types"
 import CorpEsiAccessPanel from "../components/CorpEsiAccessPanel"
 import HubPicker, { type HubSelection } from "../components/HubPicker"
+import { StatusChip } from "../components/StatusChip"
 import { hubName, isFuzzworkHub } from "../lib/hubs"
 import { canManageCorp, isManager } from "../lib/roles"
 
@@ -46,6 +47,17 @@ export default function Config() {
   const [selection, setSelection] = useState<HubSelection>({
     state: "incomplete",
   })
+
+  // A brief, self-clearing Save acknowledgment by the button (#38) — the bare,
+  // never-dismissed "Saved." sat below the fold under a long form.
+  const [showSaved, setShowSaved] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(
+    () => () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current)
+    },
+    [],
+  )
 
   // If a re-auth picker switched the authorizing character, Callback passes the
   // previous name here so the Corp ESI access panel can warn about the swap.
@@ -100,7 +112,12 @@ export default function Config() {
         aggregate_field: aggregate,
         default_accepted: defaultAccepted,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["config"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["config"] })
+      setShowSaved(true)
+      if (savedTimer.current) clearTimeout(savedTimer.current)
+      savedTimer.current = setTimeout(() => setShowSaved(false), 3500)
+    },
   })
 
   if (config.isLoading) return <p aria-busy="true">Loading…</p>
@@ -232,7 +249,12 @@ export default function Config() {
         {save.isError && (
           <p className="error">{(save.error as Error).message}</p>
         )}
-        {save.isSuccess && <p>Saved.</p>}
+        {showSaved && (
+          <p className="save-confirm" role="status">
+            <StatusChip variant="accepted">Saved</StatusChip> Your changes are
+            live.
+          </p>
+        )}
       </form>
     </>
   )

@@ -94,6 +94,22 @@ describe("Config", () => {
     })
   })
 
+  it("confirms a successful save with an inline acknowledgment (#38)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(pricingApi.updateConfig).mockResolvedValue(config)
+
+    renderConfig()
+    await u.click(await screen.findByRole("button", { name: "Save config" }))
+
+    // An inline confirmation appears by the button — a polite live region, not the
+    // old bare, never-dismissed "Saved." paragraph. (It self-clears after a few
+    // seconds via a timeout; the unmount cleanup cancels it.)
+    const confirm = await screen.findByText(/changes are live/i)
+    expect(confirm.closest("[role=status]")).toBeInTheDocument()
+  })
+
   it("explains the pricing knobs with humanized labels and helper text", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
