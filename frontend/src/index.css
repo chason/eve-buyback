@@ -448,6 +448,21 @@ tr.reprocess-detail td {
   white-space: nowrap;
 }
 
+/* The footer privacy link (#112) sits among the status segments — muted like the bar,
+   cyan on hover, and never shrinking so it stays readable next to the truncating node. */
+.hud-status .hud-link {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.hud-status .hud-link:hover,
+.hud-status .hud-link:focus-visible {
+  color: var(--bb-cyan);
+  text-decoration: underline;
+}
+
 /* The node/host segment yields first at narrow widths — truncate it so the version and
    the live EVE clock stay readable (#114). */
 .hud-status .hud-node {

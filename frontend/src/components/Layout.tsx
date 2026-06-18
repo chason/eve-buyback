@@ -117,6 +117,9 @@ export default function Layout() {
         <span className="hud-dot" aria-hidden="true" />
         <span>Buyback{version.data ? ` v${version.data.version}` : ""}</span>
         <span className="hud-node">· Node: {window.location.hostname}</span>
+        <Link className="hud-link" to="/privacy">
+          · Privacy
+        </Link>
         <span className="hud-clock" title="Current EVE time">
           EVE Time {eveTime}
         </span>

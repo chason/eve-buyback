@@ -179,7 +179,9 @@ export default function Home() {
                 />
               </button>
               <p className="login-fineprint">
-                We never see your password — login is handled by EVE Online SSO.
+                We never see your password — login is handled by EVE Online SSO. We
+                don&apos;t store your login token; see{" "}
+                <Link to="/privacy">how we use your data</Link>.
               </p>
             </article>
           </section>

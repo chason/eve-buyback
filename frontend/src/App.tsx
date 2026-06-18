@@ -10,6 +10,7 @@ import History from "./pages/History"
 import Home from "./pages/Home"
 import Locations from "./pages/Locations"
 import Managers from "./pages/Managers"
+import Privacy from "./pages/Privacy"
 import Rules from "./pages/Rules"
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
       <Route path="/auth/callback" element={<Callback />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
+        {/* Public so members can read it before granting any access (#112). */}
+        <Route path="/privacy" element={<Privacy />} />
         <Route element={<RequireAuth />}>
           <Route path="/appraise" element={<Appraise />} />
           <Route path="/a/:publicId" element={<Appraisal />} />
