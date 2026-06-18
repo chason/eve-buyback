@@ -339,6 +339,16 @@ class FakeEsiMarketSearch:
     async def resolve_structure_name(self, *, structure_id, access_token):
         return self._names.get(structure_id)
 
+    async def resolve_structure_names(self, *, structure_ids, access_token):
+        out = {}
+        for sid in structure_ids:
+            name = await self.resolve_structure_name(
+                structure_id=sid, access_token=access_token
+            )
+            if name is not None:
+                out[sid] = name
+        return out
+
 
 async def test_search_structures_returns_named_results():
     await _authorize()
