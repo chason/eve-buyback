@@ -109,7 +109,8 @@ body {
    box-shadow so it follows the chamfered silhouette below (#48) — a box-shadow traces
    the unclipped rectangle and would shear off at the cut corner. */
 article,
-.flow-step {
+.flow-step,
+.panel {
   filter:
     drop-shadow(0 0 1px rgba(51, 194, 255, 0.22))
     drop-shadow(0 0 22px rgba(51, 194, 255, 0.05));
@@ -120,7 +121,8 @@ article,
    edge; the drop-shadow filter above re-draws the glow along the new silhouette. The
    cut is small and sits in the panel's corner padding, so no panel content is clipped;
    in-flow children (e.g. search dropdowns) grow the panel rather than overflow it. */
-article {
+article,
+.panel {
   --bb-chamfer: 14px;
   clip-path: polygon(
     0 0,
@@ -129,6 +131,25 @@ article {
     100% 100%,
     0 100%
   );
+}
+
+/* The console-panel utility (#81): the same HUD frame as <article> — chamfer (above),
+   holographic glow, and scanlines (below) — for the working pages whose primary table
+   or form renders bare, not inside an <article>, so the motif is consistent rather than
+   concentrated in hero moments. Carries the card box-model so wrapped content sits inside
+   the frame with a card's padding. `background-color` (not `background`) so the scanline
+   `background-image` rule layers on top instead of resetting it. */
+.panel {
+  margin-bottom: var(--pico-block-spacing-vertical);
+  padding: var(--pico-block-spacing-vertical) var(--pico-block-spacing-horizontal);
+  background-color: var(--pico-card-background-color);
+  border-radius: var(--pico-border-radius);
+}
+
+/* A bare table/form inside a panel already carries its own bottom margin; drop the
+   panel's last child's so the frame isn't bottom-heavy. */
+.panel > :last-child {
+  margin-bottom: 0;
 }
 
 /* Product wordmark in the nav (#42): the angular bracket favicon as a logo, "BUYBACK"
@@ -731,7 +752,8 @@ a:focus-visible {
 
 /* A very faint scanline texture on panels — the CRT-console feel, dialed low enough to
    read as grain rather than stripes. Layered over the panel's solid background color. */
-article {
+article,
+.panel {
   background-image: repeating-linear-gradient(
     to bottom,
     rgba(51, 194, 255, 0.022) 0,

@@ -191,6 +191,7 @@ export default function Appraisal() {
         </article>
       )}
 
+      <div className="panel">
       <table>
         <thead>
           <tr>
@@ -265,6 +266,7 @@ export default function Appraisal() {
           ))}
         </tbody>
       </table>
+      </div>
     </>
   )
 }
