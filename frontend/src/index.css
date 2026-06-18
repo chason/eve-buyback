@@ -234,10 +234,16 @@ nav button.nav-link:hover {
   color: var(--bb-cyan);
 }
 
-/* The signed-in character as a muted mono identity tag, not a plain nav item (#87). */
+/* The signed-in character as a muted mono identity tag, not a plain nav item (#87).
+   inline-flex + center so the mono text sits on the nav's vertical centre-line like the
+   links (it's a flex item, but its own line-box was riding high), and a size closer to
+   the menu items so it doesn't read as an afterthought. */
 .identity {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--bb-mono);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1;
   color: var(--bb-muted);
 }
 
