@@ -7,13 +7,17 @@ appraisal (exact items, price, location). Each appraisal gets its current best s
 `in_progress`, `completed`, a void state (`rejected`/`cancelled`/`expired`/`failed`), or
 `mismatch` when a contract cites the appraisal but doesn't match it.
 
-Run off-request by the daily-ish background job (`interface/jobs.py`). Reuses the stored
-token server-side; a missing contracts **scope or in-game role** yields a 403 that is
-logged and skipped **without** flagging the token failed (it still works for structures and
-the roster — mirrors the roster members-403 nuance, #68)."""
+This use case is pure orchestration: it acquires the token, fetches contracts + items, maps
+them into the plain `ContractObservation`/`AppraisalFacts` the pure resolver in
+`domain/contracts.py` consumes, and persists the result. The matching/priority/validation
+rules all live in the domain layer.
+
+Run off-request by the background job (`interface/jobs.py`). Reuses the stored token
+server-side; a missing contracts **scope or in-game role** yields a 403 that is logged and
+skipped **without** flagging the token failed (it still works for structures and the roster
+— mirrors the roster members-403 nuance, #68)."""
 
 import logging
-import re
 import uuid
 from datetime import UTC, datetime
 
@@ -29,10 +33,13 @@ from app.application.errors import (
 from app.data.repositories import appraisal_contracts as links_repo
 from app.data.repositories import appraisals as appraisals_repo
 from app.domain.contracts import (
-    ContractLink,
+    VALIDATABLE_STATUSES,
+    AppraisalFacts,
+    ContractObservation,
     ContractStatus,
-    contract_matches,
     derive_lifecycle_status,
+    match_appraisal_id,
+    resolve_best_links,
 )
 from app.plugins.esi import (
     ContractItem,
@@ -45,24 +52,8 @@ from app.plugins.token_cipher import TokenCipher
 
 log = logging.getLogger(__name__)
 
-# Maximal runs of the appraisal public-id alphabet (base64url) in a contract title.
-_ID_RUN = re.compile(r"[A-Za-z0-9_-]+")
-_PUBLIC_ID_LEN = 12  # generate_appraisal_id() → secrets.token_urlsafe(9)
-
-# Lifecycle statuses worth item-validating (a live or accepted contract); voided ones are
-# surfaced as-is without an items fetch.
-_VALIDATABLE: frozenset[ContractStatus] = frozenset({"in_progress", "completed"})
-
-# When several contracts match one appraisal, prefer the most meaningful (lower wins).
-_PRIORITY: dict[ContractStatus, int] = {
-    "in_progress": 0,
-    "completed": 1,
-    "mismatch": 2,
-    "rejected": 3,
-    "cancelled": 3,
-    "expired": 3,
-    "failed": 3,
-}
+# A candidate contract: the appraisal it cites, the raw ESI contract, and its lifecycle.
+_Candidate = tuple[uuid.UUID, CorporationContract, ContractStatus]
 
 
 async def refresh_contracts(
@@ -104,56 +95,25 @@ async def refresh_contracts(
         session, corporation_id=corp.id
     )
 
-    # Candidate (appraisal_id, contract, lifecycle) for every contract whose title cites
-    # one of this corp's appraisals.
-    candidates: list[tuple[uuid.UUID, CorporationContract, ContractStatus]] = []
+    # Every contract whose title cites one of this corp's appraisals, with its lifecycle.
+    candidates: list[_Candidate] = []
     for c in contracts:
         lifecycle = derive_lifecycle_status(
             c.status, date_expired=c.date_expired, now=now
         )
         if lifecycle is None:
             continue
-        appraisal_id = _match_appraisal(c.title, id_map)
+        appraisal_id = match_appraisal_id(c.title, id_map)
         if appraisal_id is not None:
             candidates.append((appraisal_id, c, lifecycle))
 
-    # Facts for the appraisals we need to validate (the live/accepted candidates).
-    to_validate = {a for a, _, lc in candidates if lc in _VALIDATABLE}
-    facts = await appraisals_repo.match_facts(session, list(to_validate))
-    accepted = await appraisals_repo.accepted_line_items(session, list(to_validate))
+    facts = await _appraisal_facts(session, candidates)
+    observations = [
+        await _observe(esi, corporation_id, access_token, appraisal_id, c, lifecycle)
+        for appraisal_id, c, lifecycle in candidates
+    ]
 
-    # Resolve each candidate's final status (mismatch when a validatable contract is off),
-    # then keep the single best contract per appraisal.
-    best: dict[uuid.UUID, ContractLink] = {}
-    for appraisal_id, c, lifecycle in candidates:
-        if lifecycle in _VALIDATABLE:
-            items = await esi.get_corporation_contract_items(
-                corporation_id, c.contract_id, access_token
-            )
-            accepted_total, location = facts.get(appraisal_id, (None, None))
-            ok = accepted_total is not None and contract_matches(
-                price=c.price,
-                start_location_id=c.start_location_id,
-                items=_included_items(items),
-                accepted_total=accepted_total,
-                delivery_location_id=location,
-                accepted_items=accepted.get(appraisal_id, {}),
-            )
-            status: ContractStatus = lifecycle if ok else "mismatch"
-        else:
-            status = lifecycle
-
-        link = ContractLink(
-            appraisal_id=appraisal_id,
-            contract_id=c.contract_id,
-            status=status,
-            issued_at=c.date_issued,
-            completed_at=c.date_completed,
-        )
-        cur = best.get(appraisal_id)
-        if cur is None or _is_better(link, cur):
-            best[appraisal_id] = link
-
+    best = resolve_best_links(observations, facts)
     await links_repo.reconcile_for_corp(
         session, corporation_id=corp.id, links=list(best.values()), now=now
     )
@@ -166,21 +126,55 @@ async def refresh_contracts(
         )
 
 
-def _match_appraisal(
-    title: str | None, id_map: dict[str, uuid.UUID]
-) -> uuid.UUID | None:
-    """The appraisal whose 12-char public_id appears in the contract title (case-sensitive,
-    exact). Checks each base64url run and any 12-char window inside a longer run."""
-    if not title:
-        return None
-    for run in _ID_RUN.findall(title):
-        if run in id_map:
-            return id_map[run]
-        for i in range(len(run) - _PUBLIC_ID_LEN + 1):
-            window = run[i : i + _PUBLIC_ID_LEN]
-            if window in id_map:
-                return id_map[window]
-    return None
+async def _appraisal_facts(
+    session: AsyncSession, candidates: list[_Candidate]
+) -> dict[uuid.UUID, AppraisalFacts]:
+    """Load the price/location/accepted-items each validatable candidate must match."""
+    to_validate = {a for a, _, lc in candidates if lc in VALIDATABLE_STATUSES}
+    if not to_validate:
+        return {}
+    ids = list(to_validate)
+    match_facts = await appraisals_repo.match_facts(session, ids)
+    accepted = await appraisals_repo.accepted_line_items(session, ids)
+    return {
+        aid: AppraisalFacts(
+            accepted_total=total,
+            delivery_location_id=location,
+            accepted_items=accepted.get(aid, {}),
+        )
+        for aid, (total, location) in match_facts.items()
+    }
+
+
+async def _observe(
+    esi: EsiClient,
+    corporation_id: int,
+    access_token: str,
+    appraisal_id: uuid.UUID,
+    c: CorporationContract,
+    lifecycle: ContractStatus,
+) -> ContractObservation:
+    """Map an ESI contract into the plain observation the resolver consumes — fetching its
+    items only when the lifecycle is validatable (voided contracts aren't item-checked)."""
+    items = (
+        _included_items(
+            await esi.get_corporation_contract_items(
+                corporation_id, c.contract_id, access_token
+            )
+        )
+        if lifecycle in VALIDATABLE_STATUSES
+        else {}
+    )
+    return ContractObservation(
+        appraisal_id=appraisal_id,
+        contract_id=c.contract_id,
+        lifecycle=lifecycle,
+        issued_at=c.date_issued,
+        completed_at=c.date_completed,
+        price=c.price,
+        start_location_id=c.start_location_id,
+        items=items,
+    )
 
 
 def _included_items(items: list[ContractItem]) -> dict[int, int]:
@@ -190,11 +184,3 @@ def _included_items(items: list[ContractItem]) -> dict[int, int]:
         if it.is_included:
             out[it.type_id] = out.get(it.type_id, 0) + it.quantity
     return out
-
-
-def _is_better(a: ContractLink, b: ContractLink) -> bool:
-    """Prefer the more meaningful status; tiebreak the more recently issued contract."""
-    pa, pb = _PRIORITY[a.status], _PRIORITY[b.status]
-    if pa != pb:
-        return pa < pb
-    return a.issued_at > b.issued_at
