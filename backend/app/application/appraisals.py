@@ -227,6 +227,9 @@ async def create_appraisal(
 
     # One read-through-cached fetch per hub; a failing hub degrades to its own cache
     # (its unpriced lines reject as "No market data") without affecting the others.
+    # Each fetch commits its cache fill in its own unit of work (#21), independent of
+    # this appraisal's commit below — the market cache is shared infrastructure, the
+    # upsert is idempotent, and a warm cache without a saved appraisal is benign.
     # Merged (not assigned) per hub_id: two rules can reference the same hub through
     # descriptors that differ only in their save-time-cached region_id (SDE drift
     # between saves) — they bucket separately but must land in one price map.
