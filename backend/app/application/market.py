@@ -126,11 +126,21 @@ async def persist_market_rows(
     now: datetime,
     l1_ttl: int,
 ) -> dict[int, MarketPriceRecord]:
-    """Write freshly-fetched aggregates to the durable `market_prices` DB cache
-    (committing the unit of work) and, when an L1 cache is wired, promote them into it
-    (ADR-0033). Returns the persisted records keyed by type id; a no-op on empty input.
-    Shared by the lazy read-through (`get_market_prices`) and the background refresh
-    (`market_refresh`), so both write the cache identically."""
+    """Write freshly-fetched aggregates to the durable `market_prices` DB cache and,
+    when an L1 cache is wired, promote them into it (ADR-0033). Returns the persisted
+    records keyed by type id; a no-op on empty input. Shared by the lazy read-through
+    (`get_market_prices`) and the background refresh (`market_refresh`), so both write
+    the cache identically.
+
+    This `commit` is a **deliberate, independent unit of work** (#21) — the documented
+    exception to the one-use-case-one-UoW rule in `application/CLAUDE.md`. The market
+    cache is shared infrastructure, not part of any caller's transaction:
+    `create_appraisal` invokes the read-through mid-flight, *before* committing its
+    appraisal row, so this cache fill lands in its own transaction by design. It is safe
+    because `upsert_prices` is idempotent and a hub's price is identical for every corp:
+    a crash after this commit but before the caller's leaves only a warm cache (benign),
+    never a half-written appraisal. Committing here also lets the background refresh
+    persist per hub, so one hub's failure can't roll back the others."""
     if not aggregates:
         return {}
     rows = [_row_from_aggregate(tid, agg, now) for tid, agg in aggregates.items()]
@@ -160,7 +170,10 @@ async def get_market_prices(
     or memcached), then the durable `market_prices` DB cache, then the hub's source.
     `cache=None` skips L1 (identical to the prior two-tier behavior). Only fresh data
     is promoted into L1, so a source outage still degrades to stale DB rows without
-    poisoning the cache."""
+    poisoning the cache.
+
+    Cache fills are committed in their own unit of work (see `persist_market_rows`),
+    independent of any transaction the caller owns (#21)."""
     if not type_ids:
         return []
 
