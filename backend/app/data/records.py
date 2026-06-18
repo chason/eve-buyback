@@ -47,6 +47,14 @@ class ManagerRecord(BaseModel):
     granted_at: datetime
 
 
+class CorpMemberRecord(BaseModel):
+    """A corp roster member (EVE character id + name) for the manager-designation
+    picker (ADR-0036)."""
+
+    character_id: int
+    name: str
+
+
 class SdeTypeRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

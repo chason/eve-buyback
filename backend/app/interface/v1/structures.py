@@ -1,18 +1,22 @@
-"""Structure-market authorization endpoints (ADR-0029). A manager connects (or
-revokes) the corp's encrypted structure-access token via a separate SSO round-trip;
-the OAuth state/PKCE are stashed under their own session keys so they can't collide
-with a login in flight."""
+"""Corp ESI access endpoints (ADR-0029, ADR-0036). A CEO/Director connects (or revokes)
+the corp's one encrypted EVE token — covering both structure-market reads and corp-roster
+membership — via a separate SSO round-trip; the OAuth state/PKCE are stashed under their
+own session keys so they can't collide with a login in flight. Status + structure-name
+search stay manager-visible (managers configure structure hubs)."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from app.application import corp_roster as roster_app
 from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
 from app.data.records import StructureMarketTokenRecord
 from app.interface.deps import SessionDep
-from app.interface.security import require_role
+from app.interface.security import RequireCeoOrDirector, require_role
+from app.plugins.esi import EsiClient, get_esi_client
 from app.plugins.esi_market import EsiMarketClient, get_esi_market_client
 from app.plugins.sso import EveSsoClient, get_sso_client
 from app.plugins.token_cipher import TokenCipher, get_token_cipher
@@ -23,11 +27,15 @@ from app.schemas.structures import (
     StructureTokenStatus,
 )
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/corporations/me/structure-token", tags=["structures"])
 
+# Reads stay manager-visible; connect/revoke are CEO/Director (ADR-0036).
 ManagerUser = Annotated[AuthenticatedUser, Depends(require_role("manager"))]
 SsoDep = Annotated[EveSsoClient, Depends(get_sso_client)]
 CipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
+EsiDep = Annotated[EsiClient, Depends(get_esi_client)]
 EsiMarketDep = Annotated[EsiMarketClient, Depends(get_esi_market_client)]
 
 STRUCT_OAUTH_STATE_KEY = "struct_oauth_state"
@@ -80,9 +88,9 @@ async def search(
 
 @router.post("/authorize", response_model=StructureAuthorizeResponse)
 async def authorize(
-    request: Request, user: ManagerUser, sso: SsoDep
+    request: Request, user: RequireCeoOrDirector, sso: SsoDep
 ) -> StructureAuthorizeResponse:
-    """Begin the structure-access grant: mint state + PKCE and return the SSO URL."""
+    """Begin the corp ESI access grant: mint state + PKCE and return the SSO URL."""
     challenge = structures_app.begin_structure_authorize(sso)
     request.session[STRUCT_OAUTH_STATE_KEY] = challenge.state
     request.session[STRUCT_PKCE_VERIFIER_KEY] = challenge.verifier
@@ -95,12 +103,14 @@ async def authorize(
 async def complete(
     payload: StructureAuthorizeRequest,
     request: Request,
-    user: ManagerUser,
+    user: RequireCeoOrDirector,
     session: SessionDep,
     sso: SsoDep,
+    esi: EsiDep,
     cipher: CipherDep,
 ) -> StructureTokenStatus:
-    """Complete the grant: validate state, exchange the code, store the token."""
+    """Complete the grant: validate state, exchange the code, store the token, and
+    best-effort populate the roster (works if the connected character is a Director)."""
     expected_state = request.session.get(STRUCT_OAUTH_STATE_KEY)
     verifier = request.session.get(STRUCT_PKCE_VERIFIER_KEY)
     if not expected_state or not verifier or payload.state != expected_state:
@@ -109,10 +119,23 @@ async def complete(
             detail="Invalid or expired OAuth state",
         )
     result = await structures_app.complete_structure_authorize(
-        session, sso, code=payload.code, verifier=verifier, user=user, cipher=cipher
+        session, sso, esi, code=payload.code, verifier=verifier, user=user, cipher=cipher
     )
     request.session.pop(STRUCT_OAUTH_STATE_KEY, None)
     request.session.pop(STRUCT_PKCE_VERIFIER_KEY, None)
+    # Fill the roster immediately if the connected character can read membership. This is
+    # best-effort: a non-Director still gets a working structure token (roster stays empty).
+    try:
+        await roster_app.refresh_roster(
+            session,
+            sso,
+            esi,
+            corporation_id=user.corporation_id,
+            cipher=cipher,
+            enforce_cooldown=False,
+        )
+    except Exception:  # noqa: BLE001 — the connect already succeeded; roster is a bonus
+        log.info("roster auto-populate after connect failed (character may not be a Director)")
     return _status(
         result.token, replaced_character_name=result.replaced_character_name
     )
@@ -120,7 +143,7 @@ async def complete(
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke(
-    user: ManagerUser, session: SessionDep, sso: SsoDep, cipher: CipherDep
+    user: RequireCeoOrDirector, session: SessionDep, sso: SsoDep, cipher: CipherDep
 ) -> None:
     await structures_app.revoke(
         session, sso, corporation_id=user.corporation_id, cipher=cipher

@@ -81,3 +81,18 @@ def require_role(minimum: Role) -> Callable[[AuthenticatedUser], AuthenticatedUs
         return user
 
     return dependency
+
+
+def require_ceo_or_director(user: RequireUser) -> AuthenticatedUser:
+    """Allow the CEO or any Director (ADR-0036). Directors administer who the Buyback
+    Managers are — and sync the corp roster — even when they aren't managers themselves.
+    `is_director` comes from ESI at login (ADR-0015) and rides in the session cookie."""
+    if not (user.role == "ceo" or user.is_director):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires CEO or Director",
+        )
+    return user
+
+
+RequireCeoOrDirector = Annotated[AuthenticatedUser, Depends(require_ceo_or_director)]

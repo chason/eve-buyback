@@ -38,6 +38,27 @@ class ManagerNotFound(ApplicationError):
     default_detail = "Manager not found"
 
 
+class RosterAccessDenied(ApplicationError):
+    default_detail = (
+        "EVE refused the corporation member list — the connected character must be a "
+        "Director (with the membership scope) to read the roster"
+    )
+
+
+class RosterRefreshTooSoon(ApplicationError):
+    default_detail = (
+        "The corp roster was refreshed recently — try again in a few minutes "
+        "(it also refreshes automatically every day)"
+    )
+
+
+class AuthorizingCharacterNotInCorporation(ApplicationError):
+    default_detail = (
+        "The character you authorized with isn't a member of your corporation — "
+        "connect with a character that belongs to it"
+    )
+
+
 class PricingRuleNotFound(ApplicationError):
     default_detail = "Pricing rule not found"
 
@@ -71,7 +92,7 @@ class MarketHubInvalid(ApplicationError):
 
 
 class NotAuthorizedToAuthorizeStructure(ApplicationError):
-    default_detail = "Only a Buyback Manager can authorize structure access"
+    default_detail = "Only the CEO or a Director can connect or revoke corp ESI access"
 
 
 class StructureEncryptionNotConfigured(ApplicationError):
