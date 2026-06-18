@@ -6,6 +6,7 @@ import { deleteRule, listRules, putRule } from "../api/pricing"
 import { listMarketGroups, searchTypes } from "../api/sde"
 import type { Basis, RuleOut, TargetKind } from "../api/types"
 import HubPicker, { type HubSelection } from "../components/HubPicker"
+import { StatusChip } from "../components/StatusChip"
 import { hubName } from "../lib/hubs"
 import { isManager } from "../lib/roles"
 
@@ -125,7 +126,13 @@ export default function Rules() {
                 >
                   {targetLabel(rule)}
                 </td>
-                <td>{rule.accepted ? "yes" : "no"}</td>
+                <td>
+                  {rule.accepted ? (
+                    <StatusChip variant="accepted">Yes</StatusChip>
+                  ) : (
+                    <StatusChip variant="danger">No</StatusChip>
+                  )}
+                </td>
                 <td>{rule.basis ?? "(default)"}</td>
                 <td className="num">{rule.percentage}</td>
                 <td>
@@ -133,9 +140,27 @@ export default function Rules() {
                     ? (rule.market_hub_name ?? hubName(rule.market_hub_id))
                     : "(default)"}
                 </td>
-                <td>{rule.reprocess ? "yes" : "–"}</td>
-                <td>{rule.compressed_only ? "yes" : "–"}</td>
-                <td>{rule.enabled ? "yes" : "no"}</td>
+                <td>
+                  {rule.reprocess ? (
+                    <StatusChip variant="info">Yes</StatusChip>
+                  ) : (
+                    "–"
+                  )}
+                </td>
+                <td>
+                  {rule.compressed_only ? (
+                    <StatusChip variant="info">Yes</StatusChip>
+                  ) : (
+                    "–"
+                  )}
+                </td>
+                <td>
+                  {rule.enabled ? (
+                    <StatusChip variant="accepted">On</StatusChip>
+                  ) : (
+                    <StatusChip variant="muted">Off</StatusChip>
+                  )}
+                </td>
                 {canEdit && (
                   <td>
                     <button

@@ -58,6 +58,10 @@ describe("History", () => {
     expect(await screen.findByText(/4,500\.00 ISK/)).toBeInTheDocument()
     const link = screen.getByRole("link", { name: "View" })
     expect(link).toHaveAttribute("href", "/a/abc123")
+
+    // A non-zero rejected count renders as a danger status chip (#83).
+    const chip = screen.getByText("2")
+    expect(chip).toHaveClass("status", "status--danger")
   })
 
   it("shows the creator's name (not id) to a manager", async () => {

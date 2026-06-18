@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
 import { getMe } from "../api/auth"
+import { StatusChip } from "../components/StatusChip"
 import { formatIsk } from "../lib/format"
 import { hubName } from "../lib/hubs"
 
@@ -226,10 +227,10 @@ export default function Appraisal() {
                 <td className="num isk">{formatIsk(line.line_total)}</td>
                 <td>
                   {line.status === "accepted" ? (
-                    <span className="status status--accepted">Accepted</span>
+                    <StatusChip variant="accepted">Accepted</StatusChip>
                   ) : (
                     <>
-                      <span className="status status--rejected">Rejected</span>
+                      <StatusChip variant="rejected">Rejected</StatusChip>
                       {line.reason && (
                         <small className="status-reason">{line.reason}</small>
                       )}

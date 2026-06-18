@@ -67,6 +67,17 @@ describe("Rules", () => {
     // A type target shows its name, not "Type 34".
     expect(screen.getByText("Tritanium")).toBeInTheDocument()
     expect(screen.queryByText("Type 34")).not.toBeInTheDocument()
+
+    // Flags render as status chips, not literal yes/no/dash text (#83).
+    for (const chip of screen.getAllByText("On")) {
+      expect(chip).toHaveClass("status", "status--accepted") // enabled
+    }
+    // The Ore rule reprocesses → a cyan "info" chip is present.
+    expect(
+      screen
+        .getAllByText("Yes")
+        .some((c) => c.classList.contains("status--info")),
+    ).toBe(true)
   })
 
   it("lets a manager add a market-group rule", async () => {
