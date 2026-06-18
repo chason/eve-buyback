@@ -261,7 +261,7 @@ async def test_structure_hub_rejects_non_numeric_id():
 
 async def test_structure_hub_accepted_once_authorized():
     from app.data.repositories import characters as ch_repo
-    from app.data.repositories import structure_tokens as st_repo
+    from app.data.repositories import corp_esi_token as st_repo
 
     async with make_client(CeoEsi()) as http:
         await login(http)

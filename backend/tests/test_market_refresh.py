@@ -11,9 +11,9 @@ from app.data.db import SessionLocal
 from app.data.records import MarketPriceRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import characters as characters_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import prices as prices_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.domain.aggregates import OrderBookAggregate, SideAggregate
 from app.plugins.cache import MemoryCache, get_model, safe_key
 from app.plugins.sso import OAuthToken

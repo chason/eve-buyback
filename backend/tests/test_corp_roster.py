@@ -16,8 +16,8 @@ from app.application.errors import (
     RosterRefreshTooSoon,
 )
 from app.data.db import SessionLocal
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
-from app.data.repositories import structure_tokens as tokens_repo
 from app.domain.roles import Role
 from app.interface import jobs
 from app.plugins.esi import (

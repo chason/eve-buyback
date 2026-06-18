@@ -5,8 +5,9 @@ token per corp — covering both structure-market reads and corp-membership (the
 The normal login stays token-free (ADR-0004). Access tokens are never persisted —
 they're refreshed server-side at point of use and held only transiently.
 
-(The module/file keep the `structure_tokens` name to match the `structure_market_tokens`
-table; the corp-ESI-token *functions* were renamed in ADR-0036.)
+(This application module keeps the `structure_tokens` filename for now; the data layer
+— `CorpEsiToken` model, `corp_esi_tokens` table, `corp_esi_token` repo — and the use-case
+functions were renamed to corp-ESI naming in ADR-0036.)
 """
 
 import asyncio
@@ -30,9 +31,9 @@ from app.application.errors import (
     StructureEncryptionNotConfigured,
 )
 from app.config import get_settings
-from app.data.records import StructureMarketTokenRecord
+from app.data.records import CorpEsiTokenRecord
 from app.data.repositories import characters as characters_repo
-from app.data.repositories import structure_tokens as tokens_repo
+from app.data.repositories import corp_esi_token as tokens_repo
 from app.domain import auth as auth_rules
 from app.plugins.esi import EsiClient
 from app.plugins.esi_market import EsiMarketClient
@@ -55,7 +56,7 @@ class CorpEsiAuthorizeResult(BaseModel):
     set when a re-authorization switched the authorizing character (EVE can't pin the
     SSO picker), so the interface can warn that the token now belongs to someone else."""
 
-    token: StructureMarketTokenRecord
+    token: CorpEsiTokenRecord
     replaced_character_name: str | None = None
 
 
@@ -162,7 +163,7 @@ async def complete_corp_esi_authorize(
 
 async def get_status(
     session: AsyncSession, *, corporation_id: int
-) -> StructureMarketTokenRecord | None:
+) -> CorpEsiTokenRecord | None:
     """The corp's current authorization (or None), for the status view."""
     corp = await get_registered_corporation(session, corporation_id)
     return await tokens_repo.get_for_corp(session, corp.id)
