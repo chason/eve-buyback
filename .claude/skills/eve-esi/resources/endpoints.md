@@ -1,13 +1,22 @@
 # ESI Endpoint Reference
 
 Endpoints this project uses, plus the closely-related ones needed to enrich the
-data models in `../SKILL.md`. Authoritative, always-current source: the ESI
-Swagger UI at <https://esi.evetech.net/ui/>.
+data models in `../SKILL.md`. **Authoritative, always-current source:** the OpenAPI 3
+spec at <https://esi.evetech.net/meta/openapi.json>, browsable in the interactive API
+explorer at <https://developers.eveonline.com/api-explorer>. (These superseded the old
+Swagger 2.0 UI at `esi.evetech.net/ui/` + `/latest/swagger.json`; `esi.evetech.net/` now
+redirects to the explorer.) The paths/scopes below are a convenience snapshot — confirm
+against the live spec, especially **required in-game roles**, which it documents per route.
 
 ## Conventions
 
-- **Base URL:** `https://esi.evetech.net/latest/` — `latest` follows the newest
-  route version. Pin a specific version (e.g. `/v5/`) if you need stability.
+- **Base URL + versioning:** `https://esi.evetech.net/` with **unversioned** paths (e.g.
+  `universe/systems/{id}/`). ESI versions by **compatibility date**: send an
+  `X-Compatibility-Date: YYYY-MM-DD` header (or `?compatibility_date=YYYY-MM-DD`) — the
+  date you last validated against the changelog. Legacy `/latest/` and `/vN/` routes still
+  work for the foreseeable future but are the old style; prefer the header on the shared
+  client (see SKILL.md). A route flagged for removal returns a `warning: 299 …` header
+  (~1 year of backwards compatibility) — watch for it and migrate.
 - **Datasource:** defaults to Tranquility (live). Append `?datasource=tranquility`
   explicitly if you want to be unambiguous.
 - **User-Agent:** required — send app name + contact, e.g.
