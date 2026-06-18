@@ -108,9 +108,14 @@ async def refresh_due_prices(
                 cutoff=cutoff,
                 l1_ttl=l1_ttl,
             )
-        except _SKIP_HUB_ERRORS:
+        except _SKIP_HUB_ERRORS as exc:
+            # The structure fetch on this path carries `Authorization: Bearer <token>`
+            # (esi_market). Log `repr(exc)` — the exception type + message (ESI status/
+            # URL, never headers) — instead of `exc_info=True`, so the short-lived access
+            # token can't reach the logs via httpx's exception/traceback formatting (#75;
+            # httpx 0.28 doesn't serialize auth headers, but don't rely on that).
             log.warning(
-                "background refresh skipped hub %s", group.hub_id, exc_info=True
+                "background refresh skipped hub %s: %r", group.hub_id, exc
             )
             continue
         except Exception:  # noqa: BLE001 — one hub must never abort the whole cycle

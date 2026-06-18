@@ -74,7 +74,8 @@ async def run_roster_refresh(app: FastAPI) -> None:
                     now=datetime.now(UTC),
                     enforce_cooldown=False,
                 )
-        except Exception:  # noqa: BLE001 — one corp's failure must not abort the cycle
-            log.warning(
-                "roster refresh failed for corp %s", corp_eve_id, exc_info=True
-            )
+        except Exception as exc:  # noqa: BLE001 — one corp's failure must not abort the cycle
+            # refresh_roster makes Bearer-token ESI calls; log `repr(exc)` (status/message,
+            # not headers or a full traceback) so an access token can't reach the logs via
+            # httpx's exception formatting (#75).
+            log.warning("roster refresh failed for corp %s: %r", corp_eve_id, exc)

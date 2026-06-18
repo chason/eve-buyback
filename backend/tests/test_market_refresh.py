@@ -379,6 +379,36 @@ async def test_structure_access_denied_flags_token_then_recovery_clears_it():
     assert token.last_used_at is not None
 
 
+async def test_structure_fetch_error_never_logs_the_access_token(caplog):
+    # #75: the structure fetch carries `Authorization: Bearer <access_token>`. When it
+    # raises an httpx error, the skip path must log `repr(exc)` (status/message) — never
+    # `exc_info=True` — so the token can't leak into the logs via httpx's formatting.
+    import logging
+
+    import httpx
+
+    corp = await _make_corp(98000020)
+    await _set_config(corp.id, hub_id=STRUCT_HUB, kind="structure")
+    await _grant_token(corp.id, eve_char_id=920)
+
+    req = httpx.Request(
+        "GET", "https://esi.evetech.net/markets/structures/x/",
+        headers={"Authorization": "Bearer access-tok"},
+    )
+    err = httpx.HTTPStatusError(
+        "boom", request=req, response=httpx.Response(500, request=req)
+    )
+    esi = FakeEsi(structure_error=err)
+
+    with caplog.at_level(logging.WARNING, logger="app.application.market_refresh"):
+        summary = await _run(esi)
+
+    assert summary.hubs_refreshed == 0  # skipped, not fatal
+    rec = next(r for r in caplog.records if "skipped hub" in r.getMessage())
+    assert "access-tok" not in caplog.text  # token never reaches the logs
+    assert rec.exc_info is None  # no full traceback attached on the token-bearing path
+
+
 async def test_fuzzwork_hub_is_never_refreshed():
     corp = await _make_corp(98000011)
     await _set_config(corp.id, hub_id=FUZZ_HUB)  # Jita — Fuzzwork covers it
