@@ -25,10 +25,8 @@ from app.domain.aggregates import (
     RawOrder,
     aggregate_orders,
 )
+from app.plugins.esi_common import ESI_BASE, scope_missing
 
-# Unversioned ESI base — versioning is by the `X-Compatibility-Date` header set on the
-# shared httpx client (main.py); paths carry no `/latest/` or `/vN/` prefix.
-ESI_BASE = "https://esi.evetech.net"
 # Back off when ESI's sliding error budget drops to/below this many remaining.
 _ERROR_LIMIT_FLOOR = 5
 
@@ -104,7 +102,7 @@ class EsiMarketClient:
             },
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        if resp.status_code in (401, 403):
+        if scope_missing(resp):
             return []
         resp.raise_for_status()
         return list(resp.json().get("structure", []))[:limit]

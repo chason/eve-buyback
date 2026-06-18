@@ -2,9 +2,7 @@ import httpx
 from fastapi import Request
 from pydantic import BaseModel
 
-# Unversioned ESI base — versioning is by the `X-Compatibility-Date` header, set once on
-# the shared httpx client (main.py); paths carry no `/latest/` or `/vN/` prefix.
-ESI_BASE = "https://esi.evetech.net"
+from app.plugins.esi_common import ESI_BASE, scope_missing
 
 # ESI's bulk name-resolution endpoint accepts up to 1000 ids per request.
 _NAMES_CHUNK = 1000
@@ -62,7 +60,7 @@ class EsiClient:
             f"{ESI_BASE}/characters/{character_id}/roles/",
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        if resp.status_code in (401, 403):
+        if scope_missing(resp):
             return []  # scope not granted — fail closed (ADR-0015)
         resp.raise_for_status()
         return resp.json().get("roles", [])
@@ -78,7 +76,7 @@ class EsiClient:
             f"{ESI_BASE}/corporations/{corporation_id}/members/",
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        if resp.status_code in (401, 403):
+        if scope_missing(resp):
             raise CorporationMembersForbidden()
         resp.raise_for_status()
         return resp.json()
