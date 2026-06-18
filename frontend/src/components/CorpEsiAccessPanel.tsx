@@ -125,8 +125,9 @@ export default function CorpEsiAccessPanel({
                     <ConfirmButton
                       className="linkbtn"
                       label="Revoke"
-                      confirmPrompt="Revoke — stops structure pricing & roster sync?"
-                      confirmLabel="Yes, revoke"
+                      title="Revoke corp ESI access?"
+                      prompt="This stops structure pricing and roster sync until you reconnect."
+                      confirmLabel="Revoke"
                       onConfirm={() => revoke.mutate()}
                     />
                   </>

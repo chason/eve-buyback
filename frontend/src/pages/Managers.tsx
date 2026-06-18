@@ -175,7 +175,9 @@ export default function Managers() {
                   <ConfirmButton
                     className="linkbtn"
                     label="Remove"
-                    confirmPrompt="Remove manager?"
+                    title="Remove manager?"
+                    prompt="They'll lose Buyback Manager access."
+                    confirmLabel="Remove manager"
                     onConfirm={() => revoke.mutate(m.character_id)}
                   />
                 </td>
