@@ -102,8 +102,9 @@ async def complete_corp_esi_authorize(
 ) -> CorpEsiAuthorizeResult:
     """Exchange the code and store the (encrypted) refresh token for the caller's corp
     (ADR-0036). Only the CEO or a Director may connect/revoke, but the authorizing
-    character can be any corp member (validated here) — commonly a Director service
-    character so the roster works too. A re-authorization replaces any existing token; if
+    character can be any corp member (validated here) — commonly a service character with
+    permission to read the corp roster, so the roster works too. A re-authorization
+    replaces any existing token; if
     it switched to a different character, the previous character's name is returned so the
     caller can warn about the swap."""
     if not (user.role == "ceo" or user.is_director):

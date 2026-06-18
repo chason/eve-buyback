@@ -9,9 +9,9 @@ _NAMES_CHUNK = 1000
 
 
 class CorporationMembersForbidden(Exception):
-    """ESI refused the corp member list (401/403): the authorizing character lacks the
-    in-game Director role or the membership scope (ADR-0036). Transport-level; the
-    application layer maps it to a semantic error."""
+    """ESI refused the corp member list (401/403): the authorizing character lacks
+    permission to read it (the membership scope and/or the required in-game role,
+    ADR-0036). Transport-level; the application layer maps it to a semantic error."""
 
 
 class CorporationInfo(BaseModel):
@@ -69,8 +69,9 @@ class EsiClient:
         self, corporation_id: int, access_token: str
     ) -> list[int]:
         """The corp's member character ids (ADR-0036). Requires a token whose character
-        holds the in-game Director role and the membership scope; 401/403 means that
-        character can't read the roster (raised, not swallowed, so the sync can explain)."""
+        has permission to read membership (the membership scope, plus any in-game role EVE
+        requires); 401/403 means that character can't read the roster (raised, not
+        swallowed, so the sync can explain)."""
         resp = await self._client.get(
             f"{ESI_BASE}/corporations/{corporation_id}/members/",
             headers={"Authorization": f"Bearer {access_token}"},
