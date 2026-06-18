@@ -136,7 +136,8 @@ async def list_rules(
 async def _with_target_names(
     session: AsyncSession, rules: list[PricingRuleRecord]
 ) -> list[PricingRuleRecord]:
-    """Resolve each rule's target to its SDE name for display. Batched: one type
+    """Resolve each rule's target to its SDE name (display) and the market group it
+    belongs to (so the UI can file it under a category folder). Batched: one type
     lookup and one market-group lookup for the whole list."""
     type_ids = [r.target_id for r in rules if r.target_kind == "type"]
     types = await sde_repo.get_types(session, type_ids) if type_ids else {}
@@ -151,7 +152,23 @@ async def _with_target_names(
             return t.name if t else None
         return group_names.get(rule.target_id)
 
-    return [r.model_copy(update={"target_name": name_for(r)}) for r in rules]
+    def market_group_for(rule: PricingRuleRecord) -> int | None:
+        # A type files under its own market group; a market-group rule files under
+        # itself (only if the group still exists in the SDE).
+        if rule.target_kind == "type":
+            t = types.get(rule.target_id)
+            return t.market_group_id if t else None
+        return rule.target_id if rule.target_id in group_names else None
+
+    return [
+        r.model_copy(
+            update={
+                "target_name": name_for(r),
+                "target_market_group_id": market_group_for(r),
+            }
+        )
+        for r in rules
+    ]
 
 
 async def set_rule(
@@ -176,7 +193,9 @@ async def set_rule(
     (ADR-0031) is validated and resolved like the config hub; PUT is
     full-replacement, so a request without one clears it."""
     corp = await get_registered_corporation(session, corporation_id)
-    target_name = await _validate_target(session, target_kind, target_id)
+    target_name, target_market_group_id = await _validate_target(
+        session, target_kind, target_id
+    )
 
     region_id: int | None = None
     hub_name: str | None = None
@@ -204,7 +223,15 @@ async def set_rule(
         market_hub_name=hub_name,
     )
     await session.commit()
-    return record.model_copy(update={"target_name": target_name}), created
+    return (
+        record.model_copy(
+            update={
+                "target_name": target_name,
+                "target_market_group_id": target_market_group_id,
+            }
+        ),
+        created,
+    )
 
 
 async def delete_rule(
@@ -228,14 +255,15 @@ async def delete_rule(
 
 async def _validate_target(
     session: AsyncSession, target_kind: TargetKind, target_id: int
-) -> str:
-    """Ensure the target exists (else 400) and return its SDE name."""
+) -> tuple[str, int | None]:
+    """Ensure the target exists (else 400) and return its SDE name + the market group
+    it files under (the type's own group, or the target group itself)."""
     if target_kind == "type":
         sde_type = await sde_repo.get_type(session, target_id)
         if sde_type is None:
             raise PricingRuleTargetInvalid(f"Unknown type {target_id}")
-        return sde_type.name
+        return sde_type.name, sde_type.market_group_id
     group = await sde_repo.get_market_group(session, target_id)
     if group is None:
         raise PricingRuleTargetInvalid(f"Unknown market group {target_id}")
-    return group.name
+    return group.name, target_id

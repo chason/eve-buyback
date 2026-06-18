@@ -686,6 +686,60 @@ label:has(> .search-results) > input {
   text-decoration: none;
 }
 
+/* Pricing rules organised into collapsible category folders (top-level market group):
+   each folder is a <details> within the rules panel, with a console-style header. */
+.rule-folder + .rule-folder {
+  border-top: 1px solid var(--bb-panel-border);
+}
+
+.rule-folder > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  font-family: var(--bb-display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bb-heading);
+  cursor: pointer;
+  list-style: none; /* drop the default disclosure triangle; we draw our own ▸ */
+}
+
+.rule-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Pico draws its own accordion chevron on the right of <summary>; drop it — we use our
+   own cyan caret on the left. */
+.rule-folder > summary::after {
+  display: none;
+}
+
+/* Our own cyan disclosure caret that points down when the folder is open. */
+.rule-folder > summary::before {
+  content: "▸";
+  color: var(--bb-cyan);
+  transition: transform 0.15s ease;
+}
+
+.rule-folder[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.rule-folder-count {
+  margin-left: auto;
+  font-family: var(--bb-mono);
+  font-size: 0.75rem;
+  color: var(--bb-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rule-folder > summary::before {
+    transition: none;
+  }
+}
+
 /* Checkbox row in the rule editor: keep the boxes on one line, neatly aligned
    (not stretched to the height of the taller select/number inputs above). */
 .rule-flags {

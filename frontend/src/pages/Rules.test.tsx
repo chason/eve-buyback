@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -78,6 +78,40 @@ describe("Rules", () => {
         .getAllByText("Yes")
         .some((c) => c.classList.contains("status--info")),
     ).toBe(true)
+  })
+
+  it("groups rules into collapsible folders by top-level market group", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([
+      { market_group_id: 1, parent_id: null, name: "Ships" },
+      { market_group_id: 2, parent_id: 1, name: "Frigates" },
+      { market_group_id: 10, parent_id: null, name: "Materials" },
+    ])
+    vi.mocked(pricingApi.listRules).mockResolvedValue([
+      // A type two levels under "Ships" → Ships folder.
+      { target_kind: "type", target_id: 587, target_name: "Rifter", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true, target_market_group_id: 2 },
+      // A market-group rule on "Materials" → Materials folder.
+      { target_kind: "market_group", target_id: 10, target_name: "Materials", basis: "buy", percentage: "85", enabled: true, reprocess: false, compressed_only: false, accepted: true, target_market_group_id: 10 },
+      // No/unknown group → the "Other" folder.
+      { target_kind: "type", target_id: 99, target_name: "Mystery Item", basis: null, percentage: "50", enabled: true, reprocess: false, compressed_only: false, accepted: true, target_market_group_id: null },
+    ])
+
+    renderRules()
+
+    // Folder headers (top-level market groups), each a <details> summary. ("Materials"
+    // is also a rule target name, so scope the header lookups to the summary.)
+    const ships = await screen.findByText("Ships", { selector: "summary" })
+    expect(ships).toBeInTheDocument()
+    expect(screen.getByText("Materials", { selector: "summary" })).toBeInTheDocument()
+    const other = screen.getByText("Other", { selector: "summary" })
+    expect(other).toBeInTheDocument()
+
+    // The Rifter (under Ships ▸ Frigates) files in the Ships folder, not its own.
+    expect(within(ships.closest("details")!).getByText("Rifter")).toBeInTheDocument()
+    // The ungrouped rule lands in "Other".
+    expect(
+      within(other.closest("details")!).getByText("Mystery Item"),
+    ).toBeInTheDocument()
   })
 
   it("lets a manager add a market-group rule", async () => {

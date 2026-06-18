@@ -157,6 +157,10 @@ class PricingRuleRecord(BaseModel):
     # Human-readable name of the target (SDE type or market-group name), resolved by
     # the application layer for display. None if the target no longer exists in the SDE.
     target_name: str | None = None
+    # The market group the target belongs to (a type's own group, or the target group
+    # itself for a market-group rule), so the UI can file the rule under a category
+    # folder. Resolved by the application layer; None if unknown/removed from the SDE.
+    target_market_group_id: int | None = None
     basis: Basis | None
     percentage: Decimal
     enabled: bool

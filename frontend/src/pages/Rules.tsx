@@ -69,6 +69,40 @@ export default function Rules() {
     return s
   }, [groupOptions])
 
+  // The top-level market-group name a rule files under — its category folder. Walks the
+  // market tree up to the root; rules whose target has no/unknown group go in "Other".
+  const topLevelGroup = useMemo(() => {
+    const byId = new Map((groups.data ?? []).map((g) => [g.market_group_id, g]))
+    return (mgId: number | null | undefined): string => {
+      if (mgId == null) return "Other"
+      let cur = byId.get(mgId)
+      const seen = new Set<number>()
+      while (
+        cur?.parent_id != null &&
+        byId.has(cur.parent_id) &&
+        !seen.has(cur.market_group_id)
+      ) {
+        seen.add(cur.market_group_id)
+        cur = byId.get(cur.parent_id)
+      }
+      return cur?.name ?? "Other"
+    }
+  }, [groups.data])
+
+  // Rules grouped into category folders, sorted by folder name ("Other" last).
+  const folders = useMemo(() => {
+    const map = new Map<string, RuleOut[]>()
+    for (const rule of rules.data ?? []) {
+      const key = topLevelGroup(rule.target_market_group_id)
+      const list = map.get(key) ?? []
+      list.push(rule)
+      map.set(key, list)
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b),
+    )
+  }, [rules.data, topLevelGroup])
+
   function targetLabel(rule: RuleOut): string {
     // The backend resolves the SDE name; fall back to a path lookup / the raw id
     // only if it's missing (e.g. the target was removed from the SDE).
@@ -86,6 +120,63 @@ export default function Rules() {
     onSuccess: invalidate,
   })
 
+  const renderRow = (rule: RuleOut) => (
+    <tr key={`${rule.target_kind}-${rule.target_id}`}>
+      <td
+        title={
+          rule.target_kind === "market_group"
+            ? groupPath(rule.target_id)
+            : undefined
+        }
+      >
+        {targetLabel(rule)}
+      </td>
+      <td>
+        {rule.accepted ? (
+          <StatusChip variant="accepted">Yes</StatusChip>
+        ) : (
+          <StatusChip variant="danger">No</StatusChip>
+        )}
+      </td>
+      <td>{rule.basis ?? "(default)"}</td>
+      <td className="num">{rule.percentage}</td>
+      <td>
+        {rule.market_hub_id
+          ? (rule.market_hub_name ?? hubName(rule.market_hub_id))
+          : "(default)"}
+      </td>
+      <td>
+        {rule.reprocess ? <StatusChip variant="info">Yes</StatusChip> : "–"}
+      </td>
+      <td>
+        {rule.compressed_only ? (
+          <StatusChip variant="info">Yes</StatusChip>
+        ) : (
+          "–"
+        )}
+      </td>
+      <td>
+        {rule.enabled ? (
+          <StatusChip variant="accepted">On</StatusChip>
+        ) : (
+          <StatusChip variant="muted">Off</StatusChip>
+        )}
+      </td>
+      {canEdit && (
+        <td>
+          <ConfirmButton
+            className="linkbtn"
+            label="Remove"
+            title="Remove rule?"
+            prompt="This pricing rule will be deleted."
+            confirmLabel="Remove rule"
+            onConfirm={() => remove.mutate(rule)}
+          />
+        </td>
+      )}
+    </tr>
+  )
+
   if (rules.isLoading) return <p aria-busy="true">Loading…</p>
   if (rules.isError || !rules.data) {
     return <p className="error">Could not load pricing rules.</p>
@@ -102,83 +193,30 @@ export default function Rules() {
         <p>No rules yet — the corp defaults apply to everything.</p>
       ) : (
         <div className="panel">
-        <table>
-          <thead>
-            <tr>
-              <th>Target</th>
-              <th>Accept</th>
-              <th>Basis</th>
-              <th>%</th>
-              <th>Hub</th>
-              <th>Reprocess</th>
-              <th>Compressed</th>
-              <th>Enabled</th>
-              {canEdit && <th />}
-            </tr>
-          </thead>
-          <tbody>
-            {rules.data.map((rule) => (
-              <tr key={`${rule.target_kind}-${rule.target_id}`}>
-                <td
-                  title={
-                    rule.target_kind === "market_group"
-                      ? groupPath(rule.target_id)
-                      : undefined
-                  }
-                >
-                  {targetLabel(rule)}
-                </td>
-                <td>
-                  {rule.accepted ? (
-                    <StatusChip variant="accepted">Yes</StatusChip>
-                  ) : (
-                    <StatusChip variant="danger">No</StatusChip>
-                  )}
-                </td>
-                <td>{rule.basis ?? "(default)"}</td>
-                <td className="num">{rule.percentage}</td>
-                <td>
-                  {rule.market_hub_id
-                    ? (rule.market_hub_name ?? hubName(rule.market_hub_id))
-                    : "(default)"}
-                </td>
-                <td>
-                  {rule.reprocess ? (
-                    <StatusChip variant="info">Yes</StatusChip>
-                  ) : (
-                    "–"
-                  )}
-                </td>
-                <td>
-                  {rule.compressed_only ? (
-                    <StatusChip variant="info">Yes</StatusChip>
-                  ) : (
-                    "–"
-                  )}
-                </td>
-                <td>
-                  {rule.enabled ? (
-                    <StatusChip variant="accepted">On</StatusChip>
-                  ) : (
-                    <StatusChip variant="muted">Off</StatusChip>
-                  )}
-                </td>
-                {canEdit && (
-                  <td>
-                    <ConfirmButton
-                      className="linkbtn"
-                      label="Remove"
-                      title="Remove rule?"
-                      prompt="This pricing rule will be deleted."
-                      confirmLabel="Remove rule"
-                      onConfirm={() => remove.mutate(rule)}
-                    />
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          {folders.map(([folderName, folderRules]) => (
+            <details key={folderName} className="rule-folder" open>
+              <summary>
+                {folderName}
+                <span className="rule-folder-count">{folderRules.length}</span>
+              </summary>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Accept</th>
+                    <th>Basis</th>
+                    <th>%</th>
+                    <th>Hub</th>
+                    <th>Reprocess</th>
+                    <th>Compressed</th>
+                    <th>Enabled</th>
+                    {canEdit && <th />}
+                  </tr>
+                </thead>
+                <tbody>{folderRules.map(renderRow)}</tbody>
+              </table>
+            </details>
+          ))}
         </div>
       )}
 

@@ -50,6 +50,9 @@ class RuleOut(BaseModel):
     # The target's SDE name (type or market-group), for display; None if the target
     # is no longer in the SDE.
     target_name: str | None = None
+    # The market group the target belongs to, so the UI can file the rule under its
+    # category folder (#rules-folders). None if unknown/removed from the SDE.
+    target_market_group_id: int | None = None
     basis: Basis | None
     percentage: Decimal
     enabled: bool

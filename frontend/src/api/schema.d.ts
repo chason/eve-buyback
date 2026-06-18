@@ -249,7 +249,7 @@ export interface paths {
         };
         /**
          * Search Members
-         * @description Search the synced roster by name (empty until a Director connects the token).
+         * @description Search the synced roster by name (empty until the corp roster has been synced).
          */
         get: operations["search_members_api_v1_corporations_me_roster_members_get"];
         put?: never;
@@ -389,7 +389,7 @@ export interface paths {
         /**
          * Complete
          * @description Complete the grant: validate state, exchange the code, store the token, and
-         *     best-effort populate the roster (works if the connected character is a Director).
+         *     best-effort populate the roster (works if the connected character can read it).
          */
         post: operations["complete_api_v1_corporations_me_structure_token_session_post"];
         delete?: never;
@@ -847,6 +847,8 @@ export interface components {
              * @enum {string}
              */
             target_kind: "market_group" | "type";
+            /** Target Market Group Id */
+            target_market_group_id?: number | null;
             /** Target Name */
             target_name?: string | null;
         };
