@@ -156,6 +156,13 @@ docker build -t buyback .                # build the image alone (e.g. for Cooli
   shown in the UI top bar. This is the whole scheme — no tags or semver.
 - Match the style of surrounding code. Add tests alongside new behavior.
 - Don't commit secrets — use `.env` files (already gitignored).
+- **Token-use changes must update the Privacy page.** Any change to how an EVE token
+  is used, stored, scoped, or refreshed — a new scope, a new ESI call made with a token,
+  a new persisted token, a change to retention/encryption/revocation — must update the
+  user-facing Privacy / Data Use page (`frontend/src/pages/Privacy.tsx`) and its test in
+  the **same change**, so the page never describes token handling the app no longer (or
+  doesn't yet) do. The page is kept accurate to the token ADRs it cites (ADR-0004, 0029,
+  0036, 0037).
 - A pre-commit hook (`.githooks/pre-commit`) runs checks for what you stage:
   `backend/` changes → `ruff check` + `pytest`; `frontend/` changes → typecheck
   (`tsc`) + `eslint` + `vitest`. Enable per clone: `git config core.hooksPath .githooks` (needs `uv` and
