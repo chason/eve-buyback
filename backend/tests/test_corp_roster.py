@@ -11,9 +11,9 @@ from app.application import corp_roster as roster_app
 from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.application.errors import (
+    CorpEsiTokenMissing,
     RosterAccessDenied,
     RosterRefreshTooSoon,
-    StructureTokenMissing,
 )
 from app.data.db import SessionLocal
 from app.data.repositories import corporations as corporations_repo
@@ -177,7 +177,7 @@ async def test_non_director_403_does_not_flag_token():
 
 async def test_refresh_without_token_raises():
     await _register_corp()  # registered, but no Corp ESI token connected
-    with pytest.raises(StructureTokenMissing):
+    with pytest.raises(CorpEsiTokenMissing):
         await _refresh(RosterEsi(), enforce_cooldown=False)
 
 

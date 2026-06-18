@@ -103,12 +103,12 @@ class StructureEncryptionNotConfigured(ApplicationError):
     )
 
 
-class StructureTokenMissing(ApplicationError):
-    default_detail = "Structure access has not been authorized"
+class CorpEsiTokenMissing(ApplicationError):
+    default_detail = "Corp ESI access has not been connected"
 
 
-class StructureTokenExpired(ApplicationError):
-    default_detail = "Structure access has expired; please re-authorize"
+class CorpEsiTokenExpired(ApplicationError):
+    default_detail = "Corp ESI access has expired; please reconnect"
 
 
 class StructureMarketUnavailable(ApplicationError):

@@ -199,12 +199,12 @@ async def test_structure_hub_prices_via_provider_token():
 
 
 async def test_structure_missing_token_degrades_to_unpriced():
-    from app.application.errors import StructureTokenMissing
+    from app.application.errors import CorpEsiTokenMissing
 
     esi = FakeEsiMarket(response={34: _esi_book(buy="3.0", sell="4.0")})
 
     async def provider() -> str:
-        raise StructureTokenMissing()
+        raise CorpEsiTokenMissing()
 
     async with SessionLocal() as session:
         result = await get_market_prices(

@@ -11,10 +11,10 @@ from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.application.errors import (
     AuthorizingCharacterNotInCorporation,
+    CorpEsiTokenExpired,
+    CorpEsiTokenMissing,
     NotAuthorizedToAuthorizeStructure,
     StructureEncryptionNotConfigured,
-    StructureTokenExpired,
-    StructureTokenMissing,
 )
 from app.config import get_settings
 from app.data.db import SessionLocal
@@ -257,7 +257,7 @@ async def test_revoke_signs_grant_out_at_eve_and_deletes():
 async def test_revoke_without_token_raises():
     await _register_corp()
     async with SessionLocal() as session:
-        with pytest.raises(StructureTokenMissing):
+        with pytest.raises(CorpEsiTokenMissing):
             await structures_app.revoke(
                 session, FakeSso(), corporation_id=CORP_EVE_ID, cipher=CIPHER
             )
@@ -306,7 +306,7 @@ async def test_invalid_grant_marks_expired_and_raises():
         response=httpx.Response(400),
     )
     async with SessionLocal() as session:
-        with pytest.raises(StructureTokenExpired):
+        with pytest.raises(CorpEsiTokenExpired):
             await structures_app.get_structure_access_token(
                 session, FakeSso(refresh_error=err),
                 corporation_uuid=corp_uuid, cipher=CIPHER,
@@ -319,7 +319,7 @@ async def test_invalid_grant_marks_expired_and_raises():
 async def test_missing_token_raises():
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
-        with pytest.raises(StructureTokenMissing):
+        with pytest.raises(CorpEsiTokenMissing):
             await structures_app.get_structure_access_token(
                 session, FakeSso(), corporation_uuid=corp_uuid, cipher=CIPHER,
             )
@@ -361,7 +361,7 @@ async def test_search_structures_returns_named_results():
 async def test_search_structures_requires_authorization():
     await _register_corp()  # corp registered but no structure token
     async with SessionLocal() as session:
-        with pytest.raises(StructureTokenMissing):
+        with pytest.raises(CorpEsiTokenMissing):
             await structures_app.search_structures(
                 session, FakeSso(), FakeEsiMarketSearch([], {}),
                 corporation_id=CORP_EVE_ID, query="x", cipher=CIPHER,
