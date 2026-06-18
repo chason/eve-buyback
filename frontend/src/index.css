@@ -423,14 +423,9 @@ tr.reprocess-detail td {
   color: var(--bb-cyan);
 }
 
-/* The "not saved yet" cue when the picked hub differs from the saved one, and the Save
-   button's matching unsaved state (#34) — a soft cyan glow makes the required final Save
-   unmissable so setup isn't abandoned one click early. */
-.unsaved-cue {
-  margin: calc(var(--pico-spacing) * -0.5) 0 var(--pico-spacing);
-  color: var(--bb-cyan);
-}
-
+/* The Save button's unsaved-changes state (#34) — a soft cyan glow plus an inline note
+   make the required final Save unmissable, so structure setup isn't abandoned one click
+   early (the structure flow authorizes the token but doesn't persist the hub until Save). */
 button.dirty {
   filter: drop-shadow(0 0 8px rgba(51, 194, 255, 0.5));
 }

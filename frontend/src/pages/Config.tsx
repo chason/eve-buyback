@@ -129,8 +129,6 @@ export default function Config() {
   // saved, so the required final Save is signalled (a cue + a dirty Save button) — the
   // structure flow authorizes the token but doesn't persist the hub until Save.
   const c = config.data
-  const selectedHubName =
-    selection.state === "hub" ? (selection.name ?? hubName(selection.hubId)) : null
   const hubDirty =
     selection.state === "hub" &&
     (selection.hubId !== c.market_hub_id || selection.kind !== c.market_hub_kind)
@@ -140,11 +138,9 @@ export default function Config() {
     percentage !== c.default_percentage ||
     aggregate !== c.aggregate_field ||
     defaultAccepted !== c.default_accepted
-  // Suppress the cues while a save is in flight / just landed, so "unsaved" never flashes
-  // alongside the "Saved" acknowledgment before the config refetch settles.
-  const showUnsaved = !save.isPending && !showSaved
-  const hubDirtyVisible = hubDirty && showUnsaved
-  const dirtyVisible = dirty && showUnsaved
+  // Suppress the dirty state while a save is in flight / just landed, so "unsaved" never
+  // flashes alongside the "Saved" acknowledgment before the config refetch settles.
+  const dirtyVisible = dirty && !save.isPending && !showSaved
 
   return (
     <>
@@ -181,12 +177,6 @@ export default function Config() {
           <strong>{c.market_hub_name ?? hubName(c.market_hub_id)}</strong> (
           {isFuzzworkHub(c.market_hub_id) ? "Fuzzwork" : "EVE ESI"}).
         </p>
-        {hubDirtyVisible && (
-          <p className="unsaved-cue" role="status">
-            Not saved yet — click <strong>Save config</strong> to price at{" "}
-            <strong>{selectedHubName}</strong>.
-          </p>
-        )}
 
         <label>
           Default basis
