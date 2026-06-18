@@ -101,7 +101,8 @@ describe("Managers", () => {
     const input = await screen.findByLabelText("Search corp members")
     await waitFor(() => expect(input).toBeEnabled())
     await u.type(input, "gru")
-    await u.click(await screen.findByText("Grunt"))
+    // Roster picks are buttons (actions), not anchors (#80).
+    await u.click(await screen.findByRole("button", { name: "Grunt" }))
     await waitFor(() =>
       expect(managersApi.addManager).toHaveBeenCalledWith(555),
     )
@@ -121,7 +122,8 @@ describe("Managers", () => {
 
     renderPage()
     expect(await screen.findByText("Grunt")).toBeInTheDocument()
-    await u.click(screen.getByText("Remove"))
+    // Remove is an action button, not an anchor (#80).
+    await u.click(screen.getByRole("button", { name: "Remove" }))
     await waitFor(() =>
       expect(managersApi.removeManager).toHaveBeenCalledWith(555),
     )

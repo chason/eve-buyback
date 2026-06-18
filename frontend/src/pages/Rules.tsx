@@ -138,15 +138,13 @@ export default function Rules() {
                 <td>{rule.enabled ? "yes" : "no"}</td>
                 {canEdit && (
                   <td>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        remove.mutate(rule)
-                      }}
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => remove.mutate(rule)}
                     >
                       Remove
-                    </a>
+                    </button>
                   </td>
                 )}
               </tr>
@@ -309,19 +307,18 @@ function AddRule({
                 {results.isLoading && <li aria-busy="true">Searching…</li>}
                 {results.data?.map((t) => (
                   <li key={t.type_id}>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
+                    <button
+                      type="button"
+                      onClick={() =>
                         setTarget({
                           id: t.type_id,
                           name: t.name,
                           marketGroupId: t.market_group_id,
                         })
-                      }}
+                      }
                     >
                       {t.name}
-                    </a>
+                    </button>
                   </li>
                 ))}
                 {results.data?.length === 0 && <li>No matches.</li>}
@@ -345,15 +342,12 @@ function AddRule({
               <ul className="search-results">
                 {groupMatches.map((g) => (
                   <li key={g.id}>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setTarget({ id: g.id, name: g.path })
-                      }}
+                    <button
+                      type="button"
+                      onClick={() => setTarget({ id: g.id, name: g.path })}
                     >
                       {g.path}
-                    </a>
+                    </button>
                   </li>
                 ))}
                 {groupMatches.length === 0 && <li>No matches.</li>}

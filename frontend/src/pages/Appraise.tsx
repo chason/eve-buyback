@@ -165,15 +165,9 @@ export default function Appraise() {
           {results.isLoading && <li aria-busy="true">Searching…</li>}
           {results.data?.map((t) => (
             <li key={t.type_id}>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  addItem(t.type_id, t.name)
-                }}
-              >
+              <button type="button" onClick={() => addItem(t.type_id, t.name)}>
                 {t.name}
-              </a>
+              </button>
             </li>
           ))}
           {results.data?.length === 0 && <li>No matches.</li>}
@@ -209,15 +203,13 @@ export default function Appraise() {
                   />
                 </td>
                 <td>
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      removeItem(i.type_id)
-                    }}
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    onClick={() => removeItem(i.type_id)}
                   >
                     Remove
-                  </a>
+                  </button>
                 </td>
               </tr>
             ))}

@@ -121,15 +121,13 @@ export default function CorpEsiAccessPanel({
                 {canManage && (
                   <>
                     {" — "}
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        revoke.mutate()
-                      }}
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => revoke.mutate()}
                     >
                       Revoke
-                    </a>
+                    </button>
                   </>
                 )}
               </p>
@@ -165,21 +163,18 @@ export default function CorpEsiAccessPanel({
                       } member${roster.data.member_count === 1 ? "" : "s"}`
                     : "not synced yet"}
                   {" — "}
-                  <a
-                    href="#"
-                    aria-disabled={!canRefresh}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (canRefresh) refresh.mutate()
-                    }}
-                    style={!canRefresh ? { opacity: 0.5 } : undefined}
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    disabled={!canRefresh}
+                    onClick={() => refresh.mutate()}
                   >
                     {refresh.isPending
                       ? "Refreshing…"
                       : cooldownMs > 0
                         ? `Refresh (available in ${cooldownMin} min)`
                         : "Refresh roster"}
-                  </a>
+                  </button>
                 </small>
                 {refresh.isError && (
                   <>

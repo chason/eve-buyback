@@ -173,10 +173,9 @@ export default function HubPicker({
               {stationResults.isLoading && <li aria-busy="true">Searching…</li>}
               {stationResults.data?.map((s) => (
                 <li key={s.station_id}>
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
+                  <button
+                    type="button"
+                    onClick={() => {
                       const picked = {
                         id: String(s.station_id),
                         label: `${s.system_name} - ${s.name}`,
@@ -187,7 +186,7 @@ export default function HubPicker({
                     }}
                   >
                     {s.system_name} - {s.name}
-                  </a>
+                  </button>
                 </li>
               ))}
               {stationResults.data?.length === 0 && <li>No matches.</li>}
@@ -244,10 +243,9 @@ export default function HubPicker({
                   )}
                   {structureResults.data?.map((s) => (
                     <li key={s.structure_id}>
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault()
+                      <button
+                        type="button"
+                        onClick={() => {
                           const picked = { id: s.structure_id, label: s.name }
                           setStructure(picked)
                           setStructureQuery("")
@@ -255,7 +253,7 @@ export default function HubPicker({
                         }}
                       >
                         {s.name}
-                      </a>
+                      </button>
                     </li>
                   ))}
                   {structureResults.data?.length === 0 && <li>No matches.</li>}

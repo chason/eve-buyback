@@ -85,15 +85,13 @@ export default function Layout() {
             )}
             <li className="identity">{user.character_name}</li>
             <li>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  logoutMutation.mutate()
-                }}
+              <button
+                type="button"
+                className="nav-link"
+                onClick={() => logoutMutation.mutate()}
               >
                 Log out
-              </a>
+              </button>
             </li>
           </ul>
         )}
