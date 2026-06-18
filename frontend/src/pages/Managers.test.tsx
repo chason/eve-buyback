@@ -25,6 +25,7 @@ function user(over: Partial<SessionUser> = {}): SessionUser {
     role: "ceo",
     is_director: false,
     corporation_registered: true,
+    can_open_contract: false,
     ...over,
   }
 }

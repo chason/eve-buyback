@@ -26,3 +26,13 @@ export const getAppraisal = (publicId: string) =>
 /** List appraisals: own for members, the whole corp's for managers/CEO. */
 export const listAppraisals = () =>
   apiGet<AppraisalSummaryOut[]>("/appraisals")
+
+/** Open the appraisal's matched contract in the caller's own EVE client (ADR-0038).
+ * Succeeds silently (204); surfaces the backend's "log in again" detail on failure. */
+export async function openContract(publicId: string): Promise<void> {
+  const res = await apiSend(
+    "POST",
+    `/appraisals/${encodeURIComponent(publicId)}/open-contract`,
+  )
+  if (!res.ok) await throwApiError(res, "Couldn't open the contract in EVE")
+}

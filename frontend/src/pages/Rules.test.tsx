@@ -25,6 +25,7 @@ function user(role: SessionUser["role"]): SessionUser {
     role,
     is_director: false,
     corporation_registered: true,
+    can_open_contract: false,
   }
 }
 

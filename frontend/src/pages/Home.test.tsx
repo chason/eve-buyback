@@ -19,6 +19,7 @@ function user(overrides: Partial<SessionUser> = {}): SessionUser {
     role: "member",
     is_director: false,
     corporation_registered: false,
+    can_open_contract: false,
     ...overrides,
   }
 }

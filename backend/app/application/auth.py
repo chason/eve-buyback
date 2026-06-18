@@ -13,13 +13,19 @@ from app.domain import auth as auth_rules
 from app.domain.roles import Role, derive_role
 from app.plugins.esi import EsiClient
 from app.plugins.sso import EveSsoClient
+from app.plugins.token_cipher import TokenCipher
 
 
 class SessionIdentity(BaseModel):
     """Stable identity established at login (ADR-0016). The interface persists
     this in the signed session cookie; the role is resolved separately per
     request. `is_ceo`/`is_director` come from ESI and cannot be re-derived
-    without an EVE token, so they are carried here."""
+    without an EVE token, so they are carried here.
+
+    `encrypted_login_token` is the character's **login** refresh token, Fernet-encrypted
+    (ADR-0038, amends ADR-0004): kept only in this http-only cookie — never server-side —
+    so a manager can open a matched contract in their own EVE client. Absent for sessions
+    opened before that feature; rotated in place when EVE issues a new refresh token."""
 
     character_id: int
     character_name: str
@@ -27,6 +33,7 @@ class SessionIdentity(BaseModel):
     corporation_name: str
     is_director: bool = False
     is_ceo: bool = False
+    encrypted_login_token: str | None = None
 
 
 class AuthenticatedUser(BaseModel):
@@ -39,6 +46,9 @@ class AuthenticatedUser(BaseModel):
     role: Role
     is_director: bool = False
     corporation_registered: bool = False
+    # Whether this session can open a contract in EVE (ADR-0038): true once the session
+    # holds a login token (i.e. logged in after the open-window scope was added).
+    can_open_contract: bool = False
 
 
 class LoginChallenge(BaseModel):
@@ -64,9 +74,12 @@ async def complete_login(
     *,
     code: str,
     verifier: str,
+    cipher: TokenCipher,
 ) -> tuple[SessionIdentity, AuthenticatedUser]:
     """Exchange the code, look up the character/corp, persist the character, and
-    return the cookie identity plus the resolved user."""
+    return the cookie identity plus the resolved user. The login refresh token is kept
+    **encrypted in the session cookie** (ADR-0038) to power "Open in EVE" — never stored
+    server-side; the access token is still discarded after reading roles."""
     if not sso.configured:
         raise SsoNotConfigured()
 
@@ -91,6 +104,13 @@ async def complete_login(
         corporation_name=corporation.name,
         is_director=auth_rules.is_director(corp_roles),
         is_ceo=auth_rules.is_ceo(character.character_id, corporation.ceo_id),
+        # Fernet ciphertext is urlsafe-base64 ASCII; keep it as `str` so it serializes
+        # into the JSON session cookie (the cipher works in `bytes`).
+        encrypted_login_token=(
+            cipher.encrypt(token.refresh_token).decode()
+            if token.refresh_token
+            else None
+        ),
     )
     user = await resolve_authenticated_user(session, identity)
     return identity, user
@@ -120,4 +140,5 @@ async def resolve_authenticated_user(
         role=role,
         is_director=identity.is_director,
         corporation_registered=registered,
+        can_open_contract=identity.encrypted_login_token is not None,
     )

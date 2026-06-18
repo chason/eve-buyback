@@ -23,8 +23,10 @@ from app.application.errors import (
     ManagerAlreadyExists,
     ManagerNotFound,
     MarketHubInvalid,
+    NoMatchedContract,
     NotAuthorized,
     NotAuthorizedToAuthorizeStructure,
+    OpenContractUnavailable,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
     RosterAccessDenied,
@@ -61,6 +63,8 @@ _STATUS: dict[type[ApplicationError], int] = {
     LocationNotFound: 404,
     DeliveryLocationRequired: 422,
     DeliveryLocationInvalid: 422,
+    NoMatchedContract: 404,
+    OpenContractUnavailable: 409,
 }
 
 

@@ -21,7 +21,11 @@ class FakeSso:
         return f"https://login.eveonline.com/v2/oauth/authorize?state={state}"
 
     async def exchange_code(self, code: str, code_verifier: str) -> OAuthToken:
-        return OAuthToken(access_token="fake-access-token")
+        # EVE returns a refresh token on the auth-code exchange; the login flow keeps it
+        # encrypted in the session to power "Open in EVE" (ADR-0038).
+        return OAuthToken(
+            access_token="fake-access-token", refresh_token="fake-login-refresh"
+        )
 
     async def verify_token(self, access_token: str) -> VerifiedCharacter:
         return VerifiedCharacter(character_id=CHAR_ID, name=CHAR_NAME)
@@ -32,6 +36,13 @@ class FakeSso:
 
 class BaseEsi:
     ceo_id = 99999  # not the logged-in char → member
+
+    def __init__(self) -> None:
+        # Records ("Open in EVE", ADR-0038) open-window calls for endpoint assertions.
+        self.opened_contracts: list[tuple[int, str]] = []
+
+    async def open_contract_window(self, contract_id: int, access_token: str) -> None:
+        self.opened_contracts.append((contract_id, access_token))
 
     async def get_character(self, character_id: int) -> CharacterInfo:
         return CharacterInfo(name=CHAR_NAME, corporation_id=CORP_ID)

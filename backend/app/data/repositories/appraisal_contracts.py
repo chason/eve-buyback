@@ -84,3 +84,22 @@ async def get_for_appraisal(
         )
     ).scalar_one_or_none()
     return AppraisalContractRecord.model_validate(row) if row else None
+
+
+async def get_matched_contract(
+    session: AsyncSession, *, public_id: str, corporation_id: uuid.UUID
+) -> AppraisalContractRecord | None:
+    """The contract linked to the appraisal with this `public_id` **within the given corp**
+    (ADR-0038). Corp-scoped by joining `appraisals` so one corp can't open another's
+    contract; None when the appraisal is unknown/cross-corp or has no matched contract."""
+    row = (
+        await session.execute(
+            select(AppraisalContract)
+            .join(Appraisal, AppraisalContract.appraisal_id == Appraisal.id)
+            .where(
+                Appraisal.public_id == public_id,
+                Appraisal.corporation_id == corporation_id,
+            )
+        )
+    ).scalar_one_or_none()
+    return AppraisalContractRecord.model_validate(row) if row else None

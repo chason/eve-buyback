@@ -122,8 +122,14 @@ class Settings(BaseSettings):
     eve_client_id: str = ""
     eve_client_secret: str = ""
     eve_redirect_uri: str = "http://localhost:5173/auth/callback"
-    # Roles scope lets us detect Directors for corp registration (ADR-0015).
-    eve_scopes: str = "publicData esi-characters.read_corporation_roles.v1"
+    # Login scopes: publicData + the roles scope (detect Directors for registration,
+    # ADR-0015) + the open-window scope, which lets a manager open a matched contract in
+    # their own EVE client (ADR-0038). The login refresh token is kept encrypted in the
+    # session to power that (amends ADR-0004); users who logged in earlier re-login to gain
+    # the scope.
+    eve_scopes: str = (
+        "publicData esi-characters.read_corporation_roles.v1 esi-ui.open_window.v1"
+    )
     # Scopes requested by the separate "authorize structure access" flow (ADR-0029):
     # read the structure's market, search structures by name, and resolve their names.
     # (ESI structure scopes have no ".read" suffix.)

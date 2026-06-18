@@ -24,6 +24,12 @@ class CorporationContractsForbidden(Exception):
     role. Transport-level; the watcher logs and skips without flagging the token failed."""
 
 
+class OpenWindowForbidden(Exception):
+    """ESI refused the open-window call (401/403): the login token lacks the
+    `esi-ui.open_window.v1` scope (the character logged in before ADR-0038). Transport-level;
+    the application maps it to a "log in again to enable Open in EVE" error."""
+
+
 class CorporationInfo(BaseModel):
     name: str
     ceo_id: int
@@ -179,6 +185,21 @@ class EsiClient:
                 break
             page += 1
         return items
+
+    async def open_contract_window(
+        self, contract_id: int, access_token: str
+    ) -> None:
+        """Open a contract in the token-holder's running EVE client (ADR-0038), via
+        `POST /ui/openwindow/contract/`. Needs the `esi-ui.open_window.v1` scope; 401/403 →
+        `OpenWindowForbidden`. A success is HTTP 204 (no body)."""
+        resp = await self._client.post(
+            f"{ESI_BASE}/ui/openwindow/contract/",
+            params={"contract_id": contract_id, "datasource": "tranquility"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if scope_missing(resp):
+            raise OpenWindowForbidden()
+        resp.raise_for_status()
 
 
 def get_esi_client(request: Request) -> EsiClient:

@@ -8,7 +8,11 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from app.plugins.esi import CorporationContractsForbidden, EsiClient
+from app.plugins.esi import (
+    CorporationContractsForbidden,
+    EsiClient,
+    OpenWindowForbidden,
+)
 
 _CONTRACTS_P1 = [
     {
@@ -101,3 +105,28 @@ async def test_contract_items_forbidden_maps_to_typed_error():
     async with _client(handler) as http:
         with pytest.raises(CorporationContractsForbidden):
             await EsiClient(http).get_corporation_contract_items(98, 1, "tok")
+
+
+# --- open-window (ADR-0038) ---
+
+
+async def test_open_contract_window_posts_with_contract_id():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["contract_id"] = request.url.params.get("contract_id")
+        return httpx.Response(204)
+
+    async with _client(handler) as http:
+        await EsiClient(http).open_contract_window(777, "tok")
+    assert seen == {"method": "POST", "contract_id": "777"}
+
+
+async def test_open_contract_window_forbidden_maps_to_typed_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, json={"error": "Forbidden"})
+
+    async with _client(handler) as http:
+        with pytest.raises(OpenWindowForbidden):
+            await EsiClient(http).open_contract_window(777, "tok")

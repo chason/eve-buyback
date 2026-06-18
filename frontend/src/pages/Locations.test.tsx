@@ -25,6 +25,7 @@ function manager(): SessionUser {
     role: "manager",
     is_director: false,
     corporation_registered: true,
+    can_open_contract: false,
   }
 }
 
