@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from app.application import structure_tokens as structures_app
 from app.application.auth import AuthenticatedUser
 from app.application.errors import (
+    AuthorizingCharacterNotInCorporation,
     NotAuthorizedToAuthorizeStructure,
     StructureEncryptionNotConfigured,
     StructureTokenExpired,
@@ -29,13 +30,14 @@ CHAR_ID = 12345
 CIPHER = TokenCipher(Fernet.generate_key().decode())
 
 
-def _user(role: Role) -> AuthenticatedUser:
+def _user(role: Role, *, is_director: bool = False) -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID,
         character_name="Boss",
         corporation_id=CORP_EVE_ID,
         corporation_name="Test Corp",
         role=role,
+        is_director=is_director,
         corporation_registered=True,
     )
 
@@ -138,7 +140,7 @@ def test_cipher_wrong_key_fails():
         b.decrypt(a.encrypt("secret"))
 
 
-# --- authorize (manager-gated, encrypts) ---
+# --- corp ESI access connect (CEO/Director-gated, encrypts) ---
 
 
 async def test_member_cannot_authorize():
@@ -146,17 +148,51 @@ async def test_member_cannot_authorize():
     async with SessionLocal() as session:
         with pytest.raises(NotAuthorizedToAuthorizeStructure):
             await structures_app.complete_structure_authorize(
-                session, FakeSso(), code="c", verifier="v",
+                session, FakeSso(), MemberEsi(), code="c", verifier="v",
                 user=_user("member"), cipher=CIPHER,
             )
 
 
-async def test_manager_authorize_stores_encrypted_token():
+async def test_plain_manager_cannot_authorize():
+    # Connect/revoke is CEO/Director only now (ADR-0036); a manager who isn't a
+    # director can't connect the corp ESI token.
+    await _register_corp()
+    async with SessionLocal() as session:
+        with pytest.raises(NotAuthorizedToAuthorizeStructure):
+            await structures_app.complete_structure_authorize(
+                session, FakeSso(), CeoEsi(), code="c", verifier="v",
+                user=_user("manager"), cipher=CIPHER,
+            )
+
+
+async def test_out_of_corp_character_rejected():
+    await _register_corp()
+
+    class OtherCorpEsi(CeoEsi):
+        async def get_character_corporation(self, character_id: int) -> int:
+            return 98000999  # the authorizing character is in a different corp
+
+    async with SessionLocal() as session:
+        with pytest.raises(AuthorizingCharacterNotInCorporation):
+            await structures_app.complete_structure_authorize(
+                session, FakeSso(), OtherCorpEsi(), code="c", verifier="v",
+                user=_user("ceo"), cipher=CIPHER,
+            )
+
+
+def test_connect_requests_both_scope_sets():
+    scopes = get_settings().eve_corp_token_scopes
+    assert "esi-markets.structure_markets.v1" in scopes  # structures
+    assert "esi-corporations.read_corporation_membership.v1" in scopes  # roster
+    assert scopes.split().count("publicData") == 1  # deduped across the two sets
+
+
+async def test_director_authorize_stores_encrypted_token():
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
         result = await structures_app.complete_structure_authorize(
-            session, FakeSso(refresh="refresh-secret"), code="c", verifier="v",
-            user=_user("manager"), cipher=CIPHER,
+            session, FakeSso(refresh="refresh-secret"), CeoEsi(), code="c", verifier="v",
+            user=_user("member", is_director=True), cipher=CIPHER,
         )
     assert result.token.character_name == "Boss"
     assert result.replaced_character_name is None  # first authorization, no swap
@@ -172,8 +208,8 @@ async def test_reauthorize_with_different_character_warns():
     # First authorize as Boss (the default FakeSso character), refresh "refresh-1".
     async with SessionLocal() as session:
         first = await structures_app.complete_structure_authorize(
-            session, FakeSso(), code="c", verifier="v",
-            user=_user("manager"), cipher=CIPHER,
+            session, FakeSso(), CeoEsi(), code="c", verifier="v",
+            user=_user("ceo"), cipher=CIPHER,
         )
     assert first.replaced_character_name is None
 
@@ -185,8 +221,8 @@ async def test_reauthorize_with_different_character_warns():
     reauth = OtherCharSso(refresh="refresh-2")
     async with SessionLocal() as session:
         again = await structures_app.complete_structure_authorize(
-            session, reauth, code="c", verifier="v",
-            user=_user("manager"), cipher=CIPHER,
+            session, reauth, CeoEsi(), code="c", verifier="v",
+            user=_user("ceo"), cipher=CIPHER,
         )
     # The new token replaces the old, we surface the previous character, AND the
     # previous grant is signed out at EVE.
@@ -199,8 +235,8 @@ async def test_reauthorize_with_different_character_warns():
     reauth2 = OtherCharSso(refresh="refresh-3")
     async with SessionLocal() as session:
         same = await structures_app.complete_structure_authorize(
-            session, reauth2, code="c", verifier="v",
-            user=_user("manager"), cipher=CIPHER,
+            session, reauth2, CeoEsi(), code="c", verifier="v",
+            user=_user("ceo"), cipher=CIPHER,
         )
     assert same.replaced_character_name is None
     assert reauth2.revoked == ["refresh-2"]
@@ -234,8 +270,8 @@ async def _authorize(corp_refresh: str = "r1") -> uuid.UUID:
     corp_uuid = await _register_corp()
     async with SessionLocal() as session:
         await structures_app.complete_structure_authorize(
-            session, FakeSso(refresh=corp_refresh), code="c", verifier="v",
-            user=_user("manager"), cipher=CIPHER,
+            session, FakeSso(refresh=corp_refresh), CeoEsi(), code="c", verifier="v",
+            user=_user("ceo"), cipher=CIPHER,
         )
     return corp_uuid
 

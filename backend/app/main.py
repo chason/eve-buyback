@@ -14,7 +14,7 @@ from app._version import APP_VERSION
 from app.application.errors import ApplicationError
 from app.config import INSECURE_SESSION_SECRET, Settings, get_settings
 from app.interface.errors import application_error_handler
-from app.interface.jobs import run_market_refresh
+from app.interface.jobs import run_market_refresh, run_roster_refresh
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
@@ -52,9 +52,9 @@ async def lifespan(app: FastAPI):
     # in-flight appraisal + the background refresh, so they can't multiply outbound
     # ESI market requests and exhaust ESI's per-IP error budget.
     app.state.esi_semaphore = asyncio.Semaphore(settings.esi_market_concurrency)
-    # Periodic background refresh of non-Fuzzwork hub prices (ADR-0034). Single
-    # in-process scheduler (ADR-0010); a no-op when no ESI-priced hub is configured.
-    app.state.scheduler = _start_market_refresh(app, settings)
+    # Periodic background jobs (ADR-0010): market-price refresh (ADR-0034) + daily corp
+    # roster refresh (ADR-0036). One in-process scheduler; each job is added per its flag.
+    app.state.scheduler = _start_scheduler(app, settings)
     yield
     # Guarded + ordered: a failure in one teardown step must not skip the others.
     if app.state.scheduler is not None:
@@ -70,25 +70,41 @@ async def lifespan(app: FastAPI):
         await app.state.http.aclose()
 
 
-def _start_market_refresh(
+def _start_scheduler(
     app: FastAPI, settings: Settings
 ) -> AsyncIOScheduler | None:
-    """Start the background market-refresh job (ADR-0034), or return None when it's
-    disabled. Runs first after a short delay so a cold deploy warms soon without
-    hammering ESI at boot, then every `market_refresh_interval_seconds`."""
-    if not settings.market_background_refresh_enabled:
+    """Start the in-process scheduler (ADR-0010) with whichever background jobs are
+    enabled — market-price refresh (ADR-0034) and/or the daily corp-roster refresh
+    (ADR-0036). Each job runs first after a short delay so a cold deploy warms soon
+    without hammering ESI at boot. Returns None when both are disabled."""
+    if not (
+        settings.market_background_refresh_enabled
+        or settings.roster_background_refresh_enabled
+    ):
         return None
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        run_market_refresh,
-        trigger=IntervalTrigger(seconds=settings.market_refresh_interval_seconds),
-        args=[app],
-        id="market_refresh",
-        max_instances=1,  # never overlap a slow run with the next tick
-        coalesce=True,  # collapse missed ticks into one
-        next_run_time=datetime.now()
-        + timedelta(seconds=settings.market_refresh_initial_delay_seconds),
-    )
+    if settings.market_background_refresh_enabled:
+        scheduler.add_job(
+            run_market_refresh,
+            trigger=IntervalTrigger(seconds=settings.market_refresh_interval_seconds),
+            args=[app],
+            id="market_refresh",
+            max_instances=1,  # never overlap a slow run with the next tick
+            coalesce=True,  # collapse missed ticks into one
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.market_refresh_initial_delay_seconds),
+        )
+    if settings.roster_background_refresh_enabled:
+        scheduler.add_job(
+            run_roster_refresh,
+            trigger=IntervalTrigger(seconds=settings.roster_refresh_interval_seconds),
+            args=[app],
+            id="roster_refresh",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.roster_refresh_initial_delay_seconds),
+        )
     scheduler.start()
     return scheduler
 
