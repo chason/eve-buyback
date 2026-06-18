@@ -25,3 +25,6 @@ class SessionUser(BaseModel):
     is_director: bool = False
     # Whether this corporation is a registered tenant.
     corporation_registered: bool = False
+    # Whether this session can open a matched contract in EVE (ADR-0038): true once the
+    # session was opened with the open-window scope (i.e. after that feature shipped).
+    can_open_contract: bool = False

@@ -1111,6 +1111,11 @@
       "SessionUser": {
         "description": "The authenticated user returned by /me and /login (API DTO).",
         "properties": {
+          "can_open_contract": {
+            "default": false,
+            "title": "Can Open Contract",
+            "type": "boolean"
+          },
           "character_id": {
             "title": "Character Id",
             "type": "integer"
@@ -1397,7 +1402,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "69"
+    "version": "71"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1502,6 +1507,42 @@
           }
         },
         "summary": "Get Appraisal",
+        "tags": [
+          "appraisals"
+        ]
+      }
+    },
+    "/api/v1/appraisals/{public_id}/open-contract": {
+      "post": {
+        "description": "Open the appraisal's matched contract in the caller's own EVE client (ADR-0038),\nusing the login refresh token held encrypted in their session.",
+        "operationId": "open_contract_api_v1_appraisals__public_id__open_contract_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_id",
+            "required": true,
+            "schema": {
+              "title": "Public Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Contract",
         "tags": [
           "appraisals"
         ]

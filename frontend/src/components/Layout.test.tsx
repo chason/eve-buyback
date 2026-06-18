@@ -18,6 +18,7 @@ function member(): SessionUser {
     corporation_id: 2,
     corporation_name: "Corp",
     corporation_registered: true,
+    can_open_contract: false,
     is_director: false,
     role: "member",
   }

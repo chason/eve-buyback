@@ -39,6 +39,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/appraisals/{public_id}/open-contract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Contract
+         * @description Open the appraisal's matched contract in the caller's own EVE client (ADR-0038),
+         *     using the login refresh token held encrypted in their session.
+         */
+        post: operations["open_contract_api_v1_appraisals__public_id__open_contract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -899,6 +920,11 @@ export interface components {
          * @description The authenticated user returned by /me and /login (API DTO).
          */
         SessionUser: {
+            /**
+             * Can Open Contract
+             * @default false
+             */
+            can_open_contract: boolean;
             /** Character Id */
             character_id: number;
             /** Character Name */
@@ -1095,6 +1121,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AppraisalOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_contract_api_v1_appraisals__public_id__open_contract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

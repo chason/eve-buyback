@@ -28,7 +28,7 @@ domain model, auth flow, and pricing-rule resolution.
 | Backend     | Python + FastAPI + Pydantic v2 (async)   | REST/JSON API under `/api/v1` (ADR-0001)|
 | Persistence | SQLAlchemy 2.0 + Alembic on PostgreSQL (asyncpg) | Sole DB; UUID app-entity PKs (ADR-0024, 0025) |
 | Frontend    | TypeScript + React (Vite) + TanStack Query | SPA; types generated from OpenAPI (ADR-0011, 0013) |
-| Auth        | EVE SSO → backend session cookie         | No persisted login tokens (ADR-0004); one encrypted **Corp ESI access** token per corp powers structure markets, the roster used to designate managers, and the contract watcher (ADR-0029, 0036, 0037) |
+| Auth        | EVE SSO → backend session cookie         | No server-side login token; login keeps an encrypted refresh token in the session cookie for "Open in EVE" (ADR-0004, 0038); one encrypted **Corp ESI access** token per corp powers structure markets, the roster used to designate managers, and the contract watcher (ADR-0029, 0036, 0037) |
 | Market data | Fuzzwork aggregates, cached; ESI orders for other hubs; background refresh keeps non-Fuzzwork hubs warm; per-appraisal ESI-type cap + global ESI concurrency cap | (ADR-0006, 0028, 0034, 0035) |
 | Tooling     | `uv`/`venv` (py), `npm` (front)          | Pin exact tooling once chosen           |
 

@@ -20,9 +20,17 @@ describe("Privacy", () => {
       screen.getByRole("heading", { name: /privacy & data use/i }),
     ).toBeInTheDocument()
 
-    // No login token is persisted (ADR-0004).
+    // No login token is stored server-side (ADR-0004/0038).
     expect(
-      screen.getByText(/do not store your EVE login token/i),
+      screen.getByText(/store no login token on our servers/i),
+    ).toBeInTheDocument()
+    // Open in EVE (ADR-0038): the login refresh token rides encrypted in the cookie,
+    // used only to open a contract.
+    expect(
+      screen.getByText(/refresh token is kept encrypted inside that cookie/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: /opening a contract in eve/i }),
     ).toBeInTheDocument()
     // The one persisted token is encrypted at rest (ADR-0029).
     expect(screen.getByText(/encrypted at rest/i)).toBeInTheDocument()

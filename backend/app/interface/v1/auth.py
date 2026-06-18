@@ -7,12 +7,14 @@ from app.interface.deps import SessionDep
 from app.interface.security import RequireUser, clear_session, set_session_identity
 from app.plugins.esi import EsiClient, get_esi_client
 from app.plugins.sso import EveSsoClient, get_sso_client
+from app.plugins.token_cipher import TokenCipher, get_token_cipher
 from app.schemas.auth import LoginRequest, LoginUrlResponse, SessionUser
 
 router = APIRouter(prefix="/auth")
 
 SsoDep = Annotated[EveSsoClient, Depends(get_sso_client)]
 EsiDep = Annotated[EsiClient, Depends(get_esi_client)]
+CipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
 
 OAUTH_STATE_KEY = "oauth_state"
 PKCE_VERIFIER_KEY = "pkce_verifier"
@@ -37,6 +39,7 @@ async def create_session(
     sso: SsoDep,
     esi: EsiDep,
     session: SessionDep,
+    cipher: CipherDep,
 ) -> SessionUser:
     """Complete login: validate the OAuth state, exchange the code, open a session."""
     expected_state = request.session.get(OAUTH_STATE_KEY)
@@ -48,7 +51,7 @@ async def create_session(
         )
 
     identity, user = await auth_app.complete_login(
-        session, sso, esi, code=payload.code, verifier=verifier
+        session, sso, esi, code=payload.code, verifier=verifier, cipher=cipher
     )
 
     request.session.pop(OAUTH_STATE_KEY, None)

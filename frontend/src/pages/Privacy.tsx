@@ -14,6 +14,7 @@ const ADRS: { id: string; file: string }[] = [
   { id: "ADR-0029", file: "0029-encrypted-refresh-token-structures.md" },
   { id: "ADR-0036", file: "0036-corp-roster-manager-designation.md" },
   { id: "ADR-0037", file: "0037-corp-contract-watcher.md" },
+  { id: "ADR-0038", file: "0038-open-in-eve-login-token.md" },
 ]
 
 export default function Privacy() {
@@ -50,17 +51,19 @@ export default function Privacy() {
           <h2>Signing in</h2>
           <p>
             You authenticate through <strong>EVE Online SSO</strong> — we never see
-            your password. The only scopes requested at login are{" "}
-            <code>publicData</code> and <code>read_corporation_roles</code> (used to
-            tell whether you&apos;re a CEO or Director).
+            your password. The scopes requested at login are <code>publicData</code>,{" "}
+            <code>read_corporation_roles</code> (to tell whether you&apos;re a CEO or
+            Director), and <code>esi-ui.open_window.v1</code> (to open a matched contract
+            in your EVE client — see below).
           </p>
           <p>
-            <strong>We do not store your EVE login token.</strong> After login the app
-            issues a signed, http-only session cookie holding only your character and
-            corporation id and name, plus whether you&apos;re a CEO/Director. The access
-            token used at login is discarded. The session lasts about 8 hours, then you
-            sign in again; your role is re-checked on every request, so role changes take
-            effect immediately.
+            <strong>We store no login token on our servers.</strong> After login the app
+            issues a signed, http-only session cookie holding your character and
+            corporation id and name and whether you&apos;re a CEO/Director. The access
+            token is discarded; your <strong>refresh token is kept encrypted inside that
+            cookie</strong> (never in our database) so you can open a contract in EVE —
+            nothing else. The session lasts about 8 hours, then you sign in again; your
+            role is re-checked on every request, so role changes take effect immediately.
           </p>
         </section>
 
@@ -69,16 +72,17 @@ export default function Privacy() {
           <p>
             The <code>read_corporation_roles</code> scope is read <strong>once at
             login</strong> to detect whether you&apos;re a Director (the CEO is public
-            information). The result is a single flag in your session cookie — the token
-            itself isn&apos;t kept.
+            information). Only the resulting flag is kept in your session cookie — we
+            don&apos;t re-read your roles after login.
           </p>
         </section>
 
         <section>
           <h2>Corp ESI access (structure markets + roster)</h2>
           <p>
-            This is the one place the app stores a token, and it&apos;s{" "}
-            <strong>opt-in</strong>: a CEO or Director connects it on the Config page,
+            This is the one token the app stores in its <strong>database</strong>, and
+            it&apos;s <strong>opt-in</strong>: a CEO or Director connects it on the Config
+            page,
             only if the corp prices at player structures or wants member search for
             designating managers.
           </p>
@@ -138,6 +142,22 @@ export default function Privacy() {
         </section>
 
         <section>
+          <h2>Opening a contract in EVE</h2>
+          <p>
+            When an appraisal has a matched contract, an <strong>Open in EVE</strong>{" "}
+            button opens it in your running EVE client. To do that the app uses the{" "}
+            <strong>refresh token kept encrypted in your session cookie</strong> (above):
+            on each click it gets a short-lived access token and asks EVE to open that one
+            contract window — it makes <strong>no other call</strong> with your login token.
+          </p>
+          <p>
+            The token never leaves your cookie for our database, and is dropped when your
+            session ends or you sign out. If you signed in before this feature, the button
+            stays hidden until you log in again to grant the <code>open_window</code> scope.
+          </p>
+        </section>
+
+        <section>
           <h2>Market price data</h2>
           <p>
             Quote prices come from <strong>Fuzzwork aggregates and EVE ESI</strong>,
@@ -151,7 +171,8 @@ export default function Privacy() {
           <h2>What we never do</h2>
           <p>Except for what&apos;s detailed above, we never:</p>
           <ul>
-            <li>store your EVE login or access tokens;</li>
+            <li>store any EVE token on our servers, except the one opt-in corp token
+              (the login refresh token stays only in your own encrypted cookie);</li>
             <li>read your wallet, assets, mail, or skills;</li>
             <li>read your personal contracts — only the corporation&apos;s item-exchange
               contracts, via the opt-in corp token described above;</li>

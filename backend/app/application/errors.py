@@ -134,3 +134,17 @@ class DeliveryLocationRequired(ApplicationError):
 
 class DeliveryLocationInvalid(ApplicationError):
     default_detail = "That drop-off location is not accepted by your corporation"
+
+
+class NoMatchedContract(ApplicationError):
+    """No matched in-game contract is linked to this appraisal (ADR-0038), so there's
+    nothing to open in EVE."""
+
+    default_detail = "No matching in-game contract is linked to this appraisal yet"
+
+
+class OpenContractUnavailable(ApplicationError):
+    """The session can't open the contract in EVE (ADR-0038): it holds no login token, the
+    token was revoked, or it lacks the open-window scope. The fix is always to log in again."""
+
+    default_detail = "Log in again to enable opening contracts in EVE"

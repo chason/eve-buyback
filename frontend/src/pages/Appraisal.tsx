@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Fragment, useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 
-import { getAppraisal } from "../api/appraisals"
+import { getAppraisal, openContract } from "../api/appraisals"
 import { getMe } from "../api/auth"
 import { ContractStatusChip } from "../components/ContractStatusChip"
 import { StatusChip } from "../components/StatusChip"
@@ -72,6 +72,8 @@ export default function Appraisal() {
     enabled: !!publicId,
   })
   const me = useQuery({ queryKey: ["me"], queryFn: getMe })
+  // "Open in EVE" (ADR-0038): opens the matched contract in the manager's own client.
+  const openInEve = useMutation({ mutationFn: () => openContract(publicId!) })
   // Tracks which field was just copied (or "<key>:failed"), cleared after 2s.
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
@@ -132,6 +134,33 @@ export default function Appraisal() {
       {a.contract_status && (
         <p>
           Contract: <ContractStatusChip status={a.contract_status} />
+          {me.data?.can_open_contract && (
+            <>
+              {" — "}
+              <button
+                type="button"
+                className="linkbtn"
+                disabled={openInEve.isPending}
+                onClick={() => openInEve.mutate()}
+              >
+                {openInEve.isPending ? "Opening…" : "Open in EVE"}
+              </button>
+            </>
+          )}
+          {openInEve.isSuccess && (
+            <>
+              {" "}
+              <small role="status">Opened in your EVE client.</small>
+            </>
+          )}
+          {openInEve.isError && (
+            <>
+              {" "}
+              <small className="error">
+                {(openInEve.error as Error).message}
+              </small>
+            </>
+          )}
         </p>
       )}
       {a.delivery_location_name && (

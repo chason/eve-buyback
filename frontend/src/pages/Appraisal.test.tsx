@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -19,6 +20,7 @@ const sessionUser: SessionUser = {
   role: "member",
   is_director: false,
   corporation_registered: true,
+  can_open_contract: false,
 }
 
 function renderAt(publicId: string) {
@@ -191,5 +193,51 @@ describe("Appraisal", () => {
     expect(screen.getByText(/Reprocessed into/)).toBeInTheDocument()
     // The mineral name + its market value appear in the breakdown row.
     expect(screen.getByText(/Tritanium/)).toBeInTheDocument()
+  })
+
+  const withContract = (publicId: string) => ({
+    public_id: publicId,
+    created_by_character_id: 1,
+    created_at: "2026-06-07T00:00:00Z",
+    market_hub_id: "60003760",
+    accepted_total: "100.00",
+    rejected_count: 0,
+    contract_status: "in_progress",
+    lines: [],
+  })
+
+  it("opens a matched contract in EVE when the session can (ADR-0038)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      ...sessionUser,
+      can_open_contract: true,
+    })
+    vi.mocked(api.openContract).mockResolvedValue()
+    vi.mocked(api.getAppraisal).mockResolvedValue(withContract("ctr1"))
+
+    renderAt("ctr1")
+
+    const btn = await screen.findByRole("button", { name: "Open in EVE" })
+    await u.click(btn)
+
+    expect(api.openContract).toHaveBeenCalledWith("ctr1")
+    expect(
+      await screen.findByText(/Opened in your EVE client/),
+    ).toBeInTheDocument()
+  })
+
+  it("hides Open in EVE when the session lacks the scope", async () => {
+    // sessionUser.can_open_contract is false (logged in before the scope shipped).
+    vi.mocked(authApi.getMe).mockResolvedValue(sessionUser)
+    vi.mocked(api.getAppraisal).mockResolvedValue(withContract("ctr2"))
+
+    renderAt("ctr2")
+
+    // The contract chip still renders…
+    expect(await screen.findByText("In Progress")).toBeInTheDocument()
+    // …but no Open-in-EVE affordance.
+    expect(
+      screen.queryByRole("button", { name: "Open in EVE" }),
+    ).not.toBeInTheDocument()
   })
 })
