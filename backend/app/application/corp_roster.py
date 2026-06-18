@@ -3,10 +3,9 @@
 The corp's member list is pulled from ESI using the persisted **Corp ESI access** token
 (ADR-0029, broadened) and cached so the designation picker can search real members.
 Fetching reuses the stored token **server-side — no EVE round-trip**: on demand (manually,
-rate-limited) and via a daily background job. ESI returns the member list only to a
-character with the in-game Director role, so the connected character must be a Director
-for the roster to populate (`RosterAccessDenied` otherwise — the structure token still
-works regardless).
+rate-limited) and via a daily background job. ESI only returns the member list to a
+character with permission to read the roster, so a connected character lacking that
+permission yields `RosterAccessDenied` (the structure token still works regardless).
 """
 
 import logging
@@ -73,7 +72,7 @@ async def refresh_roster(
     refresh within `roster_manual_refresh_min_interval_seconds` of the last sync with
     `RosterRefreshTooSoon`; the daily background job passes `False`. Raises
     `CorpEsiTokenMissing` if no token is connected (via `get_corp_esi_access_token`) and
-    `RosterAccessDenied` if the connected character can't read membership (not a Director).
+    `RosterAccessDenied` if the connected character can't read the corp member list.
     A members-403 is **not** treated as a token-refresh failure — it leaves the token
     healthy for structure pricing."""
     corp = await get_registered_corporation(session, corporation_id)

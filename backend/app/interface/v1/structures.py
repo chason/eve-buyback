@@ -110,7 +110,7 @@ async def complete(
     cipher: CipherDep,
 ) -> StructureTokenStatus:
     """Complete the grant: validate state, exchange the code, store the token, and
-    best-effort populate the roster (works if the connected character is a Director)."""
+    best-effort populate the roster (works if the connected character can read it)."""
     expected_state = request.session.get(STRUCT_OAUTH_STATE_KEY)
     verifier = request.session.get(STRUCT_PKCE_VERIFIER_KEY)
     if not expected_state or not verifier or payload.state != expected_state:
@@ -124,7 +124,8 @@ async def complete(
     request.session.pop(STRUCT_OAUTH_STATE_KEY, None)
     request.session.pop(STRUCT_PKCE_VERIFIER_KEY, None)
     # Fill the roster immediately if the connected character can read membership. This is
-    # best-effort: a non-Director still gets a working structure token (roster stays empty).
+    # best-effort: a character without roster permission still gets a working structure
+    # token (the roster just stays empty).
     try:
         await roster_app.refresh_roster(
             session,
@@ -135,7 +136,7 @@ async def complete(
             enforce_cooldown=False,
         )
     except Exception:  # noqa: BLE001 — the connect already succeeded; roster is a bonus
-        log.info("roster auto-populate after connect failed (character may not be a Director)")
+        log.info("roster auto-populate after connect failed (character may lack roster access)")
     return _status(
         result.token, replaced_character_name=result.replaced_character_name
     )

@@ -58,7 +58,7 @@ async def search_members(
     session: SessionDep,
     q: Annotated[str, Query(min_length=2)],
 ) -> list[CorpMemberOut]:
-    """Search the synced roster by name (empty until a Director connects the token)."""
+    """Search the synced roster by name (empty until the corp roster has been synced)."""
     members = await roster_app.search_members(
         session, corporation_id=user.corporation_id, query=q
     )

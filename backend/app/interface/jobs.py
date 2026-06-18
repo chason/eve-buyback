@@ -50,8 +50,8 @@ async def run_market_refresh(app: FastAPI) -> None:
 async def run_roster_refresh(app: FastAPI) -> None:
     """Scheduler entrypoint (ADR-0036): re-pull every token-holding corp's member roster
     so the manager-designation picker stays current without anyone clicking. Each corp runs
-    in its own session and try/except — one corp's revoked/non-Director token never aborts
-    the cycle — and the manual cooldown is bypassed."""
+    in its own session and try/except — one corp's revoked or no-roster-access token never
+    aborts the cycle — and the manual cooldown is bypassed."""
     settings = get_settings()
     esi = EsiClient(app.state.http)
     sso = EveSsoClient(settings, app.state.http)

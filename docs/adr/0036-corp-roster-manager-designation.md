@@ -19,10 +19,11 @@ membership at ESI), but the endpoints were CEO-only, there was no member search,
 UI.
 
 A real "filter to corp members" picker needs the corp's member list, which ESI only
-returns from `GET /corporations/{id}/members/` — gated behind the scope
-`esi-corporations.read_corporation_membership.v1` **and** the in-game **Director** role.
-That requires a Director-authorized token. The app already persists exactly one
-Director-grade credential per corp: the encrypted **structure-market** refresh token
+returns from `GET /corporations/{id}/members/` — behind the scope
+`esi-corporations.read_corporation_membership.v1` and a character with permission to read
+the roster (EVE 403s otherwise; the exact in-game role requirement is CCP's and we treat
+the 403 as the source of truth). That needs a persisted, authorized token — and the app
+already has exactly one per corp: the encrypted **structure-market** refresh token
 (ADR-0029), with server-side refresh, rotation, and revoke. Standing up a *second* token
 subsystem (or a transient roster-only SSO step-up) would duplicate all of that.
 
@@ -38,8 +39,9 @@ access" token, carrying both scope sets, and fetch the roster server-side with i
   A new `require_ceo_or_director` dependency gates connect/revoke (and the manager
   endpoints). `complete_corp_esi_authorize` validates the authorizing character is in the
   corp (`AuthorizingCharacterNotInCorporation`). The **roster only populates if that
-  character is a Director** — `get_corporation_members` 403s otherwise, surfaced as
-  `RosterAccessDenied`; the token still works for structure pricing. **Status + structure
+  character has permission to read the member list** — `get_corporation_members` 403s
+  otherwise, surfaced as `RosterAccessDenied`; the token still works for structure
+  pricing. **Status + structure
   search stay manager-visible** (managers configure structure hubs).
 - **Server-side roster fetch, no EVE round-trip.** `corp_roster.refresh_roster` reuses
   `get_corp_esi_access_token` (server-side refresh), calls `get_corporation_members`,
@@ -57,7 +59,7 @@ access" token, carrying both scope sets, and fetch the roster server-side with i
 - One credential, one connect flow (the Config "Corp ESI access" panel), covering both
   structure pricing and the roster — no second encrypted-token subsystem.
 - A **members-403 is not a refresh failure**: it never sets `last_refresh_failed_at` (which
-  means the refresh token itself died and breaks *both* uses); the non-Director case is a
+  means the refresh token itself died and breaks *both* uses); the no-roster-permission case is a
   separate roster-status signal.
 - Structure setup now needs a **CEO/Director** to connect (was any Buyback Manager), and the
   token character must be **in the corp** (was anyone with docking access). Deliberate
@@ -72,6 +74,7 @@ access" token, carrying both scope sets, and fetch the roster server-side with i
   round-trip on every refresh and can't run in the background. Built first, then replaced.
 - **Membership scope on the normal login**, fetched opportunistically when an admin logs in:
   puts the scope on *every* member's consent screen and ties freshness to admin logins.
-- **Exact-name lookup** (no member list, validate-on-grant): needs no Director and no scope,
-  but is a type-the-name lookup, not a browse-and-filter picker — not the requested UX.
+- **Exact-name lookup** (no member list, validate-on-grant): needs no membership scope and
+  no special roster permission, but is a type-the-name lookup, not a browse-and-filter
+  picker — not the requested UX.
 - **Persisting a second, roster-only token**: duplicates the ADR-0029 machinery for no gain.

@@ -162,13 +162,13 @@ async def test_refresh_replaces_snapshot():
     assert [m.name for m in carol] == ["Carol"]
 
 
-async def test_non_director_403_does_not_flag_token():
+async def test_members_403_does_not_flag_token():
     esi = RosterEsi(forbid=True)
     corp_uuid = await _connect(esi)
     with pytest.raises(RosterAccessDenied):
         await _refresh(esi, enforce_cooldown=False)
-    # A members-403 is a per-scope access issue, NOT a refresh-token failure: the token
-    # stays healthy so structure pricing still works.
+    # A members-403 (the connected character can't read the roster) is a per-scope access
+    # issue, NOT a refresh-token failure: the token stays healthy so structure pricing works.
     async with SessionLocal() as session:
         token = await tokens_repo.get_for_corp(session, corp_uuid)
     assert token is not None

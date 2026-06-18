@@ -118,9 +118,9 @@ class Settings(BaseSettings):
         "publicData esi-markets.structure_markets.v1 "
         "esi-search.search_structures.v1 esi-universe.read_structures.v1"
     )
-    # Scope requested by the separate "sync corp roster" flow (ADR-0036) so a CEO or
-    # Director can pull the corporation's member list for the manager-designation
-    # picker. Kept off normal login so ordinary members never consent to it.
+    # Membership scope, folded into the Corp ESI access grant (ADR-0036) so the corp
+    # roster can be pulled for the manager-designation picker. Kept off normal login so
+    # ordinary members never consent to it.
     eve_roster_scopes: str = "publicData esi-corporations.read_corporation_membership.v1"
 
     @property
