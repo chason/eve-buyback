@@ -58,8 +58,8 @@ describe("Layout nav", () => {
       screen.getByRole("link", { name: "Appraisals" }),
     ).not.toHaveAttribute("aria-current")
 
-    // The signed-in character renders as the muted identity tag, not a link.
-    expect(screen.getByText("Boss")).toHaveClass("identity")
+    // The signed-in character renders as the identity tag in the HUD footer, not the nav.
+    expect(screen.getByText("Boss")).toHaveClass("hud-user")
   })
 
   it("shows the live EVE/UTC clock in the footer (#114)", async () => {

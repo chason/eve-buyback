@@ -97,7 +97,6 @@ export default function Layout() {
                 </NavLink>
               </li>
             )}
-            <li className="identity">{user.character_name}</li>
             <li>
               <button
                 type="button"
@@ -128,8 +127,11 @@ export default function Layout() {
         >
           · Source
         </a>
-        <span className="hud-clock" title="Current EVE time">
-          EVE Time {eveTime}
+        <span className="hud-session">
+          {user && <span className="hud-user">{user.character_name}</span>}
+          <span className="hud-clock" title="Current EVE time">
+            EVE Time {eveTime}
+          </span>
         </span>
       </footer>
     </>

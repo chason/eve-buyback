@@ -234,18 +234,6 @@ nav button.nav-link:hover {
   color: var(--bb-cyan);
 }
 
-/* The signed-in character as a muted mono identity tag, not a plain nav item (#87). */
-.identity {
-  font-family: var(--bb-mono);
-  font-size: 0.8rem;
-  color: var(--bb-muted);
-}
-
-.identity::before {
-  content: "▸ ";
-  color: var(--bb-cyan);
-  opacity: 0.7;
-}
 
 /* Condensed display face for headings — the technical EVE look (#43). Body copy
    stays Pico's clean system sans. */
@@ -509,11 +497,33 @@ button.dirty {
   min-width: 0;
 }
 
-/* Live EVE-time clock (#114), pinned to the right of the status bar like console
-   telemetry; slightly brighter than the muted status text so it reads as the live value. */
-.hud-status .hud-clock {
+/* Session cluster pinned to the right of the status bar: the signed-in character then
+   the live EVE clock. `margin-left: auto` sits on the cluster so the clock stays
+   right-aligned even when there's no user (the logged-out footer). */
+.hud-status .hud-session {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   flex-shrink: 0;
+}
+
+/* The signed-in character (#87), moved into the HUD bar — a muted identity tag with the
+   cyan ▸ marker, alongside the clock. */
+.hud-status .hud-user {
+  white-space: nowrap;
+  color: var(--bb-muted);
+}
+
+.hud-status .hud-user::before {
+  content: "▸ ";
+  color: var(--bb-cyan);
+  opacity: 0.7;
+}
+
+/* Live EVE-time clock (#114), like console telemetry — slightly brighter than the muted
+   status text so it reads as the live value. */
+.hud-status .hud-clock {
   white-space: nowrap;
   color: var(--bb-cyan);
 }
