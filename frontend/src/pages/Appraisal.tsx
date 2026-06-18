@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom"
 
 import { getAppraisal } from "../api/appraisals"
 import { getMe } from "../api/auth"
+import { ContractStatusChip } from "../components/ContractStatusChip"
 import { StatusChip } from "../components/StatusChip"
 import { formatIsk } from "../lib/format"
 import { hubName } from "../lib/hubs"
@@ -128,6 +129,11 @@ export default function Appraisal() {
         <TypewriterIsk value={formatIsk(a.accepted_total)} /> accepted
         {a.rejected_count > 0 && ` · ${a.rejected_count} rejected`}
       </p>
+      {a.contract_status && (
+        <p>
+          Contract: <ContractStatusChip status={a.contract_status} />
+        </p>
+      )}
       {a.delivery_location_name && (
         <p>
           Drop-off: <strong>{a.delivery_location_name}</strong>

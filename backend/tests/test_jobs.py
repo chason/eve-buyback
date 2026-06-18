@@ -32,6 +32,7 @@ def test_start_scheduler_returns_none_when_all_jobs_disabled():
         update={
             "market_background_refresh_enabled": False,
             "roster_background_refresh_enabled": False,
+            "contracts_background_refresh_enabled": False,
         }
     )
     assert _start_scheduler(SimpleNamespace(), settings) is None
@@ -46,6 +47,9 @@ async def test_start_scheduler_configures_enabled_jobs():
             "roster_background_refresh_enabled": True,
             "roster_refresh_interval_seconds": 86400,
             "roster_refresh_initial_delay_seconds": 60,
+            "contracts_background_refresh_enabled": True,
+            "contracts_refresh_interval_seconds": 900,
+            "contracts_refresh_initial_delay_seconds": 90,
         }
     )
 
@@ -61,6 +65,11 @@ async def test_start_scheduler_configures_enabled_jobs():
         roster = scheduler.get_job("roster_refresh")
         assert roster is not None
         assert roster.trigger.interval.total_seconds() == 86400
+        contracts = scheduler.get_job("contracts_refresh")
+        assert contracts is not None
+        assert contracts.trigger.interval.total_seconds() == 900
+        assert contracts.max_instances == 1
+        assert contracts.coalesce is True
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)
@@ -71,6 +80,7 @@ async def test_start_scheduler_omits_a_disabled_job():
         update={
             "market_background_refresh_enabled": False,
             "roster_background_refresh_enabled": True,
+            "contracts_background_refresh_enabled": False,
         }
     )
     scheduler = _start_scheduler(SimpleNamespace(), settings)
@@ -78,6 +88,7 @@ async def test_start_scheduler_omits_a_disabled_job():
         assert scheduler is not None
         assert scheduler.get_job("market_refresh") is None
         assert scheduler.get_job("roster_refresh") is not None
+        assert scheduler.get_job("contracts_refresh") is None
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

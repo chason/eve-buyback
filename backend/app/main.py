@@ -14,7 +14,11 @@ from app._version import APP_VERSION
 from app.application.errors import ApplicationError
 from app.config import INSECURE_SESSION_SECRET, Settings, get_settings
 from app.interface.errors import application_error_handler
-from app.interface.jobs import run_market_refresh, run_roster_refresh
+from app.interface.jobs import (
+    run_contracts_refresh,
+    run_market_refresh,
+    run_roster_refresh,
+)
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
@@ -79,12 +83,13 @@ def _start_scheduler(
     app: FastAPI, settings: Settings
 ) -> AsyncIOScheduler | None:
     """Start the in-process scheduler (ADR-0010) with whichever background jobs are
-    enabled — market-price refresh (ADR-0034) and/or the daily corp-roster refresh
-    (ADR-0036). Each job runs first after a short delay so a cold deploy warms soon
-    without hammering ESI at boot. Returns None when both are disabled."""
+    enabled — market-price refresh (ADR-0034), the daily corp-roster refresh (ADR-0036),
+    and/or the corp-contract watcher (ADR-0037). Each job runs first after a short delay so
+    a cold deploy warms soon without hammering ESI at boot. Returns None when all are off."""
     if not (
         settings.market_background_refresh_enabled
         or settings.roster_background_refresh_enabled
+        or settings.contracts_background_refresh_enabled
     ):
         return None
     scheduler = AsyncIOScheduler()
@@ -109,6 +114,19 @@ def _start_scheduler(
             coalesce=True,
             next_run_time=datetime.now()
             + timedelta(seconds=settings.roster_refresh_initial_delay_seconds),
+        )
+    if settings.contracts_background_refresh_enabled:
+        scheduler.add_job(
+            run_contracts_refresh,
+            trigger=IntervalTrigger(
+                seconds=settings.contracts_refresh_interval_seconds
+            ),
+            args=[app],
+            id="contracts_refresh",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.contracts_refresh_initial_delay_seconds),
         )
     scheduler.start()
     return scheduler

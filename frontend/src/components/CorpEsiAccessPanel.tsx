@@ -141,6 +141,16 @@ export default function CorpEsiAccessPanel({
               </p>
             )}
 
+            {connected &&
+              !status.data?.scopes?.includes(
+                "esi-contracts.read_corporation_contracts.v1",
+              ) && (
+                <p className="field-hint" role="status">
+                  ⚠️ Reconnect to enable contract tracking — your authorization
+                  predates it.
+                </p>
+              )}
+
             <button
               type="button"
               className="secondary"

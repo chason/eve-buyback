@@ -212,6 +212,17 @@
             "title": "Accepted Total",
             "type": "string"
           },
+          "contract_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Status"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -292,6 +303,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Accepted Total",
             "type": "string"
+          },
+          "contract_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Status"
           },
           "created_at": {
             "format": "date-time",
@@ -1375,7 +1397,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "68"
+    "version": "69"
   },
   "openapi": "3.1.0",
   "paths": {

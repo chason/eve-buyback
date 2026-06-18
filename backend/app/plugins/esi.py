@@ -1,3 +1,7 @@
+import json
+from datetime import datetime
+from decimal import Decimal
+
 import httpx
 from fastapi import Request
 from pydantic import BaseModel
@@ -14,6 +18,12 @@ class CorporationMembersForbidden(Exception):
     ADR-0036). Transport-level; the application layer maps it to a semantic error."""
 
 
+class CorporationContractsForbidden(Exception):
+    """ESI refused the corp contracts list/items (401/403): the corp ESI token lacks the
+    contracts scope (an old grant predating ADR-0037) or the character lacks the in-game
+    role. Transport-level; the watcher logs and skips without flagging the token failed."""
+
+
 class CorporationInfo(BaseModel):
     name: str
     ceo_id: int
@@ -23,6 +33,32 @@ class CorporationInfo(BaseModel):
 class CharacterInfo(BaseModel):
     name: str
     corporation_id: int
+
+
+class CorporationContract(BaseModel):
+    """A corp contract as returned by `/corporations/{id}/contracts/` (ADR-0037). Only the
+    fields the watcher needs; `title` is the in-game Description (the member pastes the
+    appraisal's public_id there). `price` is the ISK the corp pays to accept."""
+
+    contract_id: int
+    type: str
+    status: str
+    title: str | None = None
+    price: Decimal = Decimal(0)
+    start_location_id: int | None = None
+    issuer_id: int | None = None
+    acceptor_id: int | None = None
+    date_issued: datetime
+    date_completed: datetime | None = None
+    date_expired: datetime | None = None
+
+
+class ContractItem(BaseModel):
+    type_id: int
+    quantity: int
+    # True = an item the issuer hands over (the buyback items); False = something the
+    # contractor gives. For a buyback we only count the included items.
+    is_included: bool = True
 
 
 class EsiClient:
@@ -93,6 +129,56 @@ class EsiClient:
                 if entry.get("category") == "character":
                     names[entry["id"]] = entry["name"]
         return names
+
+    async def get_corporation_contracts(
+        self, corporation_id: int, access_token: str
+    ) -> list[CorporationContract]:
+        """The corp's **item-exchange** contracts (ADR-0037), paginated. Needs the
+        contracts scope + an in-game role; 401/403 → `CorporationContractsForbidden`.
+        Money is parsed JSON-number → Decimal directly to avoid a float round-trip
+        (ADR-0020). Non-item-exchange contracts are dropped here."""
+        url = f"{ESI_BASE}/corporations/{corporation_id}/contracts/"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        contracts: list[CorporationContract] = []
+        page = 1
+        while True:
+            resp = await self._client.get(
+                url, params={"page": page, "datasource": "tranquility"}, headers=headers
+            )
+            if page == 1 and scope_missing(resp):
+                raise CorporationContractsForbidden()
+            resp.raise_for_status()
+            for raw in json.loads(resp.text, parse_float=Decimal):
+                if raw.get("type") == "item_exchange":
+                    contracts.append(CorporationContract.model_validate(raw))
+            if page >= int(resp.headers.get("X-Pages", "1")):
+                break
+            page += 1
+        return contracts
+
+    async def get_corporation_contract_items(
+        self, corporation_id: int, contract_id: int, access_token: str
+    ) -> list[ContractItem]:
+        """The items in one corp contract (ADR-0037), paginated. Same scope as the
+        contracts list; 401/403 → `CorporationContractsForbidden`."""
+        url = (
+            f"{ESI_BASE}/corporations/{corporation_id}/contracts/{contract_id}/items/"
+        )
+        headers = {"Authorization": f"Bearer {access_token}"}
+        items: list[ContractItem] = []
+        page = 1
+        while True:
+            resp = await self._client.get(
+                url, params={"page": page, "datasource": "tranquility"}, headers=headers
+            )
+            if page == 1 and scope_missing(resp):
+                raise CorporationContractsForbidden()
+            resp.raise_for_status()
+            items.extend(ContractItem.model_validate(i) for i in resp.json())
+            if page >= int(resp.headers.get("X-Pages", "1")):
+                break
+            page += 1
+        return items
 
 
 def get_esi_client(request: Request) -> EsiClient:

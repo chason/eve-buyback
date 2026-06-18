@@ -553,6 +553,8 @@ export interface components {
         AppraisalOut: {
             /** Accepted Total */
             accepted_total: string;
+            /** Contract Status */
+            contract_status?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -579,6 +581,8 @@ export interface components {
         AppraisalSummaryOut: {
             /** Accepted Total */
             accepted_total: string;
+            /** Contract Status */
+            contract_status?: string | null;
             /**
              * Created At
              * Format: date-time
