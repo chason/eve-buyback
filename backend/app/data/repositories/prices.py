@@ -32,6 +32,12 @@ _AGGREGATE_COLUMNS = (
     "fetched_at",
 )
 
+# PostgreSQL caps a statement at 65535 bind parameters. Each upserted row carries 17
+# (hub_id + type_id + the 15 aggregate columns), so a full structure order book (~8k
+# types) in one INSERT blows the limit — the statement errors *and* building a multi-MB
+# statement stalls the event loop. Chunk well under the ceiling: 1000 × 17 = 17000.
+_MAX_ROWS_PER_INSERT = 1000
+
 
 async def get_prices(
     session: AsyncSession, *, hub_id: str, type_ids: Sequence[int]
@@ -77,9 +83,14 @@ async def upsert_prices(
     if not rows:
         return
     values = [{**row, "hub_id": hub_id} for row in rows]
-    stmt = pg_insert(MarketPrice).values(values)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[MarketPrice.hub_id, MarketPrice.type_id],
-        set_={col: getattr(stmt.excluded, col) for col in _AGGREGATE_COLUMNS},
-    )
-    await session.execute(stmt)
+    # Chunk so no single statement exceeds Postgres's 65535-parameter limit (a large
+    # structure book otherwise fails and stalls the loop). All chunks share the caller's
+    # unit of work, so they still commit atomically.
+    for start in range(0, len(values), _MAX_ROWS_PER_INSERT):
+        chunk = values[start : start + _MAX_ROWS_PER_INSERT]
+        stmt = pg_insert(MarketPrice).values(chunk)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[MarketPrice.hub_id, MarketPrice.type_id],
+            set_={col: getattr(stmt.excluded, col) for col in _AGGREGATE_COLUMNS},
+        )
+        await session.execute(stmt)

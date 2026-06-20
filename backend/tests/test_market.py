@@ -101,6 +101,23 @@ async def _seed_cache(rows: list[dict], hub_id: str = HUB) -> None:
         await session.commit()
 
 
+async def test_upsert_chunks_a_large_book_under_the_param_limit():
+    # A full structure book (~8k types × 17 params/row) is well past Postgres's 65535
+    # bind-parameter ceiling. 5000 rows = 85000 params would fail as one statement; the
+    # chunked upsert must split it and round-trip every row.
+    big_hub = "1049588174021"
+    rows = [_price_row(t, marker=str(t), fetched_at=NOW) for t in range(1, 5001)]
+
+    await _seed_cache(rows, hub_id=big_hub)
+
+    async with SessionLocal() as session:
+        stored = await prices_repo.get_prices(
+            session, hub_id=big_hub, type_ids=[1, 2500, 5000]
+        )
+    assert {r.type_id for r in stored} == {1, 2500, 5000}
+    assert {r.buy_max for r in stored} == {Decimal("1"), Decimal("2500"), Decimal("5000")}
+
+
 async def test_cache_miss_fetches_and_stores():
     fuzz = FakeFuzzwork(response={34: _aggregate(buy="5.0", sell="8.0")})
     esi = FakeEsiMarket()
