@@ -49,6 +49,12 @@ class PricingRule(Base):
         default=True, server_default=text("true")
     )
 
+    # Optional manager-assigned folder for organising rules on the Rules page (ADR-0039).
+    # A free-text label, not a foreign key — folders are emergent (they exist while a rule
+    # references them). Single folder per rule for now; null files the rule under its
+    # market-category folder instead.
+    folder: Mapped[str | None] = mapped_column(String, default=None)
+
     # Per-rule market-hub override (ADR-0031): matched items price here instead of
     # the corp's default hub. All null → inherit the default. Mirrors the config's
     # hub quartet: string EVE id (station or 64-bit structure, ADR-0029), kind,

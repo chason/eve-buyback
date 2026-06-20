@@ -62,6 +62,8 @@ class RuleOut(BaseModel):
     compressed_only: bool = False
     # False → the buyback rejects matching items (a blacklist rule).
     accepted: bool = True
+    # Manager-assigned folder for organising rules (ADR-0039); null → category folder.
+    folder: str | None = None
     # Per-rule market-hub override (ADR-0031); all null → the corp's default hub.
     market_hub_id: str | None = None
     market_hub_kind: HubKind | None = None
@@ -79,6 +81,9 @@ class RulePutRequest(BaseModel):
     reprocess: bool = False
     compressed_only: bool = False
     accepted: bool = True
+    # Optional folder label for organising rules (ADR-0039); blank/whitespace is
+    # normalised to null (file by market category) in the use case.
+    folder: str | None = Field(default=None, max_length=64)
     # Hub override: id + kind, plus the friendly name for structures (no SDE to
     # resolve against — same posture as ConfigUpdateRequest).
     market_hub_id: str | None = None

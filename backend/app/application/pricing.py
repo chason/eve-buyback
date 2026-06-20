@@ -183,6 +183,7 @@ async def set_rule(
     reprocess: bool,
     compressed_only: bool,
     accepted: bool,
+    folder: str | None = None,
     market_hub_id: str | None = None,
     market_hub_kind: HubKind | None = None,
     market_hub_name: str | None = None,
@@ -196,6 +197,10 @@ async def set_rule(
     target_name, target_market_group_id = await _validate_target(
         session, target_kind, target_id
     )
+    # Folders are emergent free-text labels (ADR-0039): trim, and treat blank as "no
+    # folder" so a rule files under its market category instead.
+    folder = folder.strip() if folder else None
+    folder = folder or None
 
     region_id: int | None = None
     hub_name: str | None = None
@@ -217,6 +222,7 @@ async def set_rule(
         reprocess=reprocess,
         compressed_only=compressed_only,
         accepted=accepted,
+        folder=folder,
         market_hub_id=market_hub_id,
         market_hub_kind=hub_kind,
         market_region_id=region_id,

@@ -170,6 +170,8 @@ class PricingRuleRecord(BaseModel):
     compressed_only: bool = False
     # False → the buyback rejects matching items (a blacklist rule).
     accepted: bool = True
+    # Manager-assigned folder for organising rules (ADR-0039); null → category folder.
+    folder: str | None = None
     # Per-rule market-hub override (ADR-0031); all None → corp default hub.
     market_hub_id: str | None = None
     market_hub_kind: HubKind | None = None

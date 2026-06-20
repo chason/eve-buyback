@@ -919,6 +919,17 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
           "market_hub_id": {
             "anyOf": [
               {
@@ -1044,6 +1055,18 @@
             "default": true,
             "title": "Enabled",
             "type": "boolean"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
           },
           "market_hub_id": {
             "anyOf": [
@@ -1402,7 +1425,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "71"
+    "version": "72"
   },
   "openapi": "3.1.0",
   "paths": {
