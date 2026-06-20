@@ -13,6 +13,9 @@ import { isManager } from "../lib/roles"
 
 const BASES: Basis[] = ["buy", "sell", "split"]
 
+// The bucket for rules with no custom folder, in the "My folders" view (ADR-0039).
+const UNGROUPED = "Ungrouped"
+
 // Reprocess pricing only applies to ores (ADR-0026): the three ore branches under
 // "Raw Materials". A target is eligible if its market-group path passes through one.
 const ORE_BRANCHES = new Set(["Standard Ores", "Moon Ores", "Ice Ores"])
@@ -26,6 +29,9 @@ export default function Rules() {
     queryFn: listMarketGroups,
   })
   const canEdit = isManager(me.data?.role)
+  // "Group by" view (ADR-0039) + the rule being edited (pre-loaded into the form below).
+  const [groupBy, setGroupBy] = useState<"category" | "folders">("category")
+  const [editing, setEditing] = useState<RuleOut | null>(null)
 
   // Full market-tree path of a group, e.g. "Manufacture & Research / Materials /
   // Raw Materials / Standard Ores / Veldspar". Market-group *names* repeat heavily
@@ -103,6 +109,45 @@ export default function Rules() {
     )
   }, [rules.data, topLevelGroup])
 
+  // Distinct custom-folder names (for the editor's combobox), sorted.
+  const existingFolders = useMemo(
+    () =>
+      [
+        ...new Set(
+          (rules.data ?? [])
+            .map((r) => r.folder?.trim())
+            .filter((f): f is string => !!f),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [rules.data],
+  )
+
+  // Rules grouped by their custom folder (ADR-0039); unfiled rules go in "Ungrouped",
+  // sorted last. Folder names sort alphabetically.
+  const customFolders = useMemo(() => {
+    const map = new Map<string, RuleOut[]>()
+    for (const rule of rules.data ?? []) {
+      const key = rule.folder?.trim() || UNGROUPED
+      const list = map.get(key) ?? []
+      list.push(rule)
+      map.set(key, list)
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      a === UNGROUPED ? 1 : b === UNGROUPED ? -1 : a.localeCompare(b),
+    )
+  }, [rules.data])
+
+  const displayFolders = groupBy === "folders" ? customFolders : folders
+
+  function startEdit(rule: RuleOut) {
+    setEditing(rule)
+    requestAnimationFrame(() =>
+      document
+        .getElementById("rule-form")
+        ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
+    )
+  }
+
   function targetLabel(rule: RuleOut): string {
     // The backend resolves the SDE name; fall back to a path lookup / the raw id
     // only if it's missing (e.g. the target was removed from the SDE).
@@ -164,6 +209,14 @@ export default function Rules() {
       </td>
       {canEdit && (
         <td>
+          <button
+            type="button"
+            className="linkbtn"
+            onClick={() => startEdit(rule)}
+          >
+            Edit
+          </button>
+          {" · "}
           <ConfirmButton
             className="linkbtn"
             label="Remove"
@@ -184,16 +237,41 @@ export default function Rules() {
 
   return (
     <>
-      <hgroup>
-        <h1>Pricing rules</h1>
-        <p>Per-type and per-market-group overrides on the corp defaults.</p>
-      </hgroup>
+      <div className="rules-head">
+        <hgroup>
+          <h1>Pricing rules</h1>
+          <p>Per-type and per-market-group overrides on the corp defaults.</p>
+        </hgroup>
+        {rules.data.length > 0 && (
+          <div className="groupby">
+            <span className="groupby-label">Group by</span>
+            <div className="seg" role="group" aria-label="Group rules by">
+              <button
+                type="button"
+                className={groupBy === "category" ? "on" : ""}
+                aria-pressed={groupBy === "category"}
+                onClick={() => setGroupBy("category")}
+              >
+                Category
+              </button>
+              <button
+                type="button"
+                className={groupBy === "folders" ? "on" : ""}
+                aria-pressed={groupBy === "folders"}
+                onClick={() => setGroupBy("folders")}
+              >
+                My folders
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {rules.data.length === 0 ? (
         <p>No rules yet — the corp defaults apply to everything.</p>
       ) : (
         <div className="panel">
-          {folders.map(([folderName, folderRules]) => (
+          {displayFolders.map(([folderName, folderRules]) => (
             <details key={folderName} className="rule-folder" open>
               <summary>
                 {folderName}
@@ -222,7 +300,14 @@ export default function Rules() {
 
       {canEdit ? (
         <AddRule
-          onSaved={invalidate}
+          key={editing ? `${editing.target_kind}-${editing.target_id}` : "new"}
+          initial={editing}
+          existingFolders={existingFolders}
+          onSaved={() => {
+            invalidate()
+            setEditing(null)
+          }}
+          onCancel={() => setEditing(null)}
           groupOptions={groupOptions}
           oreGroupIds={oreGroupIds}
         />
@@ -237,28 +322,64 @@ export default function Rules() {
 
 function AddRule({
   onSaved,
+  onCancel,
+  initial,
+  existingFolders,
   groupOptions,
   oreGroupIds,
 }: {
   onSaved: () => void
+  onCancel: () => void
+  initial: RuleOut | null
+  existingFolders: string[]
   groupOptions: { id: number; leaf: string; path: string }[]
   oreGroupIds: Set<number>
 }) {
-  const [kind, setKind] = useState<TargetKind>("type")
+  // Edit mode pre-loads a rule (the component is remounted via `key`, so these
+  // initializers re-run with the rule's values).
+  const editing = initial !== null
+  const [kind, setKind] = useState<TargetKind>(initial?.target_kind ?? "type")
   const [target, setTarget] = useState<{
     id: number
     name: string
     marketGroupId?: number | null
-  } | null>(null)
+  } | null>(
+    initial
+      ? {
+          id: initial.target_id,
+          name:
+            initial.target_name ??
+            (initial.target_kind === "market_group"
+              ? `Market group ${initial.target_id}`
+              : `Type ${initial.target_id}`),
+          marketGroupId: initial.target_market_group_id,
+        }
+      : null,
+  )
   const [search, setSearch] = useState("")
-  const [basis, setBasis] = useState<Basis | "">("")
-  const [percentage, setPercentage] = useState("90")
-  const [enabled, setEnabled] = useState(true)
-  const [accepted, setAccepted] = useState(true)
-  const [reprocess, setReprocess] = useState(false)
-  const [compressedOnly, setCompressedOnly] = useState(false)
-  // Optional per-rule hub override (ADR-0031); "default" → corp default hub.
-  const [hubSel, setHubSel] = useState<HubSelection>({ state: "default" })
+  const [basis, setBasis] = useState<Basis | "">(initial?.basis ?? "")
+  const [percentage, setPercentage] = useState(
+    initial ? String(initial.percentage) : "90",
+  )
+  const [enabled, setEnabled] = useState(initial?.enabled ?? true)
+  const [accepted, setAccepted] = useState(initial?.accepted ?? true)
+  const [reprocess, setReprocess] = useState(initial?.reprocess ?? false)
+  const [compressedOnly, setCompressedOnly] = useState(
+    initial?.compressed_only ?? false,
+  )
+  const [folder, setFolder] = useState(initial?.folder ?? "")
+  // Optional per-rule hub override (ADR-0031); "default" → corp default hub. Seeded from
+  // the edited rule so a re-save doesn't silently clear an existing override.
+  const [hubSel, setHubSel] = useState<HubSelection>(() =>
+    initial?.market_hub_id
+      ? {
+          state: "hub",
+          hubId: initial.market_hub_id,
+          kind: initial.market_hub_kind ?? "npc_station",
+          name: initial.market_hub_name ?? null,
+        }
+      : { state: "default" },
+  )
 
   // Reprocess only applies to ores: a market-group target in an ore branch, or a
   // type whose market group is in one (ADR-0026). Hidden/ignored otherwise.
@@ -309,6 +430,8 @@ function AddRule({
         accepted,
         reprocess: reprocessEligible && reprocess,
         compressed_only: reprocessEligible && compressedOnly,
+        // Folder is a free-text label; blank files the rule under its market category.
+        folder: folder.trim() || null,
         // Hub override rides only when a concrete hub is picked; "(corp default)"
         // sends nothing, which clears any previous override (PUT replaces).
         ...(accepted && hubSel.state === "hub"
@@ -329,14 +452,32 @@ function AddRule({
   })
 
   return (
-    <article>
-      <header>Add or replace a rule</header>
+    <article id="rule-form">
+      <header>
+        {editing ? `Edit rule — ${target?.name ?? ""}` : "Add or replace a rule"}
+      </header>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           if (target) save.mutate()
         }}
       >
+        {editing ? (
+          <label>
+            Target
+            <input
+              type="text"
+              value={target?.name ?? ""}
+              readOnly
+              aria-label="Rule target"
+            />
+            <small className="field-hint">
+              Editing this rule. To target a different item, add a new rule
+              instead.
+            </small>
+          </label>
+        ) : (
+          <>
         <fieldset>
           <label>
             Target kind
@@ -426,6 +567,8 @@ function AddRule({
             </small>
           </label>
         )}
+          </>
+        )}
 
         <div className="rule-flags">
           <label>
@@ -478,6 +621,15 @@ function AddRule({
             <HubPicker
               defaultOption="(corp default hub)"
               onChange={setHubSel}
+              initial={
+                initial?.market_hub_id
+                  ? {
+                      hubId: initial.market_hub_id,
+                      kind: initial.market_hub_kind ?? "npc_station",
+                      name: initial.market_hub_name ?? null,
+                    }
+                  : null
+              }
             />
             {reprocessEligible && (
               <div className="rule-flags">
@@ -512,13 +664,41 @@ function AddRule({
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={!target || (accepted && hubSel.state === "incomplete")}
-          aria-busy={save.isPending}
-        >
-          Save rule
-        </button>
+        <label>
+          Folder <small className="field-hint">(optional)</small>
+          <input
+            type="text"
+            list="rule-folders"
+            value={folder}
+            placeholder="Pick a folder or type a new name…"
+            aria-label="Rule folder"
+            onChange={(e) => setFolder(e.target.value)}
+          />
+          <datalist id="rule-folders">
+            {existingFolders.map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
+          <small className="field-hint">
+            Files the rule under <strong>My folders</strong>; blank groups it by
+            the item&apos;s market category.
+          </small>
+        </label>
+
+        <div className="rule-form-actions">
+          <button
+            type="submit"
+            disabled={!target || (accepted && hubSel.state === "incomplete")}
+            aria-busy={save.isPending}
+          >
+            {editing ? "Save changes" : "Save rule"}
+          </button>
+          {editing && (
+            <button type="button" className="secondary" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+        </div>
         {save.isError && (
           <p className="error">{(save.error as Error).message}</p>
         )}

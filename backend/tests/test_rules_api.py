@@ -141,6 +141,37 @@ async def test_put_rule_not_accepted_blacklist():
         assert listed.json()[0]["accepted"] is False
 
 
+async def test_rule_folder_round_trips_normalizes_and_clears():
+    # Custom folder (ADR-0039): a set folder round-trips; blank/whitespace normalizes to
+    # null; and PUT-replace without a folder clears a previously-set one.
+    await _seed_sde()
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+
+        set_ = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "folder": "  Moon goo  "},
+        )
+        assert set_.json()["folder"] == "Moon goo"  # trimmed
+        assert (await http.get("/api/v1/corporations/me/rules")).json()[0][
+            "folder"
+        ] == "Moon goo"
+
+        # PUT is full-replacement: a request with no folder clears it.
+        cleared = await http.put(
+            "/api/v1/corporations/me/rules/type/34", json={"percentage": "90"}
+        )
+        assert cleared.json()["folder"] is None
+
+        # Whitespace-only normalizes to null, not an empty folder.
+        blank = await http.put(
+            "/api/v1/corporations/me/rules/type/34",
+            json={"percentage": "90", "folder": "   "},
+        )
+        assert blank.json()["folder"] is None
+
+
 async def test_put_is_idempotent_upsert():
     await _seed_sde()
     async with make_client(CeoEsi()) as http:

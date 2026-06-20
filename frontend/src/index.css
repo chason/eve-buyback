@@ -747,6 +747,65 @@ label:has(> .search-results) > input {
   }
 }
 
+/* Rules header with the "Group by" segmented control (#rules-folders / ADR-0039). */
+.rules-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.groupby {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.groupby-label {
+  font-family: var(--bb-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bb-muted);
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--bb-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.seg button {
+  width: auto;
+  margin: 0;
+  background: transparent;
+  color: var(--bb-muted);
+  border: 0;
+  border-radius: 0;
+  padding: 5px 12px;
+  font-family: var(--bb-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--bb-cyan);
+  color: #04161f;
+}
+.seg button:not(.on):hover {
+  color: var(--bb-cyan);
+}
+
+/* Save / Cancel row in the rule editor (Cancel only shows when editing). */
+.rule-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rule-form-actions button {
+  width: auto;
+  margin: 0;
+}
+
 /* Checkbox row in the rule editor: keep the boxes on one line, neatly aligned
    (not stretched to the height of the taller select/number inputs above). */
 .rule-flags {

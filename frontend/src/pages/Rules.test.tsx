@@ -150,6 +150,7 @@ describe("Rules", () => {
       accepted: true,
       reprocess: true,
       compressed_only: true,
+      folder: null,
     })
   })
 
@@ -323,5 +324,56 @@ describe("Rules", () => {
     expect(
       screen.queryByRole("button", { name: "Save rule" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("groups by custom folder under 'My folders', with Ungrouped last (ADR-0039)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
+    vi.mocked(pricingApi.listRules).mockResolvedValue([
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true, folder: "Moon goo" },
+      { target_kind: "type", target_id: 35, target_name: "Pyerite", basis: null, percentage: "90", enabled: true, reprocess: false, compressed_only: false, accepted: true },
+    ])
+
+    renderRules()
+
+    await screen.findByText("Tritanium")
+    // Category view (default) shows no custom-folder headers.
+    expect(screen.queryByText("Moon goo")).not.toBeInTheDocument()
+
+    await u.click(screen.getByRole("button", { name: "My folders" }))
+    // The custom folder + the Ungrouped bucket (for the unfiled rule) appear.
+    expect(screen.getByText("Moon goo")).toBeInTheDocument()
+    expect(screen.getByText("Ungrouped")).toBeInTheDocument()
+  })
+
+  it("edits a rule: pre-fills the form incl. folder and re-saves it (ADR-0039)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(sdeApi.listMarketGroups).mockResolvedValue([])
+    vi.mocked(pricingApi.putRule).mockResolvedValue({} as never)
+    vi.mocked(pricingApi.listRules).mockResolvedValue([
+      { target_kind: "type", target_id: 34, target_name: "Tritanium", basis: "buy", percentage: "85", enabled: true, reprocess: false, compressed_only: false, accepted: true, folder: "Moon goo" },
+    ])
+
+    renderRules()
+
+    await u.click(await screen.findByRole("button", { name: "Edit" }))
+
+    // Edit mode: header, locked target, and pre-filled fields.
+    expect(screen.getByText(/Edit rule — Tritanium/)).toBeInTheDocument()
+    const folder = screen.getByLabelText("Rule folder") as HTMLInputElement
+    expect(folder.value).toBe("Moon goo")
+    expect(
+      (screen.getByLabelText("Rule percentage") as HTMLInputElement).value,
+    ).toBe("85")
+
+    await u.clear(folder)
+    await u.type(folder, "Reactions")
+    await u.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() => expect(pricingApi.putRule).toHaveBeenCalled())
+    const [kind, id, body] = vi.mocked(pricingApi.putRule).mock.calls[0]
+    expect([kind, id, body.folder]).toEqual(["type", 34, "Reactions"])
   })
 })

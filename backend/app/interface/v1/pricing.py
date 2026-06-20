@@ -65,6 +65,7 @@ async def set_rule(
         reprocess=payload.reprocess,
         compressed_only=payload.compressed_only,
         accepted=payload.accepted,
+        folder=payload.folder,
         market_hub_id=payload.market_hub_id,
         market_hub_kind=payload.market_hub_kind,
         market_hub_name=payload.market_hub_name,

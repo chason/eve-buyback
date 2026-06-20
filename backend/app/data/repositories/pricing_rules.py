@@ -62,6 +62,7 @@ async def upsert_rule(
     reprocess: bool,
     compressed_only: bool,
     accepted: bool,
+    folder: str | None = None,
     market_hub_id: str | None = None,
     market_hub_kind: HubKind | None = None,
     market_region_id: int | None = None,
@@ -92,6 +93,7 @@ async def upsert_rule(
     row.reprocess = reprocess
     row.compressed_only = compressed_only
     row.accepted = accepted
+    row.folder = folder
     # PUT is full-replacement: a request without a hub clears the override.
     row.market_hub_id = market_hub_id
     row.market_hub_kind = market_hub_kind

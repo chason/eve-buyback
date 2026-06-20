@@ -852,6 +852,8 @@ export interface components {
             compressed_only: boolean;
             /** Enabled */
             enabled: boolean;
+            /** Folder */
+            folder?: string | null;
             /** Market Hub Id */
             market_hub_id?: string | null;
             /** Market Hub Kind */
@@ -901,6 +903,8 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /** Folder */
+            folder?: string | null;
             /** Market Hub Id */
             market_hub_id?: string | null;
             /** Market Hub Kind */
