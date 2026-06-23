@@ -231,6 +231,17 @@ class AppraisalRecord(BaseModel):
     contract_status: str | None = None
 
 
+class AppraisalPreviewRecord(BaseModel):
+    """The minimal, public (unauthenticated) view of an appraisal behind a shared link,
+    for the link-unfurl preview (ADR-0040): total value + drop-off location only. No
+    character, items, or corp — the public_id is the capability."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    accepted_total: Decimal
+    delivery_location_name: str | None = None
+
+
 class AppraisalSummaryRecord(BaseModel):
     """An appraisal header without its lines, for list views."""
 

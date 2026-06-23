@@ -46,6 +46,13 @@ describe("Privacy", () => {
     expect(
       screen.getByText(/contract id, its status, and the issue\/complete timestamps/i),
     ).toBeInTheDocument()
+    // Shared-link preview (ADR-0040): public, unauthenticated, value + location only.
+    expect(
+      screen.getByRole("heading", { name: /sharing an appraisal link/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/total ISK value and drop-off location/i),
+    ).toBeInTheDocument()
   })
 
   it("links to the Config page for revoking access", () => {

@@ -12,6 +12,7 @@ from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import sde as sde_repo
+from app.domain.og import format_isk
 from app.main import app
 from app.plugins.fuzzwork import FuzzworkAggregate, FuzzworkSide, get_fuzzwork_client
 from app.plugins.token_cipher import TokenCipher
@@ -967,3 +968,33 @@ async def test_list_scope_member_sees_own_manager_sees_all():
         await login(http)
         everyone = await http.get("/api/v1/appraisals")
         assert len(everyone.json()) == 2  # manager sees the whole corp
+
+
+async def test_shared_link_preview_injects_og_meta_unauthenticated():
+    """A shared /a/{public_id} link unfurls with the appraisal's value in OG <meta> tags,
+    served publicly (no session) so Discord/Slack crawlers can read it (ADR-0040)."""
+    await _seed_sde()
+    _use_fuzzwork({34: FuzzworkAggregate(buy=_side("5.00"), sell=_side("8.00"))})
+    async with make_client(CeoEsi()) as http:
+        await login(http)
+        await http.post("/api/v1/corporations")
+        resp = await http.post(
+            "/api/v1/appraisals", json={"items": [{"type_id": 34, "quantity": 1000}]}
+        )
+        public_id = resp.json()["public_id"]  # accepted_total 4500.00
+
+        # Drop the session cookie — the preview must work for an unauthenticated crawler.
+        http.cookies.clear()
+        page = await http.get(f"/a/{public_id}")
+        assert page.status_code == 200
+        assert page.headers["content-type"].startswith("text/html")
+        body = page.text
+        assert 'property="og:title"' in body
+        assert format_isk(Decimal("4500.00")) in body  # "4,500 ISK"
+
+        # An unknown id still returns the SPA shell (client shows its own 404) with the
+        # generic site card — never leaks whether an id exists.
+        missing = await http.get("/a/doesnotexist1")
+        assert missing.status_code == 200
+        assert "BUYBACK // Corp Logistics" in missing.text
+        assert "ISK" not in missing.text  # no per-appraisal value leaked

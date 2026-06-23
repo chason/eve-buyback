@@ -15,6 +15,7 @@ const ADRS: { id: string; file: string }[] = [
   { id: "ADR-0036", file: "0036-corp-roster-manager-designation.md" },
   { id: "ADR-0037", file: "0037-corp-contract-watcher.md" },
   { id: "ADR-0038", file: "0038-open-in-eve-login-token.md" },
+  { id: "ADR-0040", file: "0040-appraisal-link-unfurl-preview.md" },
 ]
 
 export default function Privacy() {
@@ -154,6 +155,19 @@ export default function Privacy() {
             The token never leaves your cookie for our database, and is dropped when your
             session ends or you sign out. If you signed in before this feature, the button
             stays hidden until you log in again to grant the <code>open_window</code> scope.
+          </p>
+        </section>
+
+        <section>
+          <h2>Sharing an appraisal link</h2>
+          <p>
+            When you share an appraisal&apos;s link, apps like Discord and Slack show a
+            small preview of it. Those previews are fetched{" "}
+            <strong>without signing in</strong>, so anyone who has the link — and the
+            link-preview service itself — can see the appraisal&apos;s{" "}
+            <strong>total ISK value and drop-off location</strong> in that preview. No
+            character names, item lists, or other details are included, and opening the
+            full itemized appraisal still requires signing in as a member of the corp.
           </p>
         </section>
 

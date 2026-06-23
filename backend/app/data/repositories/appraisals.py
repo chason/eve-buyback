@@ -16,6 +16,7 @@ from app.data.models import (
 )
 from app.data.records import (
     AppraisalLineRecord,
+    AppraisalPreviewRecord,
     AppraisalRecord,
     AppraisalSummaryRecord,
 )
@@ -104,6 +105,27 @@ async def get_by_public_id(
         )
     ).scalars().all()
     return _to_record(appraisal, lines, creator_name, contract_status)
+
+
+async def public_preview(
+    session: AsyncSession, public_id: str
+) -> AppraisalPreviewRecord | None:
+    """The minimal public preview fields (total + drop-off location) for a shared
+    appraisal link, keyed by the unguessable public_id and **not corp-scoped** — the link
+    itself is the capability (ADR-0040). None when no such appraisal exists."""
+    row = (
+        await session.execute(
+            select(Appraisal.accepted_total, Appraisal.delivery_location_name).where(
+                Appraisal.public_id == public_id
+            )
+        )
+    ).first()
+    if row is None:
+        return None
+    accepted_total, delivery_location_name = row
+    return AppraisalPreviewRecord(
+        accepted_total=accepted_total, delivery_location_name=delivery_location_name
+    )
 
 
 async def accepted_line_items(

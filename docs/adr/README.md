@@ -49,5 +49,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0037](0037-corp-contract-watcher.md) | Corp contract watcher → validated appraisal status (separate mutable link table) | Accepted |
 | [0038](0038-open-in-eve-login-token.md) | "Open in EVE" via a session-held login refresh token (amends 0004) | Accepted |
 | [0039](0039-custom-rule-folders.md) | Custom folders for pricing rules (emergent free-text label + "Group by" toggle) | Accepted |
+| [0040](0040-appraisal-link-unfurl-preview.md) | Server-rendered link-unfurl preview for shared appraisals (public OG meta: value + location) | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
