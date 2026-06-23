@@ -26,6 +26,7 @@ from app.application.errors import (
 from app.application.pricing import get_config
 from app.config import get_settings
 from app.data.records import (
+    AppraisalPreviewRecord,
     AppraisalRecord,
     AppraisalSummaryRecord,
     BuybackConfigRecord,
@@ -376,6 +377,15 @@ async def get_appraisal(
     if record is None or corp is None or record.corporation_id != corp.id:
         raise AppraisalNotFound()
     return record
+
+
+async def get_appraisal_preview(
+    session: AsyncSession, *, public_id: str
+) -> AppraisalPreviewRecord | None:
+    """Public, unauthenticated preview of a shared appraisal (ADR-0040): total value +
+    drop-off location only, **not corp-scoped** (the unguessable public_id is the
+    capability) — it powers the link-unfurl <meta> tags. None if the id doesn't resolve."""
+    return await appraisals_repo.public_preview(session, public_id)
 
 
 async def list_appraisals(

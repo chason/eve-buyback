@@ -20,6 +20,7 @@ from app.interface.jobs import (
     run_roster_refresh,
 )
 from app.interface.middleware import CsrfHeaderMiddleware
+from app.interface.og import router as og_router
 from app.interface.spa import SpaStaticFiles
 from app.interface.v1 import api_router
 from app.plugins.cache import build_cache
@@ -153,6 +154,11 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix="/api/v1")
+
+    # Server-rendered Open Graph tags for shared appraisal links (ADR-0040). Registered
+    # before the SPA mount so /a/{public_id} is matched here (injecting <meta> tags) while
+    # still serving the SPA shell for the browser to hydrate.
+    app.include_router(og_router)
 
     # Production single-deployable: serve the built SPA under "/" (ADR-0012).
     # Mounted last so /api/v1 keeps priority. No-op in dev (no static_dir / dist),
