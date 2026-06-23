@@ -69,6 +69,12 @@ def derive_lifecycle_status(
     return None  # unknown status → don't track
 
 
+# EVE's contract "I will receive" reward field is whole-ISK, so a contract created for an
+# appraisal worth e.g. 53,139.60 ISK comes back priced at 53,139 — never an exact match.
+# Accept the price as long as it's within 1 ISK of the accepted total.
+_PRICE_TOLERANCE_ISK = Decimal(1)
+
+
 def contract_matches(
     *,
     price: Decimal,
@@ -79,9 +85,10 @@ def contract_matches(
     accepted_items: dict[int, int],
 ) -> bool:
     """Whether a contract genuinely corresponds to the appraisal: the price equals the
-    accepted total, it's at the appraisal's delivery location, and its items **exactly**
-    equal the appraisal's accepted lines (same type ids, same quantities, no extras)."""
-    if price != accepted_total:
+    accepted total **within 1 ISK** (EVE truncates the contract reward to whole ISK), it's at
+    the appraisal's delivery location, and its items **exactly** equal the appraisal's accepted
+    lines (same type ids, same quantities, no extras)."""
+    if abs(price - accepted_total) > _PRICE_TOLERANCE_ISK:
         return False
     if delivery_location_id is None or start_location_id is None:
         return False  # can't validate the location → not a confirmed match

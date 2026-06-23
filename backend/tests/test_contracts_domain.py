@@ -83,6 +83,20 @@ def test_wrong_price_fails():
     assert contract_matches(**{**_MATCH, "price": Decimal("1.00")}) is False
 
 
+def test_price_within_one_isk_passes():
+    # EVE truncates the contract reward to whole ISK, so the contract comes back a fraction
+    # under the appraisal total. Anything within 1 ISK still matches.
+    facts = {**_MATCH, "accepted_total": Decimal("1230000.60")}
+    assert contract_matches(**{**facts, "price": Decimal("1230000")}) is True  # truncated
+    assert contract_matches(**{**facts, "price": Decimal("1230001")}) is True  # rounded up
+
+
+def test_price_off_by_more_than_one_isk_fails():
+    facts = {**_MATCH, "accepted_total": Decimal("1230000.00")}
+    assert contract_matches(**{**facts, "price": Decimal("1229998")}) is False  # 2 ISK under
+    assert contract_matches(**{**facts, "price": Decimal("1230002")}) is False  # 2 ISK over
+
+
 def test_wrong_location_fails():
     assert contract_matches(**{**_MATCH, "start_location_id": 60003760}) is False
 
