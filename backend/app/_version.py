@@ -7,4 +7,4 @@ both would claim the same number. It's served at `GET /api/v1/version`, shown in
 the UI top bar, and is the FastAPI app version (so it appears in the OpenAPI doc).
 """
 
-APP_VERSION = "74"
+APP_VERSION = "75"
