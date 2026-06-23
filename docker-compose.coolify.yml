@@ -13,13 +13,23 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    # `default` keeps the app on its own compose network (Coolify wires Traefik
-    # here); `coolify` is the shared predefined network the managed Postgres lives
-    # on, so the app can resolve the DB by name. Without this the app's DNS lookup
-    # of the DB host fails (socket.gaierror / name resolution).
+    # `coolify` is the shared predefined network the Traefik proxy *and* the managed
+    # Postgres live on — it's how Traefik reaches the app and how the app resolves the
+    # DB by name. `default` is the compose project network; nothing else is on it, but
+    # the app still gets an IP there. The proxy is NOT attached to `default`, so if
+    # Traefik ever resolves the app to its `default`-network IP, every forward black-
+    # holes → 504 Gateway Timeout. The `traefik.docker.network` label below pins
+    # Traefik to the `coolify`-network IP so that can't happen (Traefik's IP choice is
+    # otherwise non-deterministic across redeploys for a multi-network container).
     networks:
       - default
       - coolify
+    # Coolify auto-generates the Traefik router/service labels (FQDN, TLS, gzip). We add
+    # only this one: tell Traefik which of the app's networks to route over — the shared
+    # `coolify` network the proxy is actually on. Without it, routing is a redeploy coin
+    # flip (see the networks comment above).
+    labels:
+      - traefik.docker.network=coolify
     # Coolify generates the public FQDN and wires Traefik + Let's Encrypt TLS to
     # container port 8000. Set the actual domain in the Coolify UI (Domains).
     expose:
