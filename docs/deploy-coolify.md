@@ -82,7 +82,17 @@ docker inspect <postgres-container> -f '{{range $k,$v := .NetworkSettings.Networ
   Network** (under the DB's settings) and redeploy the DB, then re-check.
 - If your predefined network has a **different name**, change `coolify` in
   `docker-compose.coolify.yml` (the `networks:` block and the app's `networks:` list)
-  to match, and redeploy the app.
+  to match, and redeploy the app. Also update the `traefik.docker.network` label (below)
+  to the same name.
+
+> **Why the `traefik.docker.network=coolify` label matters.** The app is attached to
+> more than one Docker network, but the Traefik proxy is only on `coolify`. Without the
+> label, Traefik's choice of which network IP to route to is non-deterministic — on some
+> redeploys it picks the app's `default`-network IP, which the proxy can't reach, and the
+> site returns **504 Gateway Timeout** even though the app and DB are perfectly healthy.
+> The label pins routing to the `coolify` network. Symptom to recognise: external HTTPS
+> connects (TLS handshake succeeds) then hangs, while `docker exec coolify-proxy wget -qO-
+> http://<app-container>:8000/api/v1/health` from the host returns `{"status":"ok"}`.
 
 ## 5. Environment variables
 
