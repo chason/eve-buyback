@@ -43,7 +43,9 @@ one status per appraisal in a separate mutable link table.**
 - **Match by public_id, then validate.** The contract title is tokenized into base64url
   runs and matched **case-sensitively, exactly** against the corp's `{public_id → id}` map
   (also any 12-char window inside a longer run). A cited appraisal is only confirmed when
-  `contract_matches`: `price == accepted_total` **and** `start_location_id` equals the
+  `contract_matches`: the `price` is **within 1 ISK** of `accepted_total` (EVE's contract
+  reward is whole-ISK, so an appraisal worth e.g. 53,139.60 ISK comes back priced 53,139)
+  **and** `start_location_id` equals the
   appraisal's delivery location **and** the contract's included items **exactly** equal the
   appraisal's accepted lines (same type ids + quantities, no missing, no extras). Money is
   parsed JSON-number → `Decimal` directly (ADR-0020).
