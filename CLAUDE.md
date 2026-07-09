@@ -57,6 +57,9 @@ buyback/
 ├── frontend/             # TypeScript SPA (Vite + React + TanStack Query); Pico.css (ADR-0023)
 │   ├── openapi.json      # exported backend schema (source for gen:api)
 │   └── src/              # api/ (+ generated schema.d.ts, types.ts), components/, pages/, lib/, test/
+├── e2e/                  # Playwright smoke suite vs the single deployable (ADR-0046)
+│   ├── support/          # env resolution, global setup, e2e_setup.py (e2e DB + minted sessions)
+│   └── tests/            # browser journeys (small smoke pack — unit suites stay primary)
 ├── docs/                 # architecture.md + adr/
 ├── Dockerfile            # single-deployable image: builds SPA, serves it + /api/v1 (ADR-0012)
 ├── docker-compose.yml    # self-host stack: Postgres + app
@@ -134,6 +137,13 @@ npm run gen:api                          # regenerate src/api/schema.d.ts from o
 npm run lint                             # ESLint
 npm run test                             # Vitest + React Testing Library
 npm run build                            # typecheck (tsc) + production build
+
+# E2E smoke suite (from e2e/, ADR-0046) — real browser vs the single deployable.
+# Prereqs: frontend built (npm run build), Postgres running; the suite creates and
+# owns a `buyback_e2e` database (dropped + recreated per run).
+npm install                              # once, then: npx playwright install chromium
+npm test                                 # run the smoke pack (starts the server itself)
+npm run test:headed                      # same, with a visible browser
 
 # Deploy — single image serves the built SPA + /api/v1 (ADR-0012). From repo root:
 cp .env.example .env                     # then fill in secrets (SESSION_SECRET, EVE SSO, POSTGRES_PASSWORD)

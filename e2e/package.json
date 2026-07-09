@@ -1,0 +1,14 @@
+{
+  "name": "buyback-e2e",
+  "private": true,
+  "description": "Playwright end-to-end smoke suite (ADR-0046): a real browser against the single deployable.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0"
+  }
+}

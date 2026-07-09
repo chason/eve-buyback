@@ -55,5 +55,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0043](0043-lot-based-buyback-accounting.md) | Lot-based buyback accounting (FIFO lots from completed contracts, cost basis, NRV) | Proposed |
 | [0044](0044-hangar-inventory-reconciliation.md) | Hangar inventory reconciliation (ESI corp assets vs derived idle stock) | Proposed |
 | [0045](0045-esi-sales-ingestion-and-manual-entry.md) | ESI outgoing-sales ingestion + manual-entry escape hatch | Proposed |
+| [0046](0046-playwright-e2e-smoke.md) | E2E smoke tests: Playwright against the single deployable (minted sessions, `buyback_e2e` DB) | Proposed |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
