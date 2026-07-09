@@ -50,5 +50,10 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0038](0038-open-in-eve-login-token.md) | "Open in EVE" via a session-held login refresh token (amends 0004) | Accepted |
 | [0039](0039-custom-rule-folders.md) | Custom folders for pricing rules (emergent free-text label + "Group by" toggle) | Accepted |
 | [0040](0040-appraisal-link-unfurl-preview.md) | Server-rendered link-unfurl preview for shared appraisals (public OG meta: value + location) | Accepted |
+| [0041](0041-app-admin-authorization-axis.md) | App-admin authorization axis (env-var allowlist, orthogonal to corp roles) | Proposed |
+| [0042](0042-paid-accounting-entitlements.md) | Paid accounting add-on: hosted-only per-corp entitlements + ISK payment reconciliation | Proposed |
+| [0043](0043-lot-based-buyback-accounting.md) | Lot-based buyback accounting (FIFO lots from completed contracts, cost basis, NRV) | Proposed |
+| [0044](0044-hangar-inventory-reconciliation.md) | Hangar inventory reconciliation (ESI corp assets vs derived idle stock) | Proposed |
+| [0045](0045-esi-sales-ingestion-and-manual-entry.md) | ESI outgoing-sales ingestion + manual-entry escape hatch | Proposed |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
