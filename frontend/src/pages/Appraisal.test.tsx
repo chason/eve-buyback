@@ -21,6 +21,7 @@ const sessionUser: SessionUser = {
   is_director: false,
   corporation_registered: true,
   can_open_contract: false,
+  is_app_admin: false,
 }
 
 function renderAt(publicId: string) {

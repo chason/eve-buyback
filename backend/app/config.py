@@ -160,6 +160,13 @@ class Settings(BaseSettings):
             seen.setdefault(scope, None)
         return " ".join(seen)
 
+    # Instance **app-admin** allowlist (ADR-0041): comma-separated EVE character ids that
+    # operate this hosted instance — an authorization axis orthogonal to the per-corp
+    # member/manager/ceo roles. Empty by default (no admins). Read only through
+    # `admin_character_id_set`; a non-numeric entry refuses to boot. Not a token/secret,
+    # just an id list — so no encryption and no Privacy-page implication.
+    admin_character_ids: str = ""
+
     # Fernet key encrypting persisted structure-market refresh tokens at rest
     # (ADR-0029). Required (a real value) to use structure hubs in production.
     token_encryption_key: str = INSECURE_TOKEN_KEY
@@ -168,6 +175,14 @@ class Settings(BaseSettings):
     def session_https_only(self) -> bool:
         """Require Secure cookies outside local development."""
         return self.environment != "development"
+
+    @property
+    def admin_character_id_set(self) -> frozenset[int]:
+        """The parsed app-admin allowlist (ADR-0041) as EVE character ids. Blanks are
+        ignored; entries are validated numeric at boot (`_require_numeric_admin_ids`)."""
+        return frozenset(
+            int(part) for part in self.admin_character_ids.split(",") if part.strip()
+        )
 
     @property
     def corp_esi_token_configured(self) -> bool:
@@ -192,6 +207,20 @@ class Settings(BaseSettings):
                 "BUYBACK_ENVIRONMENT is not 'development'. The placeholder default "
                 "would let anyone forge a session cookie."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_numeric_admin_ids(self) -> "Settings":
+        """Refuse to boot if `BUYBACK_ADMIN_CHARACTER_IDS` has a non-numeric entry — an
+        operator typo would otherwise silently grant no one (or 500 at request time when
+        `admin_character_id_set` parses)."""
+        for part in self.admin_character_ids.split(","):
+            part = part.strip()
+            if part and not part.isdigit():
+                raise ValueError(
+                    "BUYBACK_ADMIN_CHARACTER_IDS must be a comma-separated list of EVE "
+                    f"character ids (digits only); got invalid entry {part!r}."
+                )
         return self
 
     @model_validator(mode="after")

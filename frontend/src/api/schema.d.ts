@@ -943,6 +943,11 @@ export interface components {
              */
             corporation_registered: boolean;
             /**
+             * Is App Admin
+             * @default false
+             */
+            is_app_admin: boolean;
+            /**
              * Is Director
              * @default false
              */

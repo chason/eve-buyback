@@ -12,6 +12,8 @@ from app.application.auth import (
     SessionIdentity,
     resolve_authenticated_user,
 )
+from app.config import get_settings
+from app.domain.app_admin import is_app_admin
 from app.domain.roles import Role, role_at_least
 from app.interface.deps import SessionDep
 
@@ -81,6 +83,35 @@ def require_role(minimum: Role) -> Callable[[AuthenticatedUser], AuthenticatedUs
         return user
 
     return dependency
+
+
+def is_user_app_admin(user: AuthenticatedUser) -> bool:
+    """Whether the resolved user is an instance app admin (ADR-0041). Derived per request
+    from the config allowlist — never stored in the session cookie, so revocation is
+    immediate — and orthogonal to the corp role."""
+    return is_app_admin(user.character_id, get_settings().admin_character_id_set)
+
+
+def current_is_app_admin(user: CurrentUser) -> bool:
+    """The app-admin flag for the current session (False when unauthenticated). Exposed on
+    /me so the SPA can show the admin nav — cosmetic; `require_app_admin` is the real gate."""
+    return user is not None and is_user_app_admin(user)
+
+
+IsAppAdmin = Annotated[bool, Depends(current_is_app_admin)]
+
+
+def require_app_admin(user: RequireUser) -> AuthenticatedUser:
+    """Require the caller be an instance app admin (ADR-0041) — the operator of this hosted
+    instance. Independent of the corp role hierarchy (not a super-CEO)."""
+    if not is_user_app_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires app admin"
+        )
+    return user
+
+
+RequireAppAdmin = Annotated[AuthenticatedUser, Depends(require_app_admin)]
 
 
 def require_ceo_or_director(user: RequireUser) -> AuthenticatedUser:

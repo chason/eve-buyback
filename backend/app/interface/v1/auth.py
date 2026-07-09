@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.application import auth as auth_app
 from app.interface.deps import SessionDep
-from app.interface.security import RequireUser, clear_session, set_session_identity
+from app.interface.security import (
+    IsAppAdmin,
+    RequireUser,
+    clear_session,
+    is_user_app_admin,
+    set_session_identity,
+)
 from app.plugins.esi import EsiClient, get_esi_client
 from app.plugins.sso import EveSsoClient, get_sso_client
 from app.plugins.token_cipher import TokenCipher, get_token_cipher
@@ -57,7 +63,7 @@ async def create_session(
     request.session.pop(OAUTH_STATE_KEY, None)
     request.session.pop(PKCE_VERIFIER_KEY, None)
     set_session_identity(request, identity)
-    return SessionUser(**user.model_dump())
+    return SessionUser(**user.model_dump(), is_app_admin=is_user_app_admin(user))
 
 
 @router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
@@ -67,5 +73,5 @@ async def delete_session(request: Request) -> None:
 
 
 @router.get("/me", response_model=SessionUser)
-async def me(user: RequireUser) -> SessionUser:
-    return SessionUser(**user.model_dump())
+async def me(user: RequireUser, is_admin: IsAppAdmin) -> SessionUser:
+    return SessionUser(**user.model_dump(), is_app_admin=is_admin)

@@ -28,3 +28,6 @@ class SessionUser(BaseModel):
     # Whether this session can open a matched contract in EVE (ADR-0038): true once the
     # session was opened with the open-window scope (i.e. after that feature shipped).
     can_open_contract: bool = False
+    # Instance app-admin flag (ADR-0041): operator of this hosted instance. Derived per
+    # request from config (not stored in the session); drives the admin nav (cosmetic).
+    is_app_admin: bool = False
