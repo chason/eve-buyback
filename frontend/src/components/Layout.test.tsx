@@ -89,6 +89,26 @@ describe("Layout nav", () => {
     expect(source).toHaveAttribute("target", "_blank")
   })
 
+  it("shows the Admin link only to an app admin (ADR-0041)", async () => {
+    vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })
+
+    vi.mocked(authApi.getMe).mockResolvedValue(member())
+    const { unmount } = renderAt("/appraise")
+    await screen.findByRole("link", { name: "Appraise" })
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument()
+    unmount()
+
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      ...member(),
+      is_app_admin: true,
+    })
+    renderAt("/appraise")
+    expect(await screen.findByRole("link", { name: "Admin" })).toHaveAttribute(
+      "href",
+      "/admin",
+    )
+  })
+
   it("exposes Log out as a button, not a link (#80)", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(member())
     vi.mocked(versionApi.getVersion).mockResolvedValue({ version: "1" })

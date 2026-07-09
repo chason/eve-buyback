@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "AccessGrantRequest": {
+        "description": "Grant/extend a corp's access. Omitted/null `expires_at` = perpetual.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "title": "AccessGrantRequest",
+        "type": "object"
+      },
       "AppraisalCreateRequest": {
         "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side. The\ncombined item count (structured + paste) is capped in the use case; the bounds\nhere are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).",
         "properties": {
@@ -536,6 +555,80 @@
           "aggregate_field"
         ],
         "title": "ConfigUpdateRequest",
+        "type": "object"
+      },
+      "CorpAccessOut": {
+        "description": "One corp's access to the accounting add-on, as shown on the admin page.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "corporation_id": {
+            "title": "Corporation Id",
+            "type": "integer"
+          },
+          "corporation_name": {
+            "title": "Corporation Name",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "granted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted At"
+          },
+          "granted_by_character_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted By Character Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "payment",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "corporation_id",
+          "corporation_name",
+          "active"
+        ],
+        "title": "CorpAccessOut",
         "type": "object"
       },
       "CorpMemberOut": {
@@ -1430,10 +1523,123 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "79"
+    "version": "81"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/access": {
+      "get": {
+        "description": "All registered corps with their accounting-access status (cross-tenant).",
+        "operationId": "list_corp_access_api_v1_admin_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CorpAccessOut"
+                  },
+                  "title": "Response List Corp Access Api V1 Admin Access Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Corp Access",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/access/{corporation_id}": {
+      "delete": {
+        "description": "Revoke a corp's access. Idempotent.",
+        "operationId": "revoke_corp_access_api_v1_admin_access__corporation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "corporation_id",
+            "required": true,
+            "schema": {
+              "title": "Corporation Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Corp Access",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Grant or extend a corp's access (`source=admin`); null expiry = perpetual.",
+        "operationId": "grant_corp_access_api_v1_admin_access__corporation_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "corporation_id",
+            "required": true,
+            "schema": {
+              "title": "Corporation Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorpAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Corp Access",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/appraisals": {
       "get": {
         "operationId": "list_appraisals_api_v1_appraisals_get",

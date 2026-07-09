@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/api/v1/admin/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Corp Access
+         * @description All registered corps with their accounting-access status (cross-tenant).
+         */
+        get: operations["list_corp_access_api_v1_admin_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/access/{corporation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant Corp Access
+         * @description Grant or extend a corp's access (`source=admin`); null expiry = perpetual.
+         */
+        put: operations["grant_corp_access_api_v1_admin_access__corporation_id__put"];
+        post?: never;
+        /**
+         * Revoke Corp Access
+         * @description Revoke a corp's access. Idempotent.
+         */
+        delete: operations["revoke_corp_access_api_v1_admin_access__corporation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/appraisals": {
         parameters: {
             query?: never;
@@ -518,6 +562,14 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AccessGrantRequest
+         * @description Grant/extend a corp's access. Omitted/null `expires_at` = perpetual.
+         */
+        AccessGrantRequest: {
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /**
          * AppraisalCreateRequest
          * @description Items may be supplied structured, as a raw EVE paste, or both — but at least
          *     one must be non-empty. The paste is parsed and name-resolved server-side. The
@@ -687,6 +739,26 @@ export interface components {
             market_hub_kind: "npc_station" | "structure";
             /** Market Hub Name */
             market_hub_name?: string | null;
+        };
+        /**
+         * CorpAccessOut
+         * @description One corp's access to the accounting add-on, as shown on the admin page.
+         */
+        CorpAccessOut: {
+            /** Active */
+            active: boolean;
+            /** Corporation Id */
+            corporation_id: number;
+            /** Corporation Name */
+            corporation_name: string;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Granted At */
+            granted_at?: string | null;
+            /** Granted By Character Id */
+            granted_by_character_id?: number | null;
+            /** Source */
+            source?: ("payment" | "admin") | null;
         };
         /**
          * CorpMemberOut
@@ -1058,6 +1130,90 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_corp_access_api_v1_admin_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorpAccessOut"][];
+                };
+            };
+        };
+    };
+    grant_corp_access_api_v1_admin_access__corporation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                corporation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessGrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorpAccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_corp_access_api_v1_admin_access__corporation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                corporation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_appraisals_api_v1_appraisals_get: {
         parameters: {
             query?: never;
