@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.entitlements import EntitlementSource, Feature
 from app.domain.locations import LocationKind
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
@@ -270,6 +271,20 @@ class AppraisalContractRecord(BaseModel):
     status: str
     issued_at: datetime
     completed_at: datetime | None = None
+
+
+class EntitlementRecord(BaseModel):
+    """A corp's access to a paid feature (ADR-0042). `expires_at` NULL = perpetual;
+    activeness is decided by `domain.entitlements.entitlement_active`, not here."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    corporation_id: uuid.UUID
+    feature: Feature
+    source: EntitlementSource
+    granted_at: datetime
+    expires_at: datetime | None = None
+    granted_by_character_id: int | None = None
 
 
 class CorpEsiTokenRecord(BaseModel):

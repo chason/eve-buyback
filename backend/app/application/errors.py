@@ -143,6 +143,16 @@ class NoMatchedContract(ApplicationError):
     default_detail = "No matching in-game contract is linked to this appraisal yet"
 
 
+class EntitlementRequired(ApplicationError):
+    """The corp holds no active entitlement for a paid feature (ADR-0042). Mapped to
+    402 Payment Required; the detail stays plain-English (no accounting jargon)."""
+
+    default_detail = (
+        "Your corporation doesn't have access to this feature — an app admin can "
+        "grant it, or it unlocks when your corporation's access payment is received"
+    )
+
+
 class OpenContractUnavailable(ApplicationError):
     """The session can't open the contract in EVE (ADR-0038): it holds no login token, the
     token was revoked, or it lacks the open-window scope. The fix is always to log in again."""
