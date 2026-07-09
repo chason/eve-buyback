@@ -1,7 +1,12 @@
 name: CI
 
+# One run per situation, not two: PRs run against GitHub's merge preview
+# (refs/pull/N/merge — "will main pass AFTER this merges?"), and pushes to main
+# give the post-merge safety net. Without the branches filter, every push to a
+# branch with an open PR ran the whole matrix twice (push + pull_request).
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
