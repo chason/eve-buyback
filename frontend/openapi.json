@@ -1160,6 +1160,11 @@
             "title": "Corporation Registered",
             "type": "boolean"
           },
+          "is_app_admin": {
+            "default": false,
+            "title": "Is App Admin",
+            "type": "boolean"
+          },
           "is_director": {
             "default": false,
             "title": "Is Director",
@@ -1425,7 +1430,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "72"
+    "version": "79"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -143,3 +143,20 @@ def test_background_refresh_defaults():
     assert s.market_background_refresh_enabled is True
     assert s.market_refresh_interval_seconds == 600
     assert s.market_refresh_initial_delay_seconds == 30
+
+
+# --- app-admin allowlist (ADR-0041) ---
+
+
+def test_admin_ids_empty_by_default():
+    assert _dev().admin_character_id_set == frozenset()
+
+
+def test_admin_ids_parsed_deduped_and_trimmed():
+    s = _dev(admin_character_ids="90000001, 90000002 ,90000001")
+    assert s.admin_character_id_set == frozenset({90000001, 90000002})
+
+
+def test_admin_ids_non_numeric_refuses_to_boot():
+    with pytest.raises(ValidationError, match="ADMIN_CHARACTER_IDS"):
+        _dev(admin_character_ids="90000001,bogus")
