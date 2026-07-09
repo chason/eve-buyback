@@ -4,11 +4,11 @@ on grant/extend. Repositories return records and never commit (data/ conventions
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.models import Entitlement
-from app.data.records import EntitlementRecord
+from app.data.models import Corporation, Entitlement
+from app.data.records import CorpFeatureAccessRecord, EntitlementRecord
 from app.domain.entitlements import EntitlementSource, Feature
 
 
@@ -59,6 +59,38 @@ async def delete(
         return False
     await session.delete(row)
     return True
+
+
+async def list_corporations_with_feature(
+    session: AsyncSession, *, feature: Feature
+) -> list[CorpFeatureAccessRecord]:
+    """Every registered corp with its entitlement facts for `feature` (LEFT JOIN — corps
+    without a row appear with None fields). The app-admin list (ADR-0041/0042): the one
+    deliberately cross-tenant read, so it lives here and nowhere else."""
+    stmt = (
+        select(Corporation, Entitlement)
+        .join(
+            Entitlement,
+            and_(
+                Entitlement.corporation_id == Corporation.id,
+                Entitlement.feature == feature,
+            ),
+            isouter=True,
+        )
+        .order_by(Corporation.name)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        CorpFeatureAccessRecord(
+            corporation_id=corp.eve_id,
+            corporation_name=corp.name,
+            source=ent.source if ent else None,
+            granted_at=ent.granted_at if ent else None,
+            expires_at=ent.expires_at if ent else None,
+            granted_by_character_id=ent.granted_by_character_id if ent else None,
+        )
+        for corp, ent in rows
+    ]
 
 
 async def _get_row(

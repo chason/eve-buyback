@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom"
 
 import Layout from "./components/Layout"
 import RequireAuth from "./components/RequireAuth"
+import Admin from "./pages/Admin"
 import Appraisal from "./pages/Appraisal"
 import Appraise from "./pages/Appraise"
 import Callback from "./pages/Callback"
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/rules" element={<Rules />} />
           <Route path="/locations" element={<Locations />} />
           <Route path="/managers" element={<Managers />} />
+          <Route path="/admin" element={<Admin />} />
         </Route>
       </Route>
     </Routes>

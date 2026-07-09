@@ -97,6 +97,13 @@ export default function Layout() {
                 </NavLink>
               </li>
             )}
+            {user.is_app_admin && (
+              <li>
+                <NavLink to="/admin" className={navClass}>
+                  Admin
+                </NavLink>
+              </li>
+            )}
             <li>
               <button
                 type="button"

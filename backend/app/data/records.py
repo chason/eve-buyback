@@ -287,6 +287,19 @@ class EntitlementRecord(BaseModel):
     granted_by_character_id: int | None = None
 
 
+class CorpFeatureAccessRecord(BaseModel):
+    """One corp's entitlement facts for a feature (ADR-0042), for the app-admin list —
+    a deliberate cross-tenant read (ADR-0041). Entitlement fields are None when the corp
+    holds no row; "active" is computed by the application layer, not stored here."""
+
+    corporation_id: int  # EVE id (the admin API is EVE-keyed, ADR-0025)
+    corporation_name: str
+    source: EntitlementSource | None = None
+    granted_at: datetime | None = None
+    expires_at: datetime | None = None
+    granted_by_character_id: int | None = None
+
+
 class CorpEsiTokenRecord(BaseModel):
     """A corp's structure-market authorization (ADR-0029). Carries the ciphertext for
     internal refresh use; the API schema (`StructureTokenStatus`) omits it."""
