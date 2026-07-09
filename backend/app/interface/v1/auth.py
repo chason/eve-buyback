@@ -73,5 +73,5 @@ async def delete_session(request: Request) -> None:
 
 
 @router.get("/me", response_model=SessionUser)
-async def me(user: RequireUser, is_admin: IsAppAdmin) -> SessionUser:
-    return SessionUser(**user.model_dump(), is_app_admin=is_admin)
+async def me(user: RequireUser, is_app_admin: IsAppAdmin) -> SessionUser:
+    return SessionUser(**user.model_dump(), is_app_admin=is_app_admin)
