@@ -54,6 +54,61 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  # E2E smoke pack (ADR-0046): a real browser against the single deployable — the
+  # backend serving the built SPA — with minted sessions and a dedicated buyback_e2e
+  # database that the suite drops/recreates itself (so the service DB is `postgres`).
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # env.ts swaps the database name to buyback_e2e; setup recreates it per run.
+      BUYBACK_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/buyback
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+      - name: Build the SPA (the suite serves frontend/dist via the backend)
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Install backend
+        working-directory: backend
+        run: uv sync
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Run e2e smoke pack
+        working-directory: e2e
+        run: npm test
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
+
   # Prove the single-deployable image assembles (ADR-0012): the SPA build stage
   # and the Python runtime stage. No push — this is a build smoke test only.
   docker:

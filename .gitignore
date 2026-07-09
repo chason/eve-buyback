@@ -22,6 +22,11 @@ frontend/dist/
 frontend/build/
 .vite/
 
+# ---- E2E suite (ADR-0046) ----
+e2e/.artifacts/
+e2e/test-results/
+e2e/playwright-report/
+
 # ---- Databases (SQLite) ----
 *.db
 *.db-wal
