@@ -18,6 +18,8 @@ import base64
 import json
 import os
 import sys
+from datetime import UTC, datetime
+from decimal import Decimal
 
 # Run via `uv run --directory backend`, so CWD is backend/ — but this file lives in
 # e2e/support/, so backend/ must be put on sys.path for `app` imports explicitly.
@@ -68,6 +70,18 @@ PERSONAS = {
         "is_ceo": False,
         "encrypted_login_token": None,
     },
+    # A member of the SECOND corp: journeys that create records (e.g. the appraise
+    # flow) run as this persona so corp scoping keeps the first corp's history empty
+    # for the journeys that assert emptiness.
+    "hauler": {
+        "character_id": 90000003,
+        "character_name": "Renn Okata",
+        "corporation_id": SECOND_CORP["eve_id"],
+        "corporation_name": SECOND_CORP["name"],
+        "is_director": False,
+        "is_ceo": False,
+        "encrypted_login_token": None,
+    },
 }
 
 
@@ -88,10 +102,28 @@ async def _recreate_database() -> None:
         await conn.close()
 
 
+# Mini-SDE fixture (#171): just enough reference data to appraise a mineral paste with
+# the default config (90% of Jita buy percentile) and ZERO network — the real SDE seed
+# pulls from Fuzzwork, which e2e/CI must never do. Prices are chosen so journey math is
+# exact: e.g. 1000 Tritanium @ 4.00 × 0.90 = 3,600 ISK.
+#   (type_id, name, buy_percentile)  — all minerals: group 18, category 4, mg 1857.
+MINERALS = [
+    (34, "Tritanium", "4.00"),
+    (35, "Pyerite", "8.00"),
+    (36, "Mexallon", "50.00"),
+    (37, "Isogen", "25.00"),
+    (38, "Nocxium", "600.00"),
+    (39, "Zydrine", "1500.00"),
+    (40, "Megacyte", "3000.00"),
+]
+JITA = "60003760"  # the default market hub (ADR-0006)
+
+
 async def _seed() -> None:
     # Imported here: app.data.db builds its engine from settings at import time, and we
     # want that to happen after the database exists.
     from app.data.db import SessionLocal, engine
+    from app.data.models import MarketPrice, SdeMarketGroup, SdeType
     from app.data.repositories import corporations as corporations_repo
 
     async with SessionLocal() as session:
@@ -102,6 +134,45 @@ async def _seed() -> None:
                 name=corp["name"],
                 ceo_character_id=PERSONAS["ceo"]["character_id"],
                 registered_by_character_id=PERSONAS["ceo"]["character_id"],
+            )
+
+        session.add(SdeMarketGroup(market_group_id=1857, parent_id=None, name="Minerals"))
+        now = datetime.now(UTC)  # fresh within the market-cache TTL → no refetch
+        for type_id, name, buy_percentile in MINERALS:
+            session.add(
+                SdeType(
+                    type_id=type_id,
+                    name=name,
+                    group_id=18,
+                    category_id=4,
+                    market_group_id=1857,
+                    volume=Decimal("0.01"),
+                    portion_size=1,
+                    published=True,
+                )
+            )
+            buy = Decimal(buy_percentile)
+            sell = buy * Decimal("1.25")
+            session.add(
+                MarketPrice(
+                    hub_id=JITA,
+                    type_id=type_id,
+                    buy_weighted_average=buy,
+                    buy_max=buy,
+                    buy_min=buy / 2,
+                    buy_median=buy,
+                    buy_percentile=buy,
+                    buy_volume=Decimal(1_000_000_000),
+                    buy_order_count=100,
+                    sell_weighted_average=sell,
+                    sell_max=sell * 2,
+                    sell_min=sell,
+                    sell_median=sell,
+                    sell_percentile=sell,
+                    sell_volume=Decimal(1_000_000_000),
+                    sell_order_count=100,
+                    fetched_at=now,
+                )
             )
         await session.commit()
     await engine.dispose()

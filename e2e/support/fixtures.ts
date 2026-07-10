@@ -10,7 +10,7 @@ import { test as base } from "@playwright/test"
 
 import { artifactsDir, baseURL } from "./env"
 
-export type Persona = "ceo" | "member" | "admin"
+export type Persona = "ceo" | "member" | "admin" | "hauler"
 
 function sessionCookie(persona: Persona): string {
   const file = path.join(artifactsDir, "sessions.json")
