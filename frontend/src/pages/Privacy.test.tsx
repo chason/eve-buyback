@@ -32,8 +32,9 @@ describe("Privacy", () => {
     expect(
       screen.getByRole("heading", { name: /opening a contract in eve/i }),
     ).toBeInTheDocument()
-    // The one persisted token is encrypted at rest (ADR-0029).
-    expect(screen.getByText(/encrypted at rest/i)).toBeInTheDocument()
+    // Both persisted tokens — the corp token (ADR-0029) and the operator wallet
+    // token (ADR-0042) — are encrypted at rest.
+    expect(screen.getAllByText(/encrypted at rest/i)).toHaveLength(2)
     // Current ADR-0036: one token per corp, not a transient step-up.
     expect(screen.getByText(/one token per corporation/i)).toBeInTheDocument()
     // The roster snapshot caches only names + ids.
@@ -52,6 +53,22 @@ describe("Privacy", () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(/total ISK value and drop-off location/i),
+    ).toBeInTheDocument()
+    // Operator wallet (ADR-0042): the app reads only the OPERATOR's own wallet
+    // journal for payment matching — never a member's or a corp's wallet.
+    expect(
+      screen.getByRole("heading", {
+        name: /paying for optional add-ons/i,
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/that character's own wallet journal/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/never reads any member's or corporation's wallet/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/amount, sender, date, and the transfer reason/i),
     ).toBeInTheDocument()
   })
 

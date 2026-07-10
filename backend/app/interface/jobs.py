@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
-from app.application import corp_contracts, corp_roster, market_refresh
+from app.application import corp_contracts, corp_roster, market_refresh, payments
 from app.config import get_settings
 from app.data.db import SessionLocal
 from app.data.repositories import corp_esi_token as tokens_repo
@@ -79,6 +79,26 @@ async def run_roster_refresh(app: FastAPI) -> None:
             # not headers or a full traceback) so an access token can't reach the logs via
             # httpx's exception formatting (#75).
             log.warning("roster refresh failed for corp %s: %r", corp_eve_id, exc)
+
+
+async def run_payments_reconcile(app: FastAPI) -> None:
+    """Scheduler entrypoint (ADR-0042): read the operator's wallet journal and extend
+    corp access for matching ISK payments. A quiet no-op until an app admin connects
+    the operator wallet; the use case degrades on a revoked/scope-less grant."""
+    settings = get_settings()
+    esi = EsiClient(app.state.http)
+    sso = EveSsoClient(settings, app.state.http)
+    cipher = TokenCipher(settings.token_encryption_key)
+    try:
+        async with SessionLocal() as session:
+            recorded = await payments.reconcile_payments(
+                session, sso, esi, cipher=cipher, now=datetime.now(UTC)
+            )
+        if recorded:
+            log.info("payment reconciliation recorded %d new payment(s)", recorded)
+    except Exception as exc:  # noqa: BLE001 — a recurring job must survive any failure
+        # Bearer-token ESI calls — log `repr(exc)` only, never `exc_info` (#75).
+        log.warning("payment reconciliation failed: %r", exc)
 
 
 async def run_contracts_refresh(app: FastAPI) -> None:

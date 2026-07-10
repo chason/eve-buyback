@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
-import type { CorpAccessOut } from "../api/admin"
-import { grantCorpAccess, listCorpAccess, revokeCorpAccess } from "../api/admin"
+import type { CorpAccessOut, PaymentOut } from "../api/admin"
+import {
+  beginWalletAuthorize,
+  getWalletStatus,
+  grantCorpAccess,
+  listCorpAccess,
+  listPayments,
+  matchPayment,
+  revokeCorpAccess,
+  revokeWallet,
+} from "../api/admin"
 import { getMe } from "../api/auth"
 import { ConfirmButton } from "../components/ConfirmButton"
+import { formatIsk } from "../lib/format"
 
 /** What the access cell says, in plain English (no billing/entitlement jargon). */
 function accessLabel(corp: CorpAccessOut): string {
@@ -101,6 +111,159 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
   )
 }
 
+function PaymentRow({
+  payment,
+  corps,
+}: {
+  payment: PaymentOut
+  corps: CorpAccessOut[]
+}) {
+  const queryClient = useQueryClient()
+  const [corpId, setCorpId] = useState("")
+  const apply = useMutation({
+    mutationFn: () => matchPayment(payment.id, Number(corpId)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["payments"] })
+      void queryClient.invalidateQueries({ queryKey: ["corpAccess"] })
+    },
+  })
+  return (
+    <tr>
+      <td>{new Date(payment.received_at).toLocaleDateString()}</td>
+      <td>{payment.sender_name ?? "Unknown"}</td>
+      <td className="num isk">{formatIsk(payment.amount)}</td>
+      <td>{payment.reason || <span className="field-hint">no message</span>}</td>
+      <td>
+        {payment.matched ? (
+          <>
+            {payment.matched_corporation_name}
+            {payment.periods_granted > 0 && (
+              <>
+                {" "}
+                <small className="field-hint">
+                  (+{payment.periods_granted * 30} days)
+                </small>
+              </>
+            )}
+          </>
+        ) : (
+          <span className="access-actions">
+            <select
+              value={corpId}
+              onChange={(e) => setCorpId(e.target.value)}
+              aria-label={`Corporation for payment of ${formatIsk(payment.amount)}`}
+            >
+              <option value="">Pick a corporation…</option>
+              {corps.map((c) => (
+                <option key={c.corporation_id} value={c.corporation_id}>
+                  {c.corporation_name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!corpId || apply.isPending}
+              onClick={() => apply.mutate()}
+            >
+              Apply
+            </button>
+            {apply.isError && (
+              <p className="error">{(apply.error as Error).message}</p>
+            )}
+          </span>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function PaymentsSection({ corps }: { corps: CorpAccessOut[] }) {
+  const queryClient = useQueryClient()
+  const wallet = useQuery({ queryKey: ["walletStatus"], queryFn: getWalletStatus })
+  const payments = useQuery({
+    queryKey: ["payments"],
+    queryFn: () => listPayments(),
+    enabled: !!wallet.data?.connected,
+  })
+  const connect = useMutation({
+    mutationFn: beginWalletAuthorize,
+    onSuccess: (url) => window.location.assign(url),
+  })
+  const disconnect = useMutation({
+    mutationFn: revokeWallet,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["walletStatus"] }),
+  })
+
+  return (
+    <section>
+      <h2>Payments</h2>
+      {wallet.data && !wallet.data.connected && (
+        <p>
+          <small className="field-hint">
+            Connect the wallet that receives access payments — the character
+            corporations send ISK to. Payments arriving there will unlock access
+            automatically.
+          </small>{" "}
+          <button
+            type="button"
+            className="secondary"
+            disabled={!wallet.data.configured || connect.isPending}
+            onClick={() => connect.mutate()}
+          >
+            Connect payment wallet
+          </button>
+        </p>
+      )}
+      {wallet.data?.connected && (
+        <p>
+          <small className="field-hint">
+            Payments to <strong>{wallet.data.character_name}</strong> are checked
+            about every 30 minutes.
+            {wallet.data.expired &&
+              " The connection has expired — reconnect it."}{" "}
+            <ConfirmButton
+              className="linkbtn"
+              label="Disconnect"
+              title="Disconnect the payment wallet?"
+              prompt="Payments will stop being noticed until it's reconnected."
+              confirmLabel="Disconnect wallet"
+              onConfirm={() => disconnect.mutate()}
+            />
+          </small>
+        </p>
+      )}
+      {connect.isError && (
+        <p className="error">{(connect.error as Error).message}</p>
+      )}
+
+      {payments.data && payments.data.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>From</th>
+              <th>Amount</th>
+              <th>Message</th>
+              <th>Applied to</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.data.map((p) => (
+              <PaymentRow key={p.id} payment={p} corps={corps} />
+            ))}
+          </tbody>
+        </table>
+      )}
+      {wallet.data?.connected && payments.data?.length === 0 && (
+        <p>
+          <small className="field-hint">No payments seen yet.</small>
+        </p>
+      )}
+    </section>
+  )
+}
+
 export default function Admin() {
   const me = useQuery({ queryKey: ["me"], queryFn: getMe })
   const isAdmin = !!me.data?.is_app_admin
@@ -152,6 +315,8 @@ export default function Admin() {
             <small className="field-hint">No corporations registered yet.</small>
           </p>
         ))}
+
+      <PaymentsSection corps={access.data ?? []} />
     </>
   )
 }

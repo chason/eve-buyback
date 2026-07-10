@@ -12,12 +12,14 @@ from app.data.models.entitlement import Entitlement
 from app.data.models.manager_assignment import ManagerAssignment
 from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
+from app.data.models.operator_wallet_token import OperatorWalletToken
 from app.data.models.pricing_rule import PricingRule
 from app.data.models.sde_market_group import SdeMarketGroup
 from app.data.models.sde_metadata import SdeMetadata
 from app.data.models.sde_station import SdeStation
 from app.data.models.sde_type import SdeType
 from app.data.models.sde_type_material import SdeTypeMaterial
+from app.data.models.wallet_payment import WalletPayment
 
 __all__ = [
     "Appraisal",
@@ -32,6 +34,7 @@ __all__ = [
     "ManagerAssignment",
     "MarketHubRefresh",
     "MarketPrice",
+    "OperatorWalletToken",
     "PricingRule",
     "SdeMarketGroup",
     "SdeMetadata",
@@ -39,4 +42,5 @@ __all__ = [
     "SdeType",
     "SdeTypeMaterial",
     "CorpEsiToken",
+    "WalletPayment",
 ]

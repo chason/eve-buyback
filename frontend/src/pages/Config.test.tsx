@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as authApi from "../api/auth"
+import * as billingApi from "../api/billing"
 import * as pricingApi from "../api/pricing"
 import * as sdeApi from "../api/sde"
 import * as structuresApi from "../api/structures"
@@ -12,6 +13,7 @@ import type { SessionUser } from "../api/types"
 import Config from "./Config"
 
 vi.mock("../api/auth")
+vi.mock("../api/billing")
 vi.mock("../api/pricing")
 vi.mock("../api/sde")
 vi.mock("../api/structures")
@@ -67,6 +69,61 @@ describe("Config", () => {
       authorized: false,
       expired: false,
     })
+    vi.mocked(billingApi.getAccountingAccess).mockResolvedValue({
+      active: false,
+      expires_at: null,
+      price_isk: 250_000_000,
+      period_days: 30,
+      reference: "BB-98000001",
+      payment_configured: false,
+      operator_character_name: null,
+    })
+  })
+
+  it("shows plain-English payment instructions when access can be bought (ADR-0042)", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(billingApi.getAccountingAccess).mockResolvedValue({
+      active: false,
+      expires_at: null,
+      price_isk: 250_000_000,
+      period_days: 30,
+      reference: "BB-98000001",
+      payment_configured: true,
+      operator_character_name: "Site Operator",
+    })
+    renderConfig()
+
+    expect(
+      await screen.findByRole("heading", { name: "Paid features" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/doesn't have the accounting add-on yet/),
+    ).toBeInTheDocument()
+    // The checkout line: price, recipient, and the reference to put in the reason.
+    expect(screen.getByText("250,000,000.00 ISK")).toBeInTheDocument()
+    expect(screen.getByText("Site Operator")).toBeInTheDocument()
+    expect(screen.getByText("BB-98000001")).toBeInTheDocument()
+  })
+
+  it("shows active access with its expiry, no payment pitch when unconfigured", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(billingApi.getAccountingAccess).mockResolvedValue({
+      active: true,
+      expires_at: null, // perpetual
+      price_isk: 250_000_000,
+      period_days: 30,
+      reference: "BB-98000001",
+      payment_configured: false,
+      operator_character_name: null,
+    })
+    renderConfig()
+
+    expect(
+      await screen.findByText(/never expires/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/in the transfer reason/)).not.toBeInTheDocument()
   })
 
   it("lets a manager edit and save the config", async () => {

@@ -30,6 +30,24 @@ class OpenWindowForbidden(Exception):
     the application maps it to a "log in again to enable Open in EVE" error."""
 
 
+class CharacterWalletForbidden(Exception):
+    """The token can't read the character's wallet (missing scope / revoked)."""
+
+
+class WalletJournalEntry(BaseModel):
+    """One entry from a character wallet journal (ADR-0042). Only the fields payment
+    reconciliation needs; `reason` carries the player-entered transfer message where
+    the payment reference lives. `amount` is signed (positive = incoming)."""
+
+    id: int
+    ref_type: str
+    amount: Decimal | None = None
+    first_party_id: int | None = None
+    second_party_id: int | None = None
+    reason: str | None = None
+    date: datetime
+
+
 class CorporationInfo(BaseModel):
     name: str
     ceo_id: int
@@ -123,18 +141,41 @@ class EsiClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def resolve_universe_names(self, ids: list[int]) -> dict[int, str]:
+    async def resolve_universe_names(
+        self, ids: list[int], *, categories: tuple[str, ...] = ("character",)
+    ) -> dict[int, str]:
         """Resolve ids to names via the public bulk endpoint (ADR-0036), keeping only
-        the characters. Chunked at ESI's 1000-id limit; an empty input is a no-op."""
+        the requested categories (characters by default; payment reconciliation also
+        asks for corporations). Chunked at ESI's 1000-id limit; empty input is a no-op."""
         names: dict[int, str] = {}
         for start in range(0, len(ids), _NAMES_CHUNK):
             chunk = ids[start : start + _NAMES_CHUNK]
             resp = await self._client.post(f"{ESI_BASE}/universe/names/", json=chunk)
             resp.raise_for_status()
             for entry in resp.json():
-                if entry.get("category") == "character":
+                if entry.get("category") in categories:
                     names[entry["id"]] = entry["name"]
         return names
+
+    async def get_character_wallet_journal(
+        self, character_id: int, access_token: str
+    ) -> list[WalletJournalEntry]:
+        """The operator character's wallet journal (ADR-0042), most recent first. Only
+        the first page is read: ESI pages hold thousands of entries and the
+        reconciliation job polls far more often than one page's worth of activity;
+        entries are deduplicated by journal id downstream anyway. Money is parsed
+        JSON-number → Decimal directly (ADR-0020). 401/403 → `CharacterWalletForbidden`."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/characters/{character_id}/wallet/journal/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if scope_missing(resp):
+            raise CharacterWalletForbidden()
+        resp.raise_for_status()
+        return [
+            WalletJournalEntry.model_validate(raw)
+            for raw in json.loads(resp.text, parse_float=Decimal)
+        ]
 
     async def get_corporation_contracts(
         self, corporation_id: int, access_token: str

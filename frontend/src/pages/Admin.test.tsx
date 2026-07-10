@@ -53,11 +53,33 @@ function renderAdmin() {
   )
 }
 
+function payment(over: Partial<adminApi.PaymentOut> = {}): adminApi.PaymentOut {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    amount: "250000000.00",
+    sender_name: "Rich Buyer",
+    reason: "forgot the reference",
+    received_at: "2026-07-10T00:00:00Z",
+    matched: false,
+    matched_corporation_name: null,
+    periods_granted: 0,
+    ...over,
+  }
+}
+
 describe("Admin", () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(authApi.getMe).mockResolvedValue(user())
     vi.mocked(adminApi.listCorpAccess).mockResolvedValue([corp()])
+    vi.mocked(adminApi.getWalletStatus).mockResolvedValue({
+      configured: true,
+      connected: false,
+      character_name: null,
+      expired: false,
+      created_at: null,
+    })
+    vi.mocked(adminApi.listPayments).mockResolvedValue([])
   })
 
   it("blocks a non-admin", async () => {
@@ -131,5 +153,69 @@ describe("Admin", () => {
     await waitFor(() =>
       expect(adminApi.revokeCorpAccess).toHaveBeenCalledWith(98000001),
     )
+  })
+
+  it("offers to connect the payment wallet when none is connected", async () => {
+    renderAdmin()
+    expect(
+      await screen.findByRole("button", { name: "Connect payment wallet" }),
+    ).toBeInTheDocument()
+    // No wallet → no payment polling.
+    expect(adminApi.listPayments).not.toHaveBeenCalled()
+  })
+
+  it("applies an unmatched payment to a picked corporation", async () => {
+    const u = userEvent.setup()
+    vi.mocked(adminApi.getWalletStatus).mockResolvedValue({
+      configured: true,
+      connected: true,
+      character_name: "Site Operator",
+      expired: false,
+      created_at: "2026-07-01T00:00:00Z",
+    })
+    vi.mocked(adminApi.listPayments).mockResolvedValue([payment()])
+    vi.mocked(adminApi.matchPayment).mockResolvedValue(
+      payment({ matched: true, matched_corporation_name: "Test Corp" }),
+    )
+    renderAdmin()
+
+    // The unmatched payment shows sender, ISK amount, and the transfer message.
+    expect(await screen.findByText("Rich Buyer")).toBeInTheDocument()
+    expect(screen.getByText("250,000,000.00 ISK")).toBeInTheDocument()
+    expect(screen.getByText("forgot the reference")).toBeInTheDocument()
+
+    // The corp picker fills from the (separately fetched) access list.
+    await screen.findByRole("option", { name: "Test Corp" })
+    await u.selectOptions(
+      screen.getByLabelText(/Corporation for payment/),
+      "98000001",
+    )
+    await u.click(screen.getByRole("button", { name: "Apply" }))
+    await waitFor(() =>
+      expect(adminApi.matchPayment).toHaveBeenCalledWith(
+        "11111111-1111-1111-1111-111111111111",
+        98000001,
+      ),
+    )
+  })
+
+  it("shows matched payments with the corp they unlocked", async () => {
+    vi.mocked(adminApi.getWalletStatus).mockResolvedValue({
+      configured: true,
+      connected: true,
+      character_name: "Site Operator",
+      expired: false,
+      created_at: "2026-07-01T00:00:00Z",
+    })
+    vi.mocked(adminApi.listPayments).mockResolvedValue([
+      payment({
+        matched: true,
+        matched_corporation_name: "Paying Corp",
+        periods_granted: 2,
+      }),
+    ])
+    renderAdmin()
+    expect(await screen.findByText("Paying Corp")).toBeInTheDocument()
+    expect(screen.getByText(/\+60 days/)).toBeInTheDocument()
   })
 })

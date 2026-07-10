@@ -20,6 +20,63 @@
         "title": "AccessGrantRequest",
         "type": "object"
       },
+      "AccountingAccessOut": {
+        "description": "A corp's accounting-access status plus how to pay (manager-visible). When no\noperator wallet is connected (`payment_configured` False), the UI shows status\nonly \u2014 there is nowhere to send ISK yet.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "operator_character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Character Name"
+          },
+          "payment_configured": {
+            "title": "Payment Configured",
+            "type": "boolean"
+          },
+          "period_days": {
+            "title": "Period Days",
+            "type": "integer"
+          },
+          "price_isk": {
+            "title": "Price Isk",
+            "type": "integer"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "price_isk",
+          "period_days",
+          "reference",
+          "payment_configured"
+        ],
+        "title": "AccountingAccessOut",
+        "type": "object"
+      },
       "AppraisalCreateRequest": {
         "description": "Items may be supplied structured, as a raw EVE paste, or both \u2014 but at least\none must be non-empty. The paste is parsed and name-resolved server-side. The\ncombined item count (structured + paste) is capped in the use case; the bounds\nhere are the cheap first line of defense (ADR-0014, EVE's 1000-item contract).",
         "properties": {
@@ -878,6 +935,136 @@
         "title": "MarketGroupOut",
         "type": "object"
       },
+      "OperatorWalletStatus": {
+        "description": "The operator wallet connection (ADR-0042), as shown on the admin page.",
+        "properties": {
+          "character_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Character Name"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expired": {
+            "default": false,
+            "title": "Expired",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "connected"
+        ],
+        "title": "OperatorWalletStatus",
+        "type": "object"
+      },
+      "PaymentMatchRequest": {
+        "description": "Apply an unmatched payment to a corporation (by EVE corp id).",
+        "properties": {
+          "corporation_id": {
+            "title": "Corporation Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "corporation_id"
+        ],
+        "title": "PaymentMatchRequest",
+        "type": "object"
+      },
+      "PaymentOut": {
+        "description": "One incoming ISK transfer seen in the operator's wallet (ADR-0042).",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "matched": {
+            "title": "Matched",
+            "type": "boolean"
+          },
+          "matched_corporation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Corporation Name"
+          },
+          "periods_granted": {
+            "default": 0,
+            "title": "Periods Granted",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "sender_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Name"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "received_at",
+          "matched"
+        ],
+        "title": "PaymentOut",
+        "type": "object"
+      },
       "ReprocessBreakdownOut": {
         "description": "How a reprocess-priced ore line breaks down (ADR-0026): the minerals it yields\nplus any sub-batch leftover priced at the ore's own market price.",
         "properties": {
@@ -1518,12 +1705,48 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "WalletAuthorizeRequest": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "WalletAuthorizeRequest",
+        "type": "object"
+      },
+      "WalletAuthorizeResponse": {
+        "properties": {
+          "authorization_url": {
+            "title": "Authorization Url",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_url",
+          "state"
+        ],
+        "title": "WalletAuthorizeResponse",
+        "type": "object"
       }
     }
   },
   "info": {
     "title": "Buyback API",
-    "version": "81"
+    "version": "85"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1635,6 +1858,205 @@
           }
         },
         "summary": "Grant Corp Access",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/payments": {
+      "get": {
+        "description": "Recent incoming payments (newest first); `?unmatched=true` filters to the ones\nawaiting a manual match.",
+        "operationId": "list_payments_api_v1_admin_payments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unmatched",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unmatched",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOut"
+                  },
+                  "title": "Response List Payments Api V1 Admin Payments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Payments",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/payments/{payment_id}/match": {
+      "post": {
+        "description": "Apply an unmatched payment to a corp (extends their access by the periods the\namount covers).",
+        "operationId": "match_payment_api_v1_admin_payments__payment_id__match_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Payment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Match Payment",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/wallet": {
+      "delete": {
+        "operationId": "revoke_wallet_api_v1_admin_wallet_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke Wallet",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "get_wallet_status_api_v1_admin_wallet_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWalletStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Wallet Status",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/wallet/authorize": {
+      "post": {
+        "description": "Begin the operator wallet grant: mint state + PKCE, return the SSO URL.",
+        "operationId": "authorize_wallet_api_v1_admin_wallet_authorize_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletAuthorizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Authorize Wallet",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/wallet/session": {
+      "post": {
+        "description": "Complete the grant: validate state, exchange the code, store the token.",
+        "operationId": "complete_wallet_api_v1_admin_wallet_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletAuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWalletStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Wallet",
         "tags": [
           "admin"
         ]
@@ -1919,6 +2341,27 @@
         "summary": "Get My Corporation",
         "tags": [
           "corporations"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting-access": {
+      "get": {
+        "operationId": "get_accounting_access_api_v1_corporations_me_accounting_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountingAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Accounting Access",
+        "tags": [
+          "billing"
         ]
       }
     },

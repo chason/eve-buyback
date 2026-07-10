@@ -1,5 +1,6 @@
 """API DTOs for the app-admin surface (ADR-0041/0042)."""
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -26,3 +27,42 @@ class AccessGrantRequest(BaseModel):
     """Grant/extend a corp's access. Omitted/null `expires_at` = perpetual."""
 
     expires_at: datetime | None = None
+
+
+class OperatorWalletStatus(BaseModel):
+    """The operator wallet connection (ADR-0042), as shown on the admin page."""
+
+    configured: bool  # a real token-encryption key is set (ADR-0029)
+    connected: bool
+    character_name: str | None = None
+    expired: bool = False
+    created_at: datetime | None = None
+
+
+class WalletAuthorizeResponse(BaseModel):
+    authorization_url: str
+    state: str
+
+
+class WalletAuthorizeRequest(BaseModel):
+    code: str
+    state: str
+
+
+class PaymentOut(BaseModel):
+    """One incoming ISK transfer seen in the operator's wallet (ADR-0042)."""
+
+    id: uuid.UUID
+    amount: str  # Decimal ISK as a string (ADR-0020)
+    sender_name: str | None = None
+    reason: str | None = None
+    received_at: datetime
+    matched: bool
+    matched_corporation_name: str | None = None
+    periods_granted: int = 0
+
+
+class PaymentMatchRequest(BaseModel):
+    """Apply an unmatched payment to a corporation (by EVE corp id)."""
+
+    corporation_id: int

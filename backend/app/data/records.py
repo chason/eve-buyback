@@ -314,3 +314,38 @@ class CorpEsiTokenRecord(BaseModel):
     created_at: datetime
     last_refresh_failed_at: datetime | None = None
     last_used_at: datetime | None = None
+
+
+class OperatorWalletTokenRecord(BaseModel):
+    """The operator's wallet authorization (ADR-0042). Carries the ciphertext for
+    internal refresh use; the admin API DTO omits it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    character_eve_id: int
+    character_name: str
+    encrypted_refresh_token: bytes
+    scopes: str
+    created_at: datetime
+    last_refresh_failed_at: datetime | None = None
+
+
+class WalletPaymentRecord(BaseModel):
+    """One incoming ISK transfer from the operator's wallet journal (ADR-0042).
+    `matched_corporation_id`/`matched_corporation_name` are set once the payment has
+    extended a corp's access (name join-derived; None if never matched)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    journal_id: int
+    amount: Decimal
+    sender_eve_id: int | None = None
+    sender_name: str | None = None
+    reason: str | None = None
+    received_at: datetime
+    matched_corporation_id: uuid.UUID | None = None
+    matched_corporation_name: str | None = None
+    periods_granted: int = 0
+    matched_at: datetime | None = None
+    matched_by_character_id: int | None = None

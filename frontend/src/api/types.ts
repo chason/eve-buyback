@@ -36,6 +36,9 @@ export type LocationKind = LocationOut["kind"]
 // App-admin access management (ADR-0041/0042).
 export type CorpAccessOut = Schemas["CorpAccessOut"]
 export type AccessGrantRequest = Schemas["AccessGrantRequest"]
+export type OperatorWalletStatus = Schemas["OperatorWalletStatus"]
+export type PaymentOut = Schemas["PaymentOut"]
+export type AccountingAccessOut = Schemas["AccountingAccessOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

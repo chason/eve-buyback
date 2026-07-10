@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
+import { completeWalletAuthorize, WALLET_STATE_PREFIX } from "../api/admin"
 import { login } from "../api/auth"
 import {
   completeStructureAuthorize,
@@ -14,10 +15,13 @@ export default function Callback() {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const handled = useRef(false)
-  // The same SSO callback completes either a login or a Corp ESI access grant.
-  // Route on the OAuth `state` echoed back by EVE (the corp-ESI flow's state
-  // carries a prefix) — reliable across the redirect, unlike client-side storage.
-  const isCorpEsi = (params.get("state") ?? "").startsWith(STRUCTURE_STATE_PREFIX)
+  // The same SSO callback completes a login, a Corp ESI access grant, or the
+  // operator-wallet grant (ADR-0042). Route on the OAuth `state` echoed back by
+  // EVE (the non-login flows' states carry a prefix) — reliable across the
+  // redirect, unlike client-side storage.
+  const stateParam = params.get("state") ?? ""
+  const isCorpEsi = stateParam.startsWith(STRUCTURE_STATE_PREFIX)
+  const isWallet = stateParam.startsWith(WALLET_STATE_PREFIX)
 
   useEffect(() => {
     if (handled.current) return
@@ -49,13 +53,27 @@ export default function Callback() {
       return
     }
 
+    if (isWallet) {
+      completeWalletAuthorize(code, state)
+        .then(async () => {
+          await queryClient.invalidateQueries({ queryKey: ["walletStatus"] })
+          navigate("/admin", { replace: true })
+        })
+        .catch((e) => setError((e as Error).message))
+      return
+    }
+
     login(code, state)
       .then(() => queryClient.invalidateQueries({ queryKey: ["me"] }))
       .then(() => navigate("/", { replace: true }))
       .catch((e) => setError((e as Error).message))
-  }, [params, navigate, queryClient, isCorpEsi])
+  }, [params, navigate, queryClient, isCorpEsi, isWallet])
 
-  const verb = isCorpEsi ? "Connecting corp ESI access" : "Signing you in"
+  const verb = isCorpEsi
+    ? "Connecting corp ESI access"
+    : isWallet
+      ? "Connecting the payment wallet"
+      : "Signing you in"
   return (
     <main className="container">
       <section className="login-hero">

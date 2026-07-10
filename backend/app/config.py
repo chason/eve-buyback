@@ -99,6 +99,17 @@ class Settings(BaseSettings):
     contracts_refresh_interval_seconds: int = 900  # 15 minutes
     contracts_refresh_initial_delay_seconds: int = 90  # first run after boot
 
+    # Paid accounting add-on billing (ADR-0042): the recurring ISK price per access
+    # period, and the reconciliation job that reads the OPERATOR's wallet journal
+    # (their own character token, distinct from any tenant corp token) and extends
+    # entitlements when a matching payment arrives. The job no-ops until an app admin
+    # connects the operator wallet.
+    accounting_price_isk: int = 250_000_000  # ISK per access period
+    accounting_period_days: int = 30
+    payments_background_refresh_enabled: bool = True
+    payments_refresh_interval_seconds: int = 1800  # 30 minutes
+    payments_refresh_initial_delay_seconds: int = 120  # first run after boot
+
     # Pluggable L1 cache in front of the market_prices DB cache (ADR-0033). Default
     # is an in-process LRU; set "memcached" + the address to share across processes.
     # SECURITY: memcached is UNAUTHENTICATED — bind it to loopback or a private/
@@ -145,6 +156,10 @@ class Settings(BaseSettings):
     # background watcher can read the corp's contracts. Existing tokens granted before
     # this must reconnect to gain it.
     eve_contracts_scopes: str = "esi-contracts.read_corporation_contracts.v1"
+    # Scopes for the OPERATOR wallet grant (ADR-0042): reading the operator's own
+    # character wallet journal to reconcile incoming ISK access payments. This token
+    # belongs to the instance operator, never to a tenant corp.
+    eve_wallet_scopes: str = "publicData esi-wallet.read_character_wallet.v1"
 
     @property
     def eve_corp_token_scopes(self) -> str:
