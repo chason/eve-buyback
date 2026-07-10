@@ -1,7 +1,17 @@
 import { apiGet, apiSend, throwApiError } from "./client"
-import type { CorpAccessOut, OperatorWalletStatus, PaymentOut } from "./types"
+import type {
+  BillingSettingsOut,
+  CorpAccessOut,
+  OperatorWalletStatus,
+  PaymentOut,
+} from "./types"
 
-export type { CorpAccessOut, OperatorWalletStatus, PaymentOut } from "./types"
+export type {
+  BillingSettingsOut,
+  CorpAccessOut,
+  OperatorWalletStatus,
+  PaymentOut,
+} from "./types"
 
 // The operator-wallet SSO flow's state prefix (must match the backend's
 // application/operator_wallet.py) — the shared callback routes on it.
@@ -27,6 +37,19 @@ export async function grantCorpAccess(
 export async function revokeCorpAccess(corporationId: number): Promise<void> {
   const res = await apiSend("DELETE", `/admin/access/${corporationId}`)
   if (!res.ok) await throwApiError(res, "Removing access failed")
+}
+
+/** The access price the instance charges (runtime-editable, ADR-0042). */
+export const getBillingSettings = () =>
+  apiGet<BillingSettingsOut>("/admin/billing")
+
+/** Set the access price (applies to checkout and all future payment matching). */
+export async function updateBillingSettings(
+  priceIsk: number,
+): Promise<BillingSettingsOut> {
+  const res = await apiSend("PUT", "/admin/billing", { price_isk: priceIsk })
+  if (!res.ok) await throwApiError(res, "Saving the price failed")
+  return (await res.json()) as BillingSettingsOut
 }
 
 /** The operator wallet connection (payment reconciliation, ADR-0042). */

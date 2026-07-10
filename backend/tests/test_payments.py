@@ -223,6 +223,35 @@ async def test_manual_match_applies_and_refuses_repeats_and_underpayments():
             )
 
 
+# --- runtime-editable price (admin-set, ADR-0042) ----------------------------------
+
+
+async def test_admin_set_price_drives_matching_and_checkout():
+    async with SessionLocal() as session:
+        await _seed(session)
+        # Default comes from the environment until an admin sets a value.
+        assert await payments_app.get_price_isk(session) == PRICE
+
+        await payments_app.set_price_isk(session, price_isk=100_000_000)
+        assert await payments_app.get_price_isk(session) == 100_000_000
+
+        # A 250M payment now buys 2 whole periods at the 100M price.
+        await payments_app.reconcile_payments(
+            session, FakeSso(), FakeEsi([_entry(1, 250_000_000, f"BB-{CORP_EVE_ID}")]),
+            cipher=_cipher(), now=NOW,
+        )
+        ent = await entitlements_repo.get(
+            session, corporation_id=await _corp_uuid(session), feature="accounting"
+        )
+        assert ent.expires_at == NOW + timedelta(days=60)
+
+        # Checkout reflects the admin-set price too.
+        info = await payments_app.checkout_info(
+            session, corporation_eve_id=CORP_EVE_ID, now=NOW
+        )
+        assert info.price_isk == 100_000_000
+
+
 # --- checkout ----------------------------------------------------------------------
 
 
@@ -296,6 +325,30 @@ async def test_wallet_and_payment_endpoints_reject_non_admin(client):
         await _login(http)
         assert (await http.get("/api/v1/admin/wallet")).status_code == 403
         assert (await http.get("/api/v1/admin/payments")).status_code == 403
+        assert (await http.get("/api/v1/admin/billing")).status_code == 403
+        assert (
+            await http.put("/api/v1/admin/billing", json={"price_isk": 1})
+        ).status_code == 403
+
+
+@pytest.mark.parametrize("client", ["12345"], indirect=True)
+async def test_admin_edits_the_price(client):
+    async with client as http:
+        await _login(http)
+        before = (await http.get("/api/v1/admin/billing")).json()
+        assert before["price_isk"] == PRICE
+
+        updated = await http.put(
+            "/api/v1/admin/billing", json={"price_isk": 500_000_000}
+        )
+        assert updated.status_code == 200
+        assert updated.json()["price_isk"] == 500_000_000
+        assert (await http.get("/api/v1/admin/billing")).json()["price_isk"] == 500_000_000
+
+        # Zero/negative prices are refused at the contract.
+        assert (
+            await http.put("/api/v1/admin/billing", json={"price_isk": 0})
+        ).status_code == 422
 
 
 @pytest.mark.parametrize("client", ["12345"], indirect=True)

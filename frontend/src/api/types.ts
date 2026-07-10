@@ -39,6 +39,7 @@ export type AccessGrantRequest = Schemas["AccessGrantRequest"]
 export type OperatorWalletStatus = Schemas["OperatorWalletStatus"]
 export type PaymentOut = Schemas["PaymentOut"]
 export type AccountingAccessOut = Schemas["AccountingAccessOut"]
+export type BillingSettingsOut = Schemas["BillingSettingsOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

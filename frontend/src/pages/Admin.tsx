@@ -4,6 +4,7 @@ import { useState } from "react"
 import type { CorpAccessOut, PaymentOut } from "../api/admin"
 import {
   beginWalletAuthorize,
+  getBillingSettings,
   getWalletStatus,
   grantCorpAccess,
   listCorpAccess,
@@ -11,6 +12,7 @@ import {
   matchPayment,
   revokeCorpAccess,
   revokeWallet,
+  updateBillingSettings,
 } from "../api/admin"
 import { getMe } from "../api/auth"
 import { ConfirmButton } from "../components/ConfirmButton"
@@ -178,8 +180,50 @@ function PaymentRow({
   )
 }
 
+function PriceEditor({ priceIsk, periodDays }: { priceIsk: number; periodDays: number }) {
+  const queryClient = useQueryClient()
+  const [price, setPrice] = useState(String(priceIsk))
+  const save = useMutation({
+    mutationFn: () => updateBillingSettings(Number(price)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["billingSettings"] }),
+  })
+  const parsed = Number(price)
+  const valid = Number.isInteger(parsed) && parsed > 0
+
+  return (
+    <p className="access-actions">
+      <small className="field-hint">
+        Access costs <strong>{formatIsk(String(priceIsk))}</strong> per{" "}
+        {periodDays} days.
+      </small>{" "}
+      <input
+        type="number"
+        min={1}
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+        aria-label="Access price in ISK"
+        title="ISK per access period"
+      />
+      <button
+        type="button"
+        className="secondary"
+        disabled={!valid || Number(price) === priceIsk || save.isPending}
+        onClick={() => save.mutate()}
+      >
+        Save price
+      </button>
+      {save.isError && <span className="error">{(save.error as Error).message}</span>}
+    </p>
+  )
+}
+
 function PaymentsSection({ corps }: { corps: CorpAccessOut[] }) {
   const queryClient = useQueryClient()
+  const billing = useQuery({
+    queryKey: ["billingSettings"],
+    queryFn: getBillingSettings,
+  })
   const wallet = useQuery({ queryKey: ["walletStatus"], queryFn: getWalletStatus })
   const payments = useQuery({
     queryKey: ["payments"],
@@ -198,6 +242,13 @@ function PaymentsSection({ corps }: { corps: CorpAccessOut[] }) {
   return (
     <section>
       <h2>Payments</h2>
+      {billing.data && (
+        <PriceEditor
+          key={billing.data.price_isk}
+          priceIsk={billing.data.price_isk}
+          periodDays={billing.data.period_days}
+        />
+      )}
       {wallet.data && !wallet.data.connected && (
         <p>
           <small className="field-hint">

@@ -48,6 +48,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Billing Settings */
+        get: operations["get_billing_settings_api_v1_admin_billing_get"];
+        /**
+         * Update Billing Settings
+         * @description Set the access price (applies to checkout and all future payment matching).
+         */
+        put: operations["update_billing_settings_api_v1_admin_billing_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/payments": {
         parameters: {
             query?: never;
@@ -815,6 +836,24 @@ export interface components {
             /** Rejected Count */
             rejected_count: number;
         };
+        /**
+         * BillingSettingsOut
+         * @description The access price the instance charges (ADR-0042).
+         */
+        BillingSettingsOut: {
+            /** Period Days */
+            period_days: number;
+            /** Price Isk */
+            price_isk: number;
+        };
+        /**
+         * BillingSettingsUpdate
+         * @description Set the access price. Must buy something: at least 1 ISK per period.
+         */
+        BillingSettingsUpdate: {
+            /** Price Isk */
+            price_isk: number;
+        };
         /** ConfigOut */
         ConfigOut: {
             /**
@@ -1413,6 +1452,59 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_billing_settings_api_v1_admin_billing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettingsOut"];
+                };
+            };
+        };
+    };
+    update_billing_settings_api_v1_admin_billing_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettingsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

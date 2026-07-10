@@ -31,6 +31,7 @@ from app.config import get_settings
 from app.data.records import WalletPaymentRecord
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import entitlements as entitlements_repo
+from app.data.repositories import instance_settings as settings_repo
 from app.data.repositories import wallet_payments as payments_repo
 from app.domain.entitlements import Feature, entitlement_active
 from app.domain.payments import (
@@ -47,6 +48,25 @@ from app.plugins.token_cipher import TokenCipher
 log = logging.getLogger(__name__)
 
 _FEATURE: Feature = "accounting"
+
+# instance_settings key for the admin-set access price; absent → the env default
+# (BUYBACK_ACCOUNTING_PRICE_ISK) applies.
+_PRICE_KEY = "accounting_price_isk"
+
+
+async def get_price_isk(session: AsyncSession) -> int:
+    """The effective access price: the admin-set value when present, else the env
+    default. Runtime-editable from the admin UI (no redeploy)."""
+    stored = await settings_repo.get_value(session, _PRICE_KEY)
+    return int(stored) if stored is not None else get_settings().accounting_price_isk
+
+
+async def set_price_isk(session: AsyncSession, *, price_isk: int) -> int:
+    """Admin action: set the access price. Validation (positive integer) is enforced
+    at the API DTO; this persists and returns the new effective price."""
+    await settings_repo.set_value(session, _PRICE_KEY, str(price_isk))
+    await session.commit()
+    return price_isk
 
 
 class CheckoutInfo(BaseModel):
@@ -75,7 +95,7 @@ async def reconcile_payments(
     operator wallet connected → quiet no-op (the feature simply isn't turned on);
     a revoked/scope-less token is flagged on the wallet status and skipped."""
     now = now or datetime.now(UTC)
-    settings = get_settings()
+    price_isk = await get_price_isk(session)
 
     try:
         operator_character_id, access_token = await wallet_app.get_wallet_access_token(
@@ -128,7 +148,7 @@ async def reconcile_payments(
             if corp_eve_id is not None
             else None
         )
-        periods = periods_for(entry.amount, settings.accounting_price_isk)
+        periods = periods_for(entry.amount, price_isk)
         matched = corp is not None and periods > 0
         if matched:
             await _extend_access(session, corp.id, periods=periods, now=now)
@@ -181,7 +201,7 @@ async def match_payment(
     corp = await corporations_repo.get_by_eve_id(session, corporation_eve_id)
     if corp is None:
         raise CorporationNotRegistered()
-    periods = periods_for(payment.amount, get_settings().accounting_price_isk)
+    periods = periods_for(payment.amount, await get_price_isk(session))
     if periods < 1:
         raise PaymentTooSmall()
     await _extend_access(session, corp.id, periods=periods, now=now)
@@ -205,7 +225,6 @@ async def checkout_info(
     """What the corp's manager sees on the access panel: current status plus, when the
     operator wallet is connected, how to pay."""
     now = now or datetime.now(UTC)
-    settings = get_settings()
     corp = await corporations_repo.get_by_eve_id(session, corporation_eve_id)
     if corp is None:
         raise CorporationNotRegistered()
@@ -218,8 +237,8 @@ async def checkout_info(
             entitlement is not None and entitlement_active(entitlement.expires_at, now)
         ),
         expires_at=entitlement.expires_at if entitlement else None,
-        price_isk=settings.accounting_price_isk,
-        period_days=settings.accounting_period_days,
+        price_isk=await get_price_isk(session),
+        period_days=get_settings().accounting_period_days,
         reference=payment_reference(corporation_eve_id),
         payment_configured=wallet is not None,
         operator_character_name=wallet.character_name if wallet else None,

@@ -56,7 +56,9 @@ function renderAdmin() {
 function payment(over: Partial<adminApi.PaymentOut> = {}): adminApi.PaymentOut {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    amount: "250000000.00",
+    // Distinct from the default price so amount assertions never collide with the
+    // price editor's text.
+    amount: "300000000.00",
     sender_name: "Rich Buyer",
     reason: "forgot the reference",
     received_at: "2026-07-10T00:00:00Z",
@@ -80,6 +82,10 @@ describe("Admin", () => {
       created_at: null,
     })
     vi.mocked(adminApi.listPayments).mockResolvedValue([])
+    vi.mocked(adminApi.getBillingSettings).mockResolvedValue({
+      price_isk: 250_000_000,
+      period_days: 30,
+    })
   })
 
   it("blocks a non-admin", async () => {
@@ -155,6 +161,29 @@ describe("Admin", () => {
     )
   })
 
+  it("lets the admin change the access price (ADR-0042)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(adminApi.updateBillingSettings).mockResolvedValue({
+      price_isk: 100_000_000,
+      period_days: 30,
+    })
+    renderAdmin()
+
+    // The current price reads in plain English…
+    expect(await screen.findByText("250,000,000.00 ISK")).toBeInTheDocument()
+    const save = screen.getByRole("button", { name: "Save price" })
+    expect(save).toBeDisabled() // unchanged value → nothing to save
+
+    // …and editing it enables Save, which sends the new price.
+    const input = screen.getByLabelText("Access price in ISK")
+    await u.clear(input)
+    await u.type(input, "100000000")
+    await u.click(save)
+    await waitFor(() =>
+      expect(adminApi.updateBillingSettings).toHaveBeenCalledWith(100_000_000),
+    )
+  })
+
   it("offers to connect the payment wallet when none is connected", async () => {
     renderAdmin()
     expect(
@@ -181,7 +210,7 @@ describe("Admin", () => {
 
     // The unmatched payment shows sender, ISK amount, and the transfer message.
     expect(await screen.findByText("Rich Buyer")).toBeInTheDocument()
-    expect(screen.getByText("250,000,000.00 ISK")).toBeInTheDocument()
+    expect(screen.getByText("300,000,000.00 ISK")).toBeInTheDocument()
     expect(screen.getByText("forgot the reference")).toBeInTheDocument()
 
     // The corp picker fills from the (separately fetched) access list.
