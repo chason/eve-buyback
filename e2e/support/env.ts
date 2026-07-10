@@ -18,6 +18,10 @@ export const baseURL = `http://127.0.0.1:${port}`
 // script must share this secret. It exists only for local/CI e2e runs.
 export const sessionSecret = "e2e-insecure-session-secret"
 
+// The "admin" persona's character id (ADR-0041) — must match PERSONAS in
+// e2e_setup.py; if they drift, the admin journeys fail loudly.
+export const adminCharacterId = 90000090
+
 /** Minimal KEY=VALUE .env reader — real environment variables win over the file. */
 function dotenvValue(key: string): string | undefined {
   const file = path.join(backendDir, ".env")
@@ -55,6 +59,8 @@ export function serverEnv(): Record<string, string> {
     BUYBACK_ENVIRONMENT: "development",
     BUYBACK_SESSION_SECRET: sessionSecret,
     BUYBACK_STATIC_DIR: distDir,
+    // The instance app-admin allowlist (ADR-0041) — the "admin" persona.
+    BUYBACK_ADMIN_CHARACTER_IDS: String(adminCharacterId),
     // Keep the boot quiet and offline: no background ESI/Fuzzwork traffic in e2e.
     BUYBACK_MARKET_BACKGROUND_REFRESH_ENABLED: "false",
     BUYBACK_ROSTER_BACKGROUND_REFRESH_ENABLED: "false",

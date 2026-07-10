@@ -56,6 +56,18 @@ PERSONAS = {
         "is_ceo": False,
         "encrypted_login_token": None,
     },
+    # Instance app admin (ADR-0041): this character id must match the allowlist that
+    # env.ts puts in BUYBACK_ADMIN_CHARACTER_IDS — if they drift, the admin journeys
+    # fail loudly. Admin-ness is orthogonal to the corp role, so is_ceo stays False.
+    "admin": {
+        "character_id": 90000090,
+        "character_name": "Site Operator",
+        "corporation_id": SECOND_CORP["eve_id"],
+        "corporation_name": SECOND_CORP["name"],
+        "is_director": False,
+        "is_ceo": False,
+        "encrypted_login_token": None,
+    },
 }
 
 

@@ -32,6 +32,9 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
+    // Pin the locale: date assertions (e.g. the admin "Until" column) must not
+    // depend on the machine's system locale.
+    locale: "en-US",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
