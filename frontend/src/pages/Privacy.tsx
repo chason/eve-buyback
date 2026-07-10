@@ -16,6 +16,7 @@ const ADRS: { id: string; file: string }[] = [
   { id: "ADR-0037", file: "0037-corp-contract-watcher.md" },
   { id: "ADR-0038", file: "0038-open-in-eve-login-token.md" },
   { id: "ADR-0040", file: "0040-appraisal-link-unfurl-preview.md" },
+  { id: "ADR-0042", file: "0042-paid-accounting-entitlements.md" },
 ]
 
 export default function Privacy() {
@@ -172,6 +173,36 @@ export default function Privacy() {
         </section>
 
         <section>
+          <h2>Paying for optional add-ons (the operator&apos;s own wallet)</h2>
+          <p>
+            On a hosted instance, corporations can pay ISK for optional paid features.
+            To notice those payments, the person <strong>running the instance</strong>{" "}
+            can connect a wallet token for <strong>their own character</strong> — the one
+            the ISK is sent to. The app then periodically reads{" "}
+            <strong>that character&apos;s own wallet journal</strong> to match incoming
+            transfers to the corporation that paid.{" "}
+            <strong>It never reads any member&apos;s or corporation&apos;s wallet</strong>{" "}
+            — only the operator&apos;s.
+          </p>
+          <ul>
+            <li>
+              Like the corp token, its <strong>refresh token is encrypted at rest</strong>;
+              short-lived access tokens are never persisted. It&apos;s opt-in and can be
+              disconnected at any time.
+            </li>
+            <li>
+              Incoming transfers the app sees are kept as a billing record —{" "}
+              <strong>amount, sender, date, and the transfer reason</strong> — so
+              payments can be audited and matched by hand when a reference is mistyped.
+            </li>
+            <li>
+              A self-hosted instance that never connects an operator wallet stores none
+              of this.
+            </li>
+          </ul>
+        </section>
+
+        <section>
           <h2>Market price data</h2>
           <p>
             Quote prices come from <strong>Fuzzwork aggregates and EVE ESI</strong>,
@@ -185,9 +216,11 @@ export default function Privacy() {
           <h2>What we never do</h2>
           <p>Except for what&apos;s detailed above, we never:</p>
           <ul>
-            <li>store any EVE token on our servers, except the one opt-in corp token
+            <li>store any EVE token on our servers, except the opt-in corp token and the
+              operator&apos;s own wallet token described above
               (the login refresh token stays only in your own encrypted cookie);</li>
-            <li>read your wallet, assets, mail, or skills;</li>
+            <li>read your wallet, assets, mail, or skills — the only wallet the app ever
+              reads is the instance operator&apos;s own, for payment matching;</li>
             <li>read your personal contracts — only the corporation&apos;s item-exchange
               contracts, via the opt-in corp token described above;</li>
             <li>sell your data or share it with third parties.</li>

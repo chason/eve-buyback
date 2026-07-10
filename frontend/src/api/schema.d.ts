@@ -48,6 +48,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payments
+         * @description Recent incoming payments (newest first); `?unmatched=true` filters to the ones
+         *     awaiting a manual match.
+         */
+        get: operations["list_payments_api_v1_admin_payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/payments/{payment_id}/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match Payment
+         * @description Apply an unmatched payment to a corp (extends their access by the periods the
+         *     amount covers).
+         */
+        post: operations["match_payment_api_v1_admin_payments__payment_id__match_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Wallet Status */
+        get: operations["get_wallet_status_api_v1_admin_wallet_get"];
+        put?: never;
+        post?: never;
+        /** Revoke Wallet */
+        delete: operations["revoke_wallet_api_v1_admin_wallet_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallet/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize Wallet
+         * @description Begin the operator wallet grant: mint state + PKCE, return the SSO URL.
+         */
+        post: operations["authorize_wallet_api_v1_admin_wallet_authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallet/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Wallet
+         * @description Complete the grant: validate state, exchange the code, store the token.
+         */
+        post: operations["complete_wallet_api_v1_admin_wallet_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/appraisals": {
         parameters: {
             query?: never;
@@ -192,6 +292,23 @@ export interface paths {
         };
         /** Get My Corporation */
         get: operations["get_my_corporation_api_v1_corporations_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Accounting Access */
+        get: operations["get_accounting_access_api_v1_corporations_me_accounting_access_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -570,6 +687,28 @@ export interface components {
             expires_at?: string | null;
         };
         /**
+         * AccountingAccessOut
+         * @description A corp's accounting-access status plus how to pay (manager-visible). When no
+         *     operator wallet is connected (`payment_configured` False), the UI shows status
+         *     only — there is nowhere to send ISK yet.
+         */
+        AccountingAccessOut: {
+            /** Active */
+            active: boolean;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Operator Character Name */
+            operator_character_name?: string | null;
+            /** Payment Configured */
+            payment_configured: boolean;
+            /** Period Days */
+            period_days: number;
+            /** Price Isk */
+            price_isk: number;
+            /** Reference */
+            reference: string;
+        };
+        /**
          * AppraisalCreateRequest
          * @description Items may be supplied structured, as a raw EVE paste, or both — but at least
          *     one must be non-empty. The paste is parsed and name-resolved server-side. The
@@ -868,6 +1007,64 @@ export interface components {
             parent_id: number | null;
         };
         /**
+         * OperatorWalletStatus
+         * @description The operator wallet connection (ADR-0042), as shown on the admin page.
+         */
+        OperatorWalletStatus: {
+            /** Character Name */
+            character_name?: string | null;
+            /** Configured */
+            configured: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Expired
+             * @default false
+             */
+            expired: boolean;
+        };
+        /**
+         * PaymentMatchRequest
+         * @description Apply an unmatched payment to a corporation (by EVE corp id).
+         */
+        PaymentMatchRequest: {
+            /** Corporation Id */
+            corporation_id: number;
+        };
+        /**
+         * PaymentOut
+         * @description One incoming ISK transfer seen in the operator's wallet (ADR-0042).
+         */
+        PaymentOut: {
+            /** Amount */
+            amount: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Matched */
+            matched: boolean;
+            /** Matched Corporation Name */
+            matched_corporation_name?: string | null;
+            /**
+             * Periods Granted
+             * @default 0
+             */
+            periods_granted: number;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Sender Name */
+            sender_name?: string | null;
+        };
+        /**
          * ReprocessBreakdownOut
          * @description How a reprocess-priced ore line breaks down (ADR-0026): the minerals it yields
          *     plus any sub-batch leftover priced at the ore's own market price.
@@ -1121,6 +1318,20 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WalletAuthorizeRequest */
+        WalletAuthorizeRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** WalletAuthorizeResponse */
+        WalletAuthorizeResponse: {
+            /** Authorization Url */
+            authorization_url: string;
+            /** State */
+            state: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1202,6 +1413,163 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payments_api_v1_admin_payments_get: {
+        parameters: {
+            query?: {
+                unmatched?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    match_payment_api_v1_admin_payments__payment_id__match_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wallet_status_api_v1_admin_wallet_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorWalletStatus"];
+                };
+            };
+        };
+    };
+    revoke_wallet_api_v1_admin_wallet_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    authorize_wallet_api_v1_admin_wallet_authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletAuthorizeResponse"];
+                };
+            };
+        };
+    };
+    complete_wallet_api_v1_admin_wallet_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalletAuthorizeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorWalletStatus"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -1454,6 +1822,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CorporationOut"];
+                };
+            };
+        };
+    };
+    get_accounting_access_api_v1_corporations_me_accounting_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingAccessOut"];
                 };
             };
         };

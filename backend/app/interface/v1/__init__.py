@@ -4,6 +4,7 @@ from app.interface.v1 import (
     admin,
     appraisals,
     auth,
+    billing,
     corporations,
     health,
     locations,
@@ -24,3 +25,4 @@ api_router.include_router(structures.router)
 api_router.include_router(roster.router)
 api_router.include_router(locations.router)
 api_router.include_router(admin.router)
+api_router.include_router(billing.router)

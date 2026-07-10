@@ -28,6 +28,11 @@ from app.application.errors import (
     NotAuthorized,
     NotAuthorizedToAuthorizeStructure,
     OpenContractUnavailable,
+    OperatorWalletExpired,
+    OperatorWalletMissing,
+    PaymentAlreadyMatched,
+    PaymentNotFound,
+    PaymentTooSmall,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
     RosterAccessDenied,
@@ -68,6 +73,11 @@ _STATUS: dict[type[ApplicationError], int] = {
     OpenContractUnavailable: 409,
     # 402 Payment Required — the corp lacks an active paid-feature grant (ADR-0042).
     EntitlementRequired: 402,
+    OperatorWalletMissing: 409,
+    OperatorWalletExpired: 409,
+    PaymentNotFound: 404,
+    PaymentAlreadyMatched: 409,
+    PaymentTooSmall: 422,
 }
 
 

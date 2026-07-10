@@ -17,6 +17,7 @@ from app.interface.errors import application_error_handler
 from app.interface.jobs import (
     run_contracts_refresh,
     run_market_refresh,
+    run_payments_reconcile,
     run_roster_refresh,
 )
 from app.interface.middleware import CsrfHeaderMiddleware
@@ -85,12 +86,14 @@ def _start_scheduler(
 ) -> AsyncIOScheduler | None:
     """Start the in-process scheduler (ADR-0010) with whichever background jobs are
     enabled — market-price refresh (ADR-0034), the daily corp-roster refresh (ADR-0036),
-    and/or the corp-contract watcher (ADR-0037). Each job runs first after a short delay so
-    a cold deploy warms soon without hammering ESI at boot. Returns None when all are off."""
+    the corp-contract watcher (ADR-0037), and/or payment reconciliation (ADR-0042). Each
+    job runs first after a short delay so a cold deploy warms soon without hammering ESI
+    at boot. Returns None when all are off."""
     if not (
         settings.market_background_refresh_enabled
         or settings.roster_background_refresh_enabled
         or settings.contracts_background_refresh_enabled
+        or settings.payments_background_refresh_enabled
     ):
         return None
     scheduler = AsyncIOScheduler()
@@ -128,6 +131,19 @@ def _start_scheduler(
             coalesce=True,
             next_run_time=datetime.now()
             + timedelta(seconds=settings.contracts_refresh_initial_delay_seconds),
+        )
+    if settings.payments_background_refresh_enabled:
+        scheduler.add_job(
+            run_payments_reconcile,
+            trigger=IntervalTrigger(
+                seconds=settings.payments_refresh_interval_seconds
+            ),
+            args=[app],
+            id="payments_reconcile",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.payments_refresh_initial_delay_seconds),
         )
     scheduler.start()
     return scheduler

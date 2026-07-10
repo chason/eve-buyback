@@ -143,6 +143,29 @@ class NoMatchedContract(ApplicationError):
     default_detail = "No matching in-game contract is linked to this appraisal yet"
 
 
+class OperatorWalletMissing(ApplicationError):
+    default_detail = "The operator wallet has not been connected"
+
+
+class OperatorWalletExpired(ApplicationError):
+    default_detail = "The operator wallet authorization has expired; please reconnect"
+
+
+class PaymentNotFound(ApplicationError):
+    default_detail = "Payment not found"
+
+
+class PaymentAlreadyMatched(ApplicationError):
+    default_detail = "This payment has already been applied to a corporation"
+
+
+class PaymentTooSmall(ApplicationError):
+    default_detail = (
+        "This payment is smaller than the price of one access period — if you still "
+        "want to grant access for it, use Give access instead"
+    )
+
+
 class EntitlementRequired(ApplicationError):
     """The corp holds no active entitlement for a paid feature (ADR-0042). Mapped to
     402 Payment Required; the detail stays plain-English (no accounting jargon)."""

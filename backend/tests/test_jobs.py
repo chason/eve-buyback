@@ -33,6 +33,7 @@ def test_start_scheduler_returns_none_when_all_jobs_disabled():
             "market_background_refresh_enabled": False,
             "roster_background_refresh_enabled": False,
             "contracts_background_refresh_enabled": False,
+            "payments_background_refresh_enabled": False,
         }
     )
     assert _start_scheduler(SimpleNamespace(), settings) is None
@@ -50,6 +51,9 @@ async def test_start_scheduler_configures_enabled_jobs():
             "contracts_background_refresh_enabled": True,
             "contracts_refresh_interval_seconds": 900,
             "contracts_refresh_initial_delay_seconds": 90,
+            "payments_background_refresh_enabled": True,
+            "payments_refresh_interval_seconds": 1800,
+            "payments_refresh_initial_delay_seconds": 120,
         }
     )
 
@@ -70,6 +74,11 @@ async def test_start_scheduler_configures_enabled_jobs():
         assert contracts.trigger.interval.total_seconds() == 900
         assert contracts.max_instances == 1
         assert contracts.coalesce is True
+        payments = scheduler.get_job("payments_reconcile")
+        assert payments is not None
+        assert payments.trigger.interval.total_seconds() == 1800
+        assert payments.max_instances == 1
+        assert payments.coalesce is True
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

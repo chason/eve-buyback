@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom"
 import { getMe } from "../api/auth"
 import { getConfig, updateConfig } from "../api/pricing"
 import type { AggregateField, Basis } from "../api/types"
+import AccountingAccessPanel from "../components/AccountingAccessPanel"
 import CorpEsiAccessPanel from "../components/CorpEsiAccessPanel"
 import HubPicker, { type HubSelection } from "../components/HubPicker"
 import { StatusChip } from "../components/StatusChip"
@@ -275,6 +276,8 @@ export default function Config() {
           </p>
         )}
       </form>
+
+      <AccountingAccessPanel />
     </>
   )
 }
