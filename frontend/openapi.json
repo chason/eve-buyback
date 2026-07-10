@@ -457,6 +457,41 @@
         "title": "AppraisalSummaryOut",
         "type": "object"
       },
+      "BillingSettingsOut": {
+        "description": "The access price the instance charges (ADR-0042).",
+        "properties": {
+          "period_days": {
+            "title": "Period Days",
+            "type": "integer"
+          },
+          "price_isk": {
+            "title": "Price Isk",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "price_isk",
+          "period_days"
+        ],
+        "title": "BillingSettingsOut",
+        "type": "object"
+      },
+      "BillingSettingsUpdate": {
+        "description": "Set the access price. Must buy something: at least 1 ISK per period.",
+        "properties": {
+          "price_isk": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Price Isk",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "price_isk"
+        ],
+        "title": "BillingSettingsUpdate",
+        "type": "object"
+      },
       "ConfigOut": {
         "properties": {
           "aggregate_field": {
@@ -1858,6 +1893,67 @@
           }
         },
         "summary": "Grant Corp Access",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/billing": {
+      "get": {
+        "operationId": "get_billing_settings_api_v1_admin_billing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Billing Settings",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Set the access price (applies to checkout and all future payment matching).",
+        "operationId": "update_billing_settings_api_v1_admin_billing_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Billing Settings",
         "tags": [
           "admin"
         ]

@@ -9,6 +9,7 @@ from app.data.models.corp_esi_token import CorpEsiToken
 from app.data.models.corp_roster_member import CorpRosterMember
 from app.data.models.corporation import Corporation
 from app.data.models.entitlement import Entitlement
+from app.data.models.instance_setting import InstanceSetting
 from app.data.models.manager_assignment import ManagerAssignment
 from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
@@ -31,6 +32,7 @@ __all__ = [
     "CorpRosterMember",
     "Corporation",
     "Entitlement",
+    "InstanceSetting",
     "ManagerAssignment",
     "MarketHubRefresh",
     "MarketPrice",

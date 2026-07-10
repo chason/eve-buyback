@@ -21,6 +21,8 @@ from app.plugins.sso import EveSsoClient, get_sso_client
 from app.plugins.token_cipher import TokenCipher, get_token_cipher
 from app.schemas.admin import (
     AccessGrantRequest,
+    BillingSettingsOut,
+    BillingSettingsUpdate,
     CorpAccessOut,
     OperatorWalletStatus,
     PaymentMatchRequest,
@@ -78,6 +80,30 @@ async def revoke_corp_access(
     """Revoke a corp's access. Idempotent."""
     await entitlements_app.revoke_access(
         session, corporation_eve_id=corporation_id, feature=_FEATURE
+    )
+
+
+# --- billing settings (ADR-0042): the runtime-editable access price ---------------
+
+
+@router.get("/billing", response_model=BillingSettingsOut)
+async def get_billing_settings(
+    user: RequireAppAdmin, session: SessionDep
+) -> BillingSettingsOut:
+    return BillingSettingsOut(
+        price_isk=await payments_app.get_price_isk(session),
+        period_days=get_settings().accounting_period_days,
+    )
+
+
+@router.put("/billing", response_model=BillingSettingsOut)
+async def update_billing_settings(
+    payload: BillingSettingsUpdate, user: RequireAppAdmin, session: SessionDep
+) -> BillingSettingsOut:
+    """Set the access price (applies to checkout and all future payment matching)."""
+    price = await payments_app.set_price_isk(session, price_isk=payload.price_isk)
+    return BillingSettingsOut(
+        price_isk=price, period_days=get_settings().accounting_period_days
     )
 
 

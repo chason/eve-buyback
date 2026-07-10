@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.entitlements import EntitlementSource
 
@@ -66,3 +66,16 @@ class PaymentMatchRequest(BaseModel):
     """Apply an unmatched payment to a corporation (by EVE corp id)."""
 
     corporation_id: int
+
+
+class BillingSettingsOut(BaseModel):
+    """The access price the instance charges (ADR-0042)."""
+
+    price_isk: int
+    period_days: int
+
+
+class BillingSettingsUpdate(BaseModel):
+    """Set the access price. Must buy something: at least 1 ISK per period."""
+
+    price_isk: int = Field(gt=0, le=1_000_000_000_000_000)  # sanity cap: 1 quadrillion
