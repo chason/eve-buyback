@@ -34,8 +34,8 @@ function untilLabel(corp: CorpAccessOut): string {
   })
 }
 
-function sourceLabel(corp: CorpAccessOut): string | null {
-  if (!corp.granted_at) return null
+function sourceLabel(corp: CorpAccessOut): string | undefined {
+  if (!corp.granted_at) return undefined
   return corp.source === "payment" ? "paid" : "granted by admin"
 }
 
@@ -62,17 +62,20 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
       queryClient.invalidateQueries({ queryKey: ["corpAccess"] }),
   })
 
+  // How the grant came to be shows on hover, not inline — the badge stays clean.
   const source = sourceLabel(corp)
   return (
     <tr>
       <td>{corp.corporation_name}</td>
       <td>
-        {corp.active ? <mark>On</mark> : accessLabel(corp)}
-        {source && (
-          <>
-            {" "}
-            <small className="field-hint">({source})</small>
-          </>
+        {corp.active ? (
+          <mark className="access-badge" title={source}>
+            On
+          </mark>
+        ) : (
+          <span className="access-badge" title={source}>
+            {accessLabel(corp)}
+          </span>
         )}
       </td>
       <td>{untilLabel(corp)}</td>

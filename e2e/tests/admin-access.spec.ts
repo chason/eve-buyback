@@ -42,7 +42,11 @@ test("admin: grants access forever, sees it live", async ({
   await rowA.getByRole("button", { name: "Give access" }).click()
   await expect(rowA).toContainText("On")
   await expect(rowA).toContainText("Forever")
-  await expect(rowA).toContainText("granted by admin")
+  // The grant source shows on hover, not inline.
+  await expect(rowA.locator(".access-badge")).toHaveAttribute(
+    "title",
+    "granted by admin",
+  )
 
   // Cleanup so journeys stay independent (the API is admin-gated + CSRF-checked).
   const res = await page.request.delete(`/api/v1/admin/access/${CORP_A.id}`, {
