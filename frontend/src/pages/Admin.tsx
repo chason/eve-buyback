@@ -16,13 +16,15 @@ import {
 } from "../api/admin"
 import { getMe } from "../api/auth"
 import { ConfirmButton } from "../components/ConfirmButton"
+import { StatusChip, type StatusVariant } from "../components/StatusChip"
 import { formatIsk } from "../lib/format"
 
-/** What the access cell says, in plain English (no billing/entitlement jargon). */
-function accessLabel(corp: CorpAccessOut): string {
-  if (corp.active) return "On"
-  if (corp.granted_at) return "Expired"
-  return "Off"
+/** What the access cell says, in plain English (no billing/entitlement jargon) —
+ * rendered as the same HUD status chips the appraisal line states use. */
+function accessChip(corp: CorpAccessOut): { label: string; variant: StatusVariant } {
+  if (corp.active) return { label: "On", variant: "accepted" }
+  if (corp.granted_at) return { label: "Expired", variant: "expired" }
+  return { label: "Off", variant: "muted" }
 }
 
 function untilLabel(corp: CorpAccessOut): string {
@@ -62,21 +64,16 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
       queryClient.invalidateQueries({ queryKey: ["corpAccess"] }),
   })
 
-  // How the grant came to be shows on hover, not inline — the badge stays clean.
+  // How the grant came to be shows on hover, not inline — the chip stays clean.
   const source = sourceLabel(corp)
+  const chip = accessChip(corp)
   return (
     <tr>
       <td>{corp.corporation_name}</td>
       <td>
-        {corp.active ? (
-          <mark className="access-badge" title={source}>
-            On
-          </mark>
-        ) : (
-          <span className="access-badge" title={source}>
-            {accessLabel(corp)}
-          </span>
-        )}
+        <span className="access-badge" title={source}>
+          <StatusChip variant={chip.variant}>{chip.label}</StatusChip>
+        </span>
       </td>
       <td>{untilLabel(corp)}</td>
       <td className="access-actions">
@@ -89,7 +86,7 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
         />
         <button
           type="button"
-          className="secondary"
+          className="secondary access-grant-btn"
           disabled={grant.isPending}
           onClick={() => grant.mutate()}
         >

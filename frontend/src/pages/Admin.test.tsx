@@ -110,11 +110,18 @@ describe("Admin", () => {
     ])
     renderAdmin()
     expect(await screen.findByText("Test Corp")).toBeInTheDocument()
-    expect(screen.getByText("Off")).toBeInTheDocument()
     expect(screen.getByText("Forever")).toBeInTheDocument() // active, no expiry
-    // How the grant came to be lives on hover (title), keeping the badge clean.
-    expect(screen.getByText("On")).toHaveAttribute("title", "granted by admin")
-    expect(screen.getByText("Off")).not.toHaveAttribute("title")
+    // Access states render as the same HUD chips the appraisal line states use…
+    expect(screen.getByText("On")).toHaveClass("status--accepted")
+    expect(screen.getByText("Off")).toHaveClass("status--muted")
+    // …and how the grant came to be lives on hover (title), keeping the chip clean.
+    expect(screen.getByText("On").closest(".access-badge")).toHaveAttribute(
+      "title",
+      "granted by admin",
+    )
+    expect(screen.getByText("Off").closest(".access-badge")).not.toHaveAttribute(
+      "title",
+    )
   })
 
   it("gives access forever when no date is picked", async () => {
