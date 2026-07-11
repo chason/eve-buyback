@@ -143,7 +143,8 @@ describe("Admin", () => {
     )
     renderAdmin()
     const date = await screen.findByLabelText(/Access until date for Test Corp/)
-    expect(date).toHaveAttribute("placeholder", "YYYY-MM-DD")
+    // The native picker can't reach the past: min is pinned to today (EVE/UTC).
+    expect(date.getAttribute("min")).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     // A date relative to now, so the test never rots into "the past".
     const future = new Date(Date.now() + 30 * 86_400_000)
       .toISOString()
@@ -158,19 +159,16 @@ describe("Admin", () => {
     )
   })
 
-  it("refuses a past or malformed end date in the UI", async () => {
+  it("refuses a past end date in the UI", async () => {
     const u = userEvent.setup()
     renderAdmin()
     const date = await screen.findByLabelText(/Access until date for Test Corp/)
     const give = screen.getByRole("button", { name: "Give access" })
 
-    await u.type(date, "2020-01-01") // long past
+    // A typed/pasted past date (the picker itself is min-clamped to today).
+    await u.type(date, "2020-01-01")
     expect(give).toBeDisabled()
     expect(date).toHaveAttribute("aria-invalid", "true")
-
-    await u.clear(date)
-    await u.type(date, "not-a-date")
-    expect(give).toBeDisabled()
 
     await u.clear(date) // empty = perpetual, always allowed
     expect(give).toBeEnabled()
