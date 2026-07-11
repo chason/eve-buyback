@@ -741,6 +741,12 @@ label:has(> .search-results) > input {
   padding: 0.25rem 0.5rem;
 }
 
+/* .field-hint's checkbox-oriented margins (negative top, spacing bottom) drag text
+   upward inside these flex rows — zero them so hints center against the controls. */
+.access-actions .field-hint {
+  margin: 0;
+}
+
 /* Mutation errors drop below the controls, full-width, instead of squeezing beside. */
 .access-actions .error {
   flex-basis: 100%;
