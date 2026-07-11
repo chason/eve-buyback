@@ -709,9 +709,9 @@ label:has(> .search-results) > input {
   line-height: 1.2;
 }
 
-/* The grant end date is typed as EVE-time ISO (YYYY-MM-DD) — ten characters. */
+/* The grant end date: native picker (min = today blocks the past), compact. */
 .access-actions input.access-date {
-  width: 8.5rem;
+  width: 10.5rem;
 }
 
 .access-actions input[type="number"] {

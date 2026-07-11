@@ -90,15 +90,14 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
       <td>{untilLabel(corp)}</td>
       <td className="access-actions">
         <input
-          type="text"
+          type="date"
           className="access-date"
-          placeholder="YYYY-MM-DD"
-          maxLength={10}
+          min={todayUtc()}
           value={until}
           onChange={(e) => setUntil(e.target.value)}
           aria-label={`Access until date for ${corp.corporation_name}`}
           aria-invalid={until !== "" && !isValidUntil(until) ? true : undefined}
-          title="End date in EVE time (YYYY-MM-DD), today or later; leave empty for access that never expires"
+          title="End date (EVE time), today or later; leave empty for access that never expires"
         />
         <button
           type="button"
