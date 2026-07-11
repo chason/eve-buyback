@@ -143,6 +143,13 @@ class NoMatchedContract(ApplicationError):
     default_detail = "No matching in-game contract is linked to this appraisal yet"
 
 
+class GrantExpiryInPast(ApplicationError):
+    default_detail = (
+        "The access end date is in the past — pick a future date, or leave it "
+        "empty for access that never expires"
+    )
+
+
 class OperatorWalletMissing(ApplicationError):
     default_detail = "The operator wallet has not been connected"
 

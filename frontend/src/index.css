@@ -695,25 +695,42 @@ label:has(> .search-results) > input {
   gap: 0.75rem;
 }
 
+/* Compact controls: Pico's roomy form sizing is meant for forms, not table rows.
+   Smaller padding/font keeps each row a thin strip and vertically centers the
+   surrounding text against the inputs. */
 .access-actions input,
 .access-actions select,
 .access-actions button.secondary {
   width: auto;
+  height: auto;
   margin-bottom: 0;
-}
-
-.access-actions input[type="date"] {
-  max-width: 11rem;
-}
-
-/* Compact action buttons in these cells; the grant button gets a fixed floor so
-   "Give access" and "Update access" render at one consistent width. */
-.access-actions button.secondary {
-  padding: 0.375rem 0.75rem;
+  padding: 0.375rem 0.5rem;
   font-size: 0.875rem;
   line-height: 1.2;
 }
 
+/* The grant end date is typed as EVE-time ISO (YYYY-MM-DD) — ten characters. */
+.access-actions input.access-date {
+  width: 8.5rem;
+}
+
+.access-actions input[type="number"] {
+  width: 11rem;
+}
+
+/* Keep the corp picker narrow enough that Apply sits beside it on one line;
+   preserve room for the dropdown arrow Pico draws in the right padding. */
+.access-actions select {
+  max-width: 13rem;
+  padding-right: 2rem;
+}
+
+.access-actions button.secondary {
+  padding: 0.375rem 0.75rem;
+}
+
+/* The grant button gets a fixed floor so "Give access" and "Update access"
+   render at one consistent width. */
 .access-grant-btn {
   min-width: 9.5rem;
   text-align: center;

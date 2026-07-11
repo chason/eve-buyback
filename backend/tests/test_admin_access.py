@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from app.config import Settings
 from app.data.db import SessionLocal
 from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import entitlements as entitlements_repo
 from app.interface import security
 from app.main import app
 from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
@@ -143,16 +144,35 @@ async def test_grant_list_revoke_round_trip(client):
 
 async def test_expired_grant_lists_inactive(client):
     await _register_corp()
+    # Arrange the lapsed grant directly (the API refuses past-dated grants).
+    async with SessionLocal() as session:
+        corp = await corporations_repo.get_by_eve_id(session, OTHER_CORP_EVE_ID)
+        await entitlements_repo.upsert(
+            session,
+            corporation_id=corp.id,
+            feature="accounting",
+            source="admin",
+            expires_at=datetime.now(UTC) - timedelta(days=1),
+        )
+        await session.commit()
+    async with client as http:
+        await _login(http)
+        listing = (await http.get("/api/v1/admin/access")).json()
+        corp_row = next(c for c in listing if c["corporation_id"] == OTHER_CORP_EVE_ID)
+        assert corp_row["active"] is False
+        assert corp_row["source"] == "admin"  # the lapsed grant is still visible
+
+
+async def test_grant_with_past_expiry_is_refused(client):
+    await _register_corp()
     async with client as http:
         await _login(http)
         past = (datetime.now(UTC) - timedelta(days=1)).isoformat()
-        await http.put(
+        resp = await http.put(
             f"/api/v1/admin/access/{OTHER_CORP_EVE_ID}", json={"expires_at": past}
         )
-        listing = (await http.get("/api/v1/admin/access")).json()
-        corp = next(c for c in listing if c["corporation_id"] == OTHER_CORP_EVE_ID)
-        assert corp["active"] is False
-        assert corp["source"] == "admin"  # the lapsed grant is still visible
+        assert resp.status_code == 422
+        assert "in the past" in resp.json()["detail"]
 
 
 async def test_grant_unregistered_corp_404s(client):

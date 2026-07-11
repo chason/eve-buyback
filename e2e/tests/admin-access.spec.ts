@@ -62,16 +62,21 @@ test("admin: a dated grant shows the picked day in UTC", async ({
   await loginAs("admin")
   await page.goto("/admin")
 
+  // A date relative to now (typed as EVE-time ISO — past dates are refused), so
+  // the journey never rots into "the past".
+  const until = new Date(Date.now() + 365 * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+  const [y, m, d] = until.split("-").map(Number)
+
   const rowB = page.getByRole("row", { name: new RegExp(CORP_B.name) })
-  await rowB
-    .getByLabel(`Access until date for ${CORP_B.name}`)
-    .fill("2026-08-09")
+  await rowB.getByLabel(`Access until date for ${CORP_B.name}`).fill(until)
   await rowB.getByRole("button", { name: "Give access" }).click()
 
   await expect(rowB).toContainText("On")
   // Rendered in UTC (EVE time) — the exact regression the manual test caught:
-  // a local-time render would show 8/10/2026 east of UTC.
-  await expect(rowB).toContainText("8/9/2026")
+  // a local-time render would show the NEXT day east of UTC.
+  await expect(rowB).toContainText(`${m}/${d}/${y}`)
 
   const res = await page.request.delete(`/api/v1/admin/access/${CORP_B.id}`, {
     headers: CSRF,

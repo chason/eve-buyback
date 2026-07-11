@@ -19,6 +19,7 @@ from app.application.errors import (
     DeliveryLocationRequired,
     EmptyAppraisal,
     EntitlementRequired,
+    GrantExpiryInPast,
     LocationInvalid,
     LocationNotFound,
     ManagerAlreadyExists,
@@ -73,6 +74,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     OpenContractUnavailable: 409,
     # 402 Payment Required — the corp lacks an active paid-feature grant (ADR-0042).
     EntitlementRequired: 402,
+    GrantExpiryInPast: 422,
     OperatorWalletMissing: 409,
     OperatorWalletExpired: 409,
     PaymentNotFound: 404,

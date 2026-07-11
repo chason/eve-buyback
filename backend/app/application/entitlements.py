@@ -11,7 +11,11 @@ from datetime import UTC, datetime
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.errors import CorporationNotRegistered, EntitlementRequired
+from app.application.errors import (
+    CorporationNotRegistered,
+    EntitlementRequired,
+    GrantExpiryInPast,
+)
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import entitlements as entitlements_repo
 from app.domain.entitlements import EntitlementSource, Feature, entitlement_active
@@ -93,7 +97,12 @@ async def grant_access(
     now: datetime | None = None,
 ) -> CorpFeatureAccess:
     """Grant or extend a corp's access by admin action (`source=admin`, ADR-0042).
-    `expires_at` None = perpetual. Re-granting rewrites expiry/source in place."""
+    `expires_at` None = perpetual. Re-granting rewrites expiry/source in place. A
+    dated grant must end in the future — granting already-lapsed access is always a
+    mistake (the UI enforces this too; this is the authoritative check)."""
+    now = now or datetime.now(UTC)
+    if expires_at is not None and expires_at <= now:
+        raise GrantExpiryInPast()
     corp = await corporations_repo.get_by_eve_id(session, corporation_eve_id)
     if corp is None:
         raise CorporationNotRegistered()
