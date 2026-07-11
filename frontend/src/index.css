@@ -706,6 +706,19 @@ label:has(> .search-results) > input {
   max-width: 11rem;
 }
 
+/* Compact action buttons in these cells; the grant button gets a fixed floor so
+   "Give access" and "Update access" render at one consistent width. */
+.access-actions button.secondary {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.access-grant-btn {
+  min-width: 9.5rem;
+  text-align: center;
+}
+
 /* Breathing room around the inline Remove action so it doesn't crowd the button. */
 .access-actions .linkbtn {
   padding: 0.25rem 0.5rem;
