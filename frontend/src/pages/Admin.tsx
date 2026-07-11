@@ -41,6 +41,18 @@ function sourceLabel(corp: CorpAccessOut): string | undefined {
   return corp.source === "payment" ? "paid" : "granted by admin"
 }
 
+/** Today in EVE/UTC as YYYY-MM-DD — the floor for grant end dates. */
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** Empty = perpetual; otherwise a complete ISO date that isn't in the past.
+ * String comparison is safe for YYYY-MM-DD. */
+function isValidUntil(until: string): boolean {
+  if (until === "") return true
+  return /^\d{4}-\d{2}-\d{2}$/.test(until) && until >= todayUtc()
+}
+
 function AccessRow({ corp }: { corp: CorpAccessOut }) {
   const queryClient = useQueryClient()
   // Optional "until" date for the grant; empty = access never expires.
@@ -78,16 +90,20 @@ function AccessRow({ corp }: { corp: CorpAccessOut }) {
       <td>{untilLabel(corp)}</td>
       <td className="access-actions">
         <input
-          type="date"
+          type="text"
+          className="access-date"
+          placeholder="YYYY-MM-DD"
+          maxLength={10}
           value={until}
           onChange={(e) => setUntil(e.target.value)}
           aria-label={`Access until date for ${corp.corporation_name}`}
-          title="Leave empty for access that never expires"
+          aria-invalid={until !== "" && !isValidUntil(until) ? true : undefined}
+          title="End date in EVE time (YYYY-MM-DD), today or later; leave empty for access that never expires"
         />
         <button
           type="button"
           className="secondary access-grant-btn"
-          disabled={grant.isPending}
+          disabled={grant.isPending || !isValidUntil(until)}
           onClick={() => grant.mutate()}
         >
           {corp.active ? "Update access" : "Give access"}

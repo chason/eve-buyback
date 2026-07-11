@@ -136,21 +136,45 @@ describe("Admin", () => {
     )
   })
 
-  it("gives access until a picked date (end of day, UTC)", async () => {
+  it("gives access until a typed ISO date (end of day, UTC)", async () => {
     const u = userEvent.setup()
     vi.mocked(adminApi.grantCorpAccess).mockResolvedValue(
       corp({ active: true, granted_at: "2026-07-09T00:00:00Z" }),
     )
     renderAdmin()
     const date = await screen.findByLabelText(/Access until date for Test Corp/)
-    await u.type(date, "2026-08-09")
+    expect(date).toHaveAttribute("placeholder", "YYYY-MM-DD")
+    // A date relative to now, so the test never rots into "the past".
+    const future = new Date(Date.now() + 30 * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+    await u.type(date, future)
     await u.click(screen.getByRole("button", { name: "Give access" }))
     await waitFor(() =>
       expect(adminApi.grantCorpAccess).toHaveBeenCalledWith(
         98000001,
-        "2026-08-09T23:59:59Z",
+        `${future}T23:59:59Z`,
       ),
     )
+  })
+
+  it("refuses a past or malformed end date in the UI", async () => {
+    const u = userEvent.setup()
+    renderAdmin()
+    const date = await screen.findByLabelText(/Access until date for Test Corp/)
+    const give = screen.getByRole("button", { name: "Give access" })
+
+    await u.type(date, "2020-01-01") // long past
+    expect(give).toBeDisabled()
+    expect(date).toHaveAttribute("aria-invalid", "true")
+
+    await u.clear(date)
+    await u.type(date, "not-a-date")
+    expect(give).toBeDisabled()
+
+    await u.clear(date) // empty = perpetual, always allowed
+    expect(give).toBeEnabled()
+    expect(adminApi.grantCorpAccess).not.toHaveBeenCalled()
   })
 
   it("removes access behind a confirm", async () => {
