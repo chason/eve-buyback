@@ -686,6 +686,42 @@ label:has(> .search-results) > input {
   text-decoration: none;
 }
 
+/* Admin access/payments action cells: keep the date/select, primary button, and the
+   Remove link on ONE line — Pico's full-width inputs otherwise force a wrap. */
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.access-actions input,
+.access-actions select,
+.access-actions button.secondary {
+  width: auto;
+  margin-bottom: 0;
+}
+
+.access-actions input[type="date"] {
+  max-width: 11rem;
+}
+
+/* Breathing room around the inline Remove action so it doesn't crowd the button. */
+.access-actions .linkbtn {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Mutation errors drop below the controls, full-width, instead of squeezing beside. */
+.access-actions .error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* The access badge carries its "how was this granted" detail as a hover tooltip. */
+.access-badge[title] {
+  cursor: help;
+}
+
 /* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
    stable width so the wider state doesn't reflow the table column (and shift the row). */
 .copy-btn {

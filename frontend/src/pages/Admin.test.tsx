@@ -111,9 +111,10 @@ describe("Admin", () => {
     renderAdmin()
     expect(await screen.findByText("Test Corp")).toBeInTheDocument()
     expect(screen.getByText("Off")).toBeInTheDocument()
-    expect(screen.getByText("On")).toBeInTheDocument()
     expect(screen.getByText("Forever")).toBeInTheDocument() // active, no expiry
-    expect(screen.getByText(/granted by admin/)).toBeInTheDocument()
+    // How the grant came to be lives on hover (title), keeping the badge clean.
+    expect(screen.getByText("On")).toHaveAttribute("title", "granted by admin")
+    expect(screen.getByText("Off")).not.toHaveAttribute("title")
   })
 
   it("gives access forever when no date is picked", async () => {
