@@ -1004,6 +1004,10 @@ export interface components {
             type_id: number;
             /** Type Name */
             type_name?: string | null;
+            /** Unrealized */
+            unrealized?: string | null;
+            /** Worth */
+            worth?: string | null;
         };
         /**
          * InventoryLotOut
@@ -1039,8 +1043,14 @@ export interface components {
             stale_days: number;
             /** Total Cost */
             total_cost: string;
+            /** Unpriced Types */
+            unpriced_types: number;
+            /** Unrealized Total */
+            unrealized_total: string;
             /** Verified Cost */
             verified_cost: string;
+            /** Worth Total */
+            worth_total: string;
         };
         /**
          * LocationCreateRequest

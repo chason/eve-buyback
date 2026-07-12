@@ -28,6 +28,10 @@ class InventoryItemOut(BaseModel):
     oldest_days: int
     stale: bool
     any_estimated: bool
+    # What the holding would fetch today and the paper gain/loss vs cost (#153);
+    # None when the type has no cached market price.
+    worth: Decimal | None = None
+    unrealized: Decimal | None = None
     lots: list[InventoryLotOut]
 
 
@@ -37,4 +41,9 @@ class InventoryOut(BaseModel):
     estimated_cost: Decimal
     # Lots held at least this many days are flagged `stale` (config, #152).
     stale_days: int
+    # "If we sold it all today" + the paper gain/loss as its own line (#153), over
+    # the types the market cache can price; `unpriced_types` counts the rest.
+    worth_total: Decimal
+    unrealized_total: Decimal
+    unpriced_types: int
     items: list[InventoryItemOut]

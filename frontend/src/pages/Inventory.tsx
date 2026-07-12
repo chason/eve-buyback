@@ -31,6 +31,8 @@ export default function Inventory() {
   }
 
   const inv = result.data.inventory
+  // Valuation cards only make sense once something is priced (#153).
+  const anythingPriced = inv.items.length > inv.unpriced_types
   return (
     <>
       <hgroup>
@@ -43,6 +45,12 @@ export default function Inventory() {
         <SummaryCard label="Bought through the app" value={inv.verified_cost} />
         {inv.estimated_cost !== "0" && Number(inv.estimated_cost) !== 0 && (
           <SummaryCard label="Estimated value" value={inv.estimated_cost} />
+        )}
+        {anythingPriced && (
+          <>
+            <SummaryCard label="If we sold it all today" value={inv.worth_total} />
+            <GainLossCard value={inv.unrealized_total} />
+          </>
         )}
       </div>
 
@@ -59,6 +67,7 @@ export default function Inventory() {
                 <th>Item</th>
                 <th className="num">How many</th>
                 <th className="num">What we paid</th>
+                <th className="num">Worth now</th>
                 <th>Sitting for</th>
                 <th />
               </tr>
@@ -69,9 +78,34 @@ export default function Inventory() {
               ))}
             </tbody>
           </table>
+          {inv.unpriced_types > 0 && (
+            <small className="field-hint">
+              {inv.unpriced_types === 1
+                ? "1 item has no current market price, so it isn't counted in the totals."
+                : `${inv.unpriced_types} items have no current market price, so they aren't counted in the totals.`}
+            </small>
+          )}
         </div>
       )}
     </>
+  )
+}
+
+/** The paper gain/loss card (#153): what selling everything today would mean
+ * compared to what we paid — its own line, never folded into the holdings. */
+function GainLossCard({ value }: { value: string }) {
+  const negative = value.startsWith("-")
+  return (
+    <div className="inventory-card">
+      <small>Compared to what we paid</small>
+      <strong
+        className={negative ? "isk worth-loss" : "isk"}
+        title={formatIsk(value)}
+      >
+        {negative ? "" : "+"}
+        {formatIskCompact(value)} ISK
+      </strong>
+    </div>
   )
 }
 
@@ -103,6 +137,9 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
           <span title={formatIsk(item.total_cost)}>
             {formatIskCompact(item.total_cost)}
           </span>
+        </td>
+        <td className="num isk">
+          <WorthNow worth={item.worth} unrealized={item.unrealized} />
         </td>
         <td>
           <DaysHeld days={item.oldest_days} stale={item.stale} />
@@ -145,6 +182,7 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
                 </span>
               </small>
             </td>
+            <td />
             <td>
               <small>
                 <DaysHeld days={lot.days_held} stale={lot.stale} />
@@ -154,6 +192,27 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
           </tr>
         ))}
     </>
+  )
+}
+
+/** What the holding would fetch today (#153). A dash when the market cache has no
+ * price for it; danger-red with a plain-English tooltip when it's worth less than
+ * we paid. Exact ISK on hover either way. */
+function WorthNow({
+  worth,
+  unrealized,
+}: {
+  worth?: string | null
+  unrealized?: string | null
+}) {
+  if (worth == null) return <>—</>
+  const losing = unrealized != null && unrealized.startsWith("-")
+  const compact = <span title={formatIsk(worth)}>{formatIskCompact(worth)}</span>
+  if (!losing) return compact
+  return (
+    <span className="worth-loss" title="Worth less than we paid">
+      {compact}
+    </span>
   )
 }
 

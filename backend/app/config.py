@@ -1,3 +1,4 @@
+from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
@@ -109,6 +110,17 @@ class Settings(BaseSettings):
     # "Sitting a while" threshold for the inventory view (ADR-0043, #152): lots held
     # at least this many days are flagged as going stale in "What we've got".
     accounting_stale_days: int = 30
+    # Sales-tax rate netted out of the current market value when estimating what stock
+    # would fetch today (NRV, ADR-0043/#153). Defaults to EVE's base 4.5% — deliberately
+    # the untrained-skills worst case, so the paper number errs conservative. Operators
+    # can lower it to match their traders' Accounting skill.
+    accounting_sales_tax_rate: Decimal = Decimal("0.045")
+    # Automatic write-down sweep (ADR-0043, #153): for every corp with the accounting
+    # add-on, lots worth less than their carried cost are written down to market value
+    # and the loss booked — conservatism, applied without anyone clicking. Daily.
+    accounting_writedown_enabled: bool = True
+    accounting_writedown_interval_seconds: int = 86400  # 24 hours
+    accounting_writedown_initial_delay_seconds: int = 300
     payments_background_refresh_enabled: bool = True
     payments_refresh_interval_seconds: int = 1800  # 30 minutes
     payments_refresh_initial_delay_seconds: int = 120  # first run after boot

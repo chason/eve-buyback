@@ -90,6 +90,24 @@ async def consume(
     return LotRecord.model_validate(lot)
 
 
+async def write_down(
+    session: AsyncSession, *, lot_id: uuid.UUID, value: Decimal
+) -> LotRecord:
+    """Floor a lot's carried value to `value` (ADR-0043 conservatism). Only ever
+    downward: raising the carried value back up is a caller bug, so it raises."""
+    lot = (
+        await session.execute(select(Lot).where(Lot.id == lot_id))
+    ).scalar_one()
+    if lot.written_down_to is not None and value >= lot.written_down_to:
+        raise ValueError(
+            f"lot {lot_id} is already written down to {lot.written_down_to}; "
+            f"a write-down to {value} would raise it"
+        )
+    lot.written_down_to = value
+    await session.flush()
+    return LotRecord.model_validate(lot)
+
+
 async def exists_for_appraisal(
     session: AsyncSession, appraisal_id: uuid.UUID
 ) -> bool:

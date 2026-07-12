@@ -10,7 +10,8 @@ from sqlalchemy import update
 
 from app.application import lots as lots_app
 from app.data.db import SessionLocal
-from app.data.models import Lot
+from app.data.models import Lot, MarketPrice
+from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corporations as corporations_repo
 from app.data.repositories import entitlements as entitlements_repo
 from app.data.repositories import lots as lots_repo
@@ -85,7 +86,8 @@ async def test_inventory_rolls_up_per_type_with_verified_estimated_split():
 
     async with SessionLocal() as session:
         view = await lots_app.get_inventory(
-            session, corporation_eve_id=CORP_ID, stale_days=30, now=NOW
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW
         )
 
     assert view.total_cost == Decimal("665.00")  # 400 + 250 + 15
@@ -122,7 +124,8 @@ async def test_inventory_uses_landed_cost_with_write_down_floor():
 
     async with SessionLocal() as session:
         view = await lots_app.get_inventory(
-            session, corporation_eve_id=CORP_ID, stale_days=30, now=NOW
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW
         )
 
     # Carried at the written-down value, not purchase + hauling.
@@ -134,10 +137,80 @@ async def test_empty_inventory_is_all_zeros():
     await _seed_corp()
     async with SessionLocal() as session:
         view = await lots_app.get_inventory(
-            session, corporation_eve_id=CORP_ID, stale_days=30, now=NOW
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW
         )
     assert view.total_cost == Decimal(0)
     assert view.items == []
+
+
+async def _configure_market(*, prices: dict[int, str]) -> None:
+    """Give the corp a default hub (Jita, buy percentile) and cache buy prices."""
+    async with SessionLocal() as session:
+        corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+        await config_repo.upsert_config(
+            session,
+            corporation_id=corp.id,
+            market_hub_id=JITA,
+            default_basis="buy",
+            default_percentage=90,
+            aggregate_field="percentile",
+        )
+        for type_id, buy in prices.items():
+            b = Decimal(buy)
+            session.add(MarketPrice(
+                hub_id=JITA, type_id=type_id,
+                buy_weighted_average=b, buy_max=b, buy_min=b, buy_median=b,
+                buy_percentile=b, buy_volume=Decimal(1000), buy_order_count=10,
+                sell_weighted_average=b, sell_max=b, sell_min=b, sell_median=b,
+                sell_percentile=b, sell_volume=Decimal(1000), sell_order_count=10,
+                fetched_at=NOW,
+            ))
+        await session.commit()
+
+
+# --- worth now + unrealized gain/loss (#153) ---------------------------------------
+
+
+async def test_worth_and_unrealized_from_the_cached_market():
+    corp_id = await _seed_corp()
+    await _lot(corp_id, type_id=34, qty=100, cost="4.00")  # cost 400
+    await _lot(corp_id, type_id=35, qty=10, cost="2.00")  # cost 20, no cached price
+    # Jita buy 5.00, 10% tax → nrv 4.50/unit → worth 450, paper gain +50.
+    await _configure_market(prices={34: "5.00"})
+
+    async with SessionLocal() as session:
+        view = await lots_app.get_inventory(
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal("0.10"), now=NOW,
+        )
+
+    trit = next(i for i in view.items if i.type_id == 34)
+    assert trit.worth == Decimal("450.00")
+    assert trit.unrealized == Decimal("50.00")
+    # The unpriced type is surfaced, never invented.
+    pye = next(i for i in view.items if i.type_id == 35)
+    assert pye.worth is None and pye.unrealized is None
+    assert view.unpriced_types == 1
+    # Totals cover only priced items; unrealized is its own line, not folded in.
+    assert view.worth_total == Decimal("450.00")
+    assert view.unrealized_total == Decimal("50.00")
+    assert view.total_cost == Decimal("420.00")
+
+
+async def test_unrealized_loss_is_negative():
+    corp_id = await _seed_corp()
+    await _lot(corp_id, type_id=34, qty=100, cost="4.00")
+    await _configure_market(prices={34: "3.00"})
+
+    async with SessionLocal() as session:
+        view = await lots_app.get_inventory(
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW,
+        )
+
+    assert view.items[0].unrealized == Decimal("-100.00")
+    assert view.unrealized_total == Decimal("-100.00")
 
 
 # --- API gates + shape --------------------------------------------------------------
