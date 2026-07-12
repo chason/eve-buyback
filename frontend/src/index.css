@@ -792,6 +792,13 @@ label:has(> .search-results) > input {
   color: var(--pico-muted-color);
 }
 
+/* Aging past the stale threshold: the day count itself reads danger-red, with the
+   plain-English "Sitting a while" as its hover tooltip. */
+.stale-days {
+  color: var(--bb-danger);
+  cursor: help;
+}
+
 /* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
    stable width so the wider state doesn't reflow the table column (and shift the row). */
 .copy-btn {
