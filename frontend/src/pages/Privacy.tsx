@@ -92,8 +92,8 @@ export default function Privacy() {
             <li>
               It&apos;s <strong>one token per corporation</strong>, carrying the scopes
               to read a structure&apos;s market orders, search and resolve structures,
-              read the corporation&apos;s member list, and read the corporation&apos;s
-              contracts.
+              read the corporation&apos;s member list, read the corporation&apos;s
+              contracts, and read the corporation&apos;s assets.
             </li>
             <li>
               The <strong>refresh token is encrypted at rest</strong> (Fernet) before it
@@ -140,6 +140,24 @@ export default function Privacy() {
             no extra item or ISK detail beyond what the appraisal already holds. If the
             token lacks the contracts scope, or the character lacks the in-game role to
             read corp contracts, the app simply skips this and tracks nothing.
+          </p>
+        </section>
+
+        <section>
+          <h2>Reading the buyback hangar</h2>
+          <p>
+            When the corp ESI token can read assets, and a manager has marked one or
+            more corp hangar divisions as the buyback&apos;s on the Stock page, the app
+            periodically reads the corporation&apos;s <strong>asset list</strong> and
+            keeps only <strong>item type and quantity counts for those marked
+            hangars</strong> — so the stock ledger can be checked against what&apos;s
+            physically there. It never reads members&apos; personal assets, and asset
+            rows outside the marked hangars are discarded, not stored.
+          </p>
+          <p>
+            If the token lacks the assets scope (grants made before this feature), or
+            the connecting character isn&apos;t a Director in game, the app simply
+            skips this — reconnecting corp ESI access adds the scope.
           </p>
         </section>
 

@@ -308,6 +308,17 @@ class LotRecord(BaseModel):
     notes: str | None = None
 
 
+class BuybackHangarRecord(BaseModel):
+    """One configured buyback hangar (ADR-0044): a drop-off location + a corp hangar
+    division (1..7 → CorpSAG1..7). `location_name` is the add-time snapshot."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    location_id: str
+    location_name: str
+    division: int
+
+
 class ExpenseRecord(BaseModel):
     """One booked expense (ADR-0043/0045): a cost outside any lot's basis — a
     write-down loss, a selling fee, outbound hauling, or a manual entry."""

@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
+import { Link } from "react-router-dom"
 
-import { getInventory } from "../api/accounting"
+import { addHangar, getInventory, listHangars, removeHangar } from "../api/accounting"
 import type { InventoryItemOut } from "../api/accounting"
+import { listLocations } from "../api/locations"
 import AccountingAccessPanel from "../components/AccountingAccessPanel"
 import { StatusChip } from "../components/StatusChip"
 import { formatIsk, formatIskCompact } from "../lib/format"
@@ -87,7 +89,103 @@ export default function Inventory() {
           )}
         </div>
       )}
+
+      <HangarsSection />
     </>
+  )
+}
+
+/** Buyback-hangar config (ADR-0044, #154): which corp hangar divisions hold buyback
+ * stock. The location picker offers the corp's drop-off locations — that's where
+ * members deliver. The check itself (books vs hangar) rides a background sync. */
+function HangarsSection() {
+  const queryClient = useQueryClient()
+  const hangars = useQuery({ queryKey: ["hangars"], queryFn: listHangars })
+  const locations = useQuery({ queryKey: ["locations"], queryFn: listLocations })
+  const [locationId, setLocationId] = useState("")
+  const [division, setDivision] = useState(1)
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["hangars"] })
+  const add = useMutation({
+    mutationFn: () => addHangar(locationId, division),
+    onSuccess: invalidate,
+  })
+  const remove = useMutation({
+    mutationFn: (h: { location_id: string; division: number }) =>
+      removeHangar(h.location_id, h.division),
+    onSuccess: invalidate,
+  })
+
+  return (
+    <section className="panel">
+      <h2>Our hangars</h2>
+      <p>
+        <small className="field-hint">
+          Mark the corp hangars where buyback stock lives, so the app can check the
+          books against what&apos;s actually in them.
+        </small>
+      </p>
+      {hangars.data && hangars.data.length > 0 && (
+        <ul className="hangar-list">
+          {hangars.data.map((h) => (
+            <li key={`${h.location_id}-${h.division}`}>
+              {h.location_name} — hangar {h.division}{" "}
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => remove.mutate(h)}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {locations.data && locations.data.length === 0 ? (
+        <p>
+          <small className="field-hint">
+            Add a drop-off location on the <Link to="/locations">Locations</Link>{" "}
+            page first — hangars are picked from there.
+          </small>
+        </p>
+      ) : (
+        <div className="access-actions">
+          <select
+            aria-label="Hangar location"
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+          >
+            <option value="">Pick a location…</option>
+            {(locations.data ?? []).map((l) => (
+              <option key={l.location_id} value={l.location_id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Hangar division"
+            value={division}
+            onChange={(e) => setDivision(Number(e.target.value))}
+          >
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <option key={d} value={d}>
+                Hangar {d}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="secondary"
+            disabled={!locationId || add.isPending}
+            onClick={() => add.mutate()}
+          >
+            Add hangar
+          </button>
+          {add.isError && (
+            <small className="error">{(add.error as Error).message}</small>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 

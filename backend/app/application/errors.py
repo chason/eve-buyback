@@ -188,3 +188,13 @@ class OpenContractUnavailable(ApplicationError):
     token was revoked, or it lacks the open-window scope. The fix is always to log in again."""
 
     default_detail = "Log in again to enable opening contracts in EVE"
+
+
+class HangarLocationUnknown(ApplicationError):
+    """The buyback-hangar location isn't one of the corp's drop-off locations
+    (ADR-0044) — the hangar picker offers only those."""
+
+    default_detail = (
+        "That location isn't one of your corporation's drop-off locations — add it "
+        "on the Locations page first"
+    )

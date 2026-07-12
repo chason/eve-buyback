@@ -789,6 +789,50 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HangarCreateRequest": {
+        "properties": {
+          "division": {
+            "maximum": 7.0,
+            "minimum": 1.0,
+            "title": "Division",
+            "type": "integer"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "location_id",
+          "division"
+        ],
+        "title": "HangarCreateRequest",
+        "type": "object"
+      },
+      "HangarOut": {
+        "description": "One configured buyback hangar (ADR-0044): a drop-off location + a corp hangar\ndivision whose contents count as buyback stock.",
+        "properties": {
+          "division": {
+            "title": "Division",
+            "type": "integer"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "location_name": {
+            "title": "Location Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "location_id",
+          "location_name",
+          "division"
+        ],
+        "title": "HangarOut",
+        "type": "object"
+      },
       "InventoryItemOut": {
         "properties": {
           "any_estimated": {
@@ -1966,7 +2010,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "91"
+    "version": "92"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2643,6 +2687,114 @@
         "summary": "Get Accounting Access",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/hangars": {
+      "get": {
+        "operationId": "list_hangars_api_v1_corporations_me_accounting_hangars_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HangarOut"
+                  },
+                  "title": "Response List Hangars Api V1 Corporations Me Accounting Hangars Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Hangars",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "operationId": "add_hangar_api_v1_corporations_me_accounting_hangars_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HangarCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HangarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Hangar",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/hangars/{location_id}/{division}": {
+      "delete": {
+        "operationId": "remove_hangar_api_v1_corporations_me_accounting_hangars__location_id___division__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "location_id",
+            "required": true,
+            "schema": {
+              "title": "Location Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "division",
+            "required": true,
+            "schema": {
+              "title": "Division",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Hangar",
+        "tags": [
+          "accounting"
         ]
       }
     },

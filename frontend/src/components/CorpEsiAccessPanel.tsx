@@ -151,6 +151,16 @@ export default function CorpEsiAccessPanel({
                 </p>
               )}
 
+            {connected &&
+              !status.data?.scopes?.includes(
+                "esi-assets.read_corporation_assets.v1",
+              ) && (
+                <p className="field-hint" role="status">
+                  ⚠️ Reconnect to enable hangar tracking (the Stock page&apos;s
+                  hangar check) — your authorization predates it.
+                </p>
+              )}
+
             <button
               type="button"
               className="secondary"

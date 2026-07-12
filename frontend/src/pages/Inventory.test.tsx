@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as accountingApi from "../api/accounting"
 import * as billingApi from "../api/billing"
+import * as locationsApi from "../api/locations"
 import type { InventoryOut } from "../api/types"
 import Inventory from "./Inventory"
 
 vi.mock("../api/accounting")
 vi.mock("../api/billing")
+vi.mock("../api/locations")
 
 const INVENTORY: InventoryOut = {
   total_cost: "4200000000.00",
@@ -69,7 +71,12 @@ function renderInventory() {
 }
 
 describe("Inventory", () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    // The hangar section always queries these; individual tests override.
+    vi.mocked(accountingApi.listHangars).mockResolvedValue([])
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([])
+  })
 
   it("shows holdings at what we paid, compact, with plain-English flags", async () => {
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
@@ -198,6 +205,54 @@ describe("Inventory", () => {
     const cell = screen.getByTitle("Worth less than we paid")
     expect(cell).toHaveClass("worth-loss")
     expect(cell).toHaveTextContent("3.9B")
+  })
+
+  it("lists marked hangars and adds one from the drop-off picker (#154)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listHangars).mockResolvedValue([
+      { location_id: "60003760", location_name: "Jita IV - Moon 4", division: 2 },
+    ])
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([
+      { location_id: "60003760", kind: "npc_station", name: "Jita IV - Moon 4",
+        system_name: "Jita" },
+    ])
+    vi.mocked(accountingApi.addHangar).mockResolvedValue({
+      location_id: "60003760", location_name: "Jita IV - Moon 4", division: 3,
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText(/Jita IV - Moon 4 — hangar 2/)).toBeInTheDocument()
+
+    await u.selectOptions(
+      screen.getByRole("combobox", { name: "Hangar location" }), "60003760",
+    )
+    await u.selectOptions(
+      screen.getByRole("combobox", { name: "Hangar division" }), "3",
+    )
+    await u.click(screen.getByRole("button", { name: "Add hangar" }))
+    expect(accountingApi.addHangar).toHaveBeenCalledWith("60003760", 3)
+  })
+
+  it("points at the Locations page when no drop-offs exist yet", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(/Add a drop-off location/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Locations" })).toHaveAttribute(
+      "href",
+      "/locations",
+    )
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

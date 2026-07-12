@@ -806,6 +806,18 @@ label:has(> .search-results) > input {
   cursor: help;
 }
 
+/* The configured buyback hangars (#154): a compact list above the add controls. */
+.hangar-list {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0.75rem;
+}
+
+.hangar-list li {
+  list-style: none;
+  padding: 0.15rem 0;
+}
+
 /* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
    stable width so the wider state doesn't reflow the table column (and shift the row). */
 .copy-btn {
