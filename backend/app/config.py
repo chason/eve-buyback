@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     # connects the operator wallet.
     accounting_price_isk: int = 250_000_000  # ISK per access period
     accounting_period_days: int = 30
+    # "Sitting a while" threshold for the inventory view (ADR-0043, #152): lots held
+    # at least this many days are flagged as going stale in "What we've got".
+    accounting_stale_days: int = 30
     payments_background_refresh_enabled: bool = True
     payments_refresh_interval_seconds: int = 1800  # 30 minutes
     payments_refresh_initial_delay_seconds: int = 120  # first run after boot

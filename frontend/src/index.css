@@ -758,6 +758,40 @@ label:has(> .search-results) > input {
   cursor: help;
 }
 
+/* "What we've got" (#152): headline cost cards above the stock table. Same HUD
+   panel treatment as .panel, sized to their content and wrapping on small screens. */
+.inventory-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: var(--pico-block-spacing-vertical);
+}
+
+.inventory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 11rem;
+  padding: 0.6rem 0.9rem;
+  background-color: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.inventory-card small {
+  color: var(--pico-muted-color);
+}
+
+.inventory-card strong {
+  font-size: 1.25rem;
+}
+
+/* Per-buy detail rows expanded under an item: dimmed so the item rows stay primary. */
+.inventory-lot-row td {
+  border-bottom-style: dashed;
+  color: var(--pico-muted-color);
+}
+
 /* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
    stable width so the wider state doesn't reflow the table column (and shift the row). */
 .copy-btn {

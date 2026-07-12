@@ -789,6 +789,150 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InventoryItemOut": {
+        "properties": {
+          "any_estimated": {
+            "title": "Any Estimated",
+            "type": "boolean"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryLotOut"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "oldest_days": {
+            "title": "Oldest Days",
+            "type": "integer"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "total_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Cost",
+            "type": "string"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          }
+        },
+        "required": [
+          "type_id",
+          "qty",
+          "total_cost",
+          "oldest_days",
+          "stale",
+          "any_estimated",
+          "lots"
+        ],
+        "title": "InventoryItemOut",
+        "type": "object"
+      },
+      "InventoryLotOut": {
+        "description": "One open purchase of the item: what's left of it, what one unit is carried\nat, and how long it has been sitting.",
+        "properties": {
+          "acquired_at": {
+            "format": "date-time",
+            "title": "Acquired At",
+            "type": "string"
+          },
+          "cost_is_estimated": {
+            "title": "Cost Is Estimated",
+            "type": "boolean"
+          },
+          "days_held": {
+            "title": "Days Held",
+            "type": "integer"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "total_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Cost",
+            "type": "string"
+          },
+          "unit_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unit Cost",
+            "type": "string"
+          }
+        },
+        "required": [
+          "qty",
+          "unit_cost",
+          "total_cost",
+          "acquired_at",
+          "days_held",
+          "stale",
+          "cost_is_estimated"
+        ],
+        "title": "InventoryLotOut",
+        "type": "object"
+      },
+      "InventoryOut": {
+        "properties": {
+          "estimated_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Estimated Cost",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "stale_days": {
+            "title": "Stale Days",
+            "type": "integer"
+          },
+          "total_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Cost",
+            "type": "string"
+          },
+          "verified_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Verified Cost",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total_cost",
+          "verified_cost",
+          "estimated_cost",
+          "stale_days",
+          "items"
+        ],
+        "title": "InventoryOut",
+        "type": "object"
+      },
       "LocationCreateRequest": {
         "description": "Add a drop-off location. For an NPC station the name is resolved server-side\nfrom the SDE (any supplied name is ignored); for a structure \u2014 which has no SDE \u2014\nthe name from the structure search is required.",
         "properties": {
@@ -1781,7 +1925,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "85"
+    "version": "90"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2458,6 +2602,27 @@
         "summary": "Get Accounting Access",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/inventory": {
+      "get": {
+        "operationId": "get_inventory_api_v1_corporations_me_accounting_inventory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Inventory",
+        "tags": [
+          "accounting"
         ]
       }
     },

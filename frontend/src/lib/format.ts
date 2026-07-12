@@ -21,6 +21,33 @@ function expandScientific(value: string): string {
   return sign + out
 }
 
+/** Format a Decimal ISK string compactly for dashboards: "4.2B", "850M", "12.5K",
+ * whole numbers below a thousand ("850"). One decimal, dropped when it's 0. Pure
+ * string surgery on the integer digits — no `Number()`, so no float error and no
+ * precision cliff on huge treasuries. Truncates rather than rounds (999,999,999 is
+ * "999M", not a misleading "1B"); the decimal is dropped once the whole part has
+ * three digits. */
+export function formatIskCompact(value: string): string {
+  const [intPart] = expandScientific(value).split(".")
+  const negative = intPart.startsWith("-")
+  const digits = intPart.replace("-", "").replace(/^0+(?=\d)/, "") || "0"
+  const units: Array<[string, number]> = [
+    ["T", 13],
+    ["B", 10],
+    ["M", 7],
+    ["K", 4],
+  ]
+  for (const [suffix, minDigits] of units) {
+    if (digits.length >= minDigits) {
+      const whole = digits.slice(0, digits.length - minDigits + 1)
+      const tenth = digits[digits.length - minDigits + 1]
+      const frac = tenth && tenth !== "0" && whole.length < 3 ? `.${tenth}` : ""
+      return `${negative ? "-" : ""}${whole}${frac}${suffix}`
+    }
+  }
+  return `${negative ? "-" : ""}${digits}`
+}
+
 /** Format a Decimal ISK string for display: thousands-grouped, 2 decimal places.
  *
  * The API sends money as Decimal *strings* (ADR-0020); we keep them as strings and

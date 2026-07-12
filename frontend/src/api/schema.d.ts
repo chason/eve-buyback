@@ -338,6 +338,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Inventory */
+        get: operations["get_inventory_api_v1_corporations_me_accounting_inventory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/config": {
         parameters: {
             query?: never;
@@ -968,6 +985,62 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InventoryItemOut */
+        InventoryItemOut: {
+            /** Any Estimated */
+            any_estimated: boolean;
+            /** Lots */
+            lots: components["schemas"]["InventoryLotOut"][];
+            /** Oldest Days */
+            oldest_days: number;
+            /** Qty */
+            qty: number;
+            /** Stale */
+            stale: boolean;
+            /** Total Cost */
+            total_cost: string;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+        };
+        /**
+         * InventoryLotOut
+         * @description One open purchase of the item: what's left of it, what one unit is carried
+         *     at, and how long it has been sitting.
+         */
+        InventoryLotOut: {
+            /**
+             * Acquired At
+             * Format: date-time
+             */
+            acquired_at: string;
+            /** Cost Is Estimated */
+            cost_is_estimated: boolean;
+            /** Days Held */
+            days_held: number;
+            /** Qty */
+            qty: number;
+            /** Stale */
+            stale: boolean;
+            /** Total Cost */
+            total_cost: string;
+            /** Unit Cost */
+            unit_cost: string;
+        };
+        /** InventoryOut */
+        InventoryOut: {
+            /** Estimated Cost */
+            estimated_cost: string;
+            /** Items */
+            items: components["schemas"]["InventoryItemOut"][];
+            /** Stale Days */
+            stale_days: number;
+            /** Total Cost */
+            total_cost: string;
+            /** Verified Cost */
+            verified_cost: string;
         };
         /**
          * LocationCreateRequest
@@ -1934,6 +2007,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountingAccessOut"];
+                };
+            };
+        };
+    };
+    get_inventory_api_v1_corporations_me_accounting_inventory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryOut"];
                 };
             };
         };

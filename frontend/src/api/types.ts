@@ -41,6 +41,11 @@ export type PaymentOut = Schemas["PaymentOut"]
 export type AccountingAccessOut = Schemas["AccountingAccessOut"]
 export type BillingSettingsOut = Schemas["BillingSettingsOut"]
 
+// Accounting add-on: the "What we've got" inventory view (ADR-0043, #152).
+export type InventoryOut = Schemas["InventoryOut"]
+export type InventoryItemOut = Schemas["InventoryItemOut"]
+export type InventoryLotOut = Schemas["InventoryLotOut"]
+
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]
 export type ConfigUpdateRequest = Schemas["ConfigUpdateRequest"]
