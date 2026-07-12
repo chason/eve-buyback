@@ -183,14 +183,14 @@ async def accepted_lines_for_lots(
             .order_by(AppraisalLine.appraisal_id, AppraisalLine.position)
         )
     ).all()
-    out: dict[uuid.UUID, list[AcceptedLineCostRecord]] = {}
+    lines_by_appraisal: dict[uuid.UUID, list[AcceptedLineCostRecord]] = {}
     for appraisal_id, type_id, quantity, unit_price in rows:
-        out.setdefault(appraisal_id, []).append(
+        lines_by_appraisal.setdefault(appraisal_id, []).append(
             AcceptedLineCostRecord(
                 type_id=type_id, quantity=quantity, unit_price=unit_price
             )
         )
-    return out
+    return lines_by_appraisal
 
 
 async def match_facts(
