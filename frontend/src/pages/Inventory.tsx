@@ -92,8 +92,12 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
   return (
     <>
       <tr>
-        <td>
-          {item.type_name ?? `Type ${item.type_id}`}
+        <td>{item.type_name ?? `Type ${item.type_id}`}</td>
+        <td className="num">{item.qty.toLocaleString()}</td>
+        <td className="num isk">
+          <span title={formatIsk(item.total_cost)}>
+            {formatIskCompact(item.total_cost)}
+          </span>
           {item.any_estimated && (
             <>
               {" "}
@@ -101,18 +105,8 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
             </>
           )}
         </td>
-        <td className="num">{item.qty.toLocaleString()}</td>
-        <td className="num isk" title={formatIsk(item.total_cost)}>
-          {formatIskCompact(item.total_cost)}
-        </td>
         <td>
-          {daysText(item.oldest_days)}
-          {item.stale && (
-            <>
-              {" "}
-              <StatusChip variant="danger">Sitting a while</StatusChip>
-            </>
-          )}
+          <DaysHeld days={item.oldest_days} stale={item.stale} />
         </td>
         <td>
           {multiple && (
@@ -135,6 +129,16 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
                 {new Date(lot.acquired_at).toLocaleDateString(undefined, {
                   timeZone: "UTC",
                 })}
+              </small>
+            </td>
+            <td className="num">
+              <small>{lot.qty.toLocaleString()}</small>
+            </td>
+            <td className="num isk">
+              <small>
+                <span title={formatIsk(lot.total_cost)}>
+                  {formatIsk(lot.unit_cost)} each
+                </span>
                 {lot.cost_is_estimated && (
                   <>
                     {" "}
@@ -143,29 +147,26 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
                 )}
               </small>
             </td>
-            <td className="num">
-              <small>{lot.qty.toLocaleString()}</small>
-            </td>
-            <td className="num isk">
-              <small title={formatIsk(lot.total_cost)}>
-                {formatIsk(lot.unit_cost)} each
-              </small>
-            </td>
             <td>
               <small>
-                {daysText(lot.days_held)}
-                {lot.stale && (
-                  <>
-                    {" "}
-                    <StatusChip variant="danger">Sitting a while</StatusChip>
-                  </>
-                )}
+                <DaysHeld days={lot.days_held} stale={lot.stale} />
               </small>
             </td>
             <td />
           </tr>
         ))}
     </>
+  )
+}
+
+/** Aging readout: past the stale threshold the number itself turns danger-red and
+ * the plain-English explanation rides a tooltip instead of a chip. */
+function DaysHeld({ days, stale }: { days: number; stale: boolean }) {
+  if (!stale) return <>{daysText(days)}</>
+  return (
+    <span className="stale-days" title="Sitting a while">
+      {daysText(days)}
+    </span>
   )
 }
 

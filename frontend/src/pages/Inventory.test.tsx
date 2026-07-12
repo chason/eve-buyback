@@ -80,13 +80,20 @@ describe("Inventory", () => {
     expect(screen.getByText("3.3B ISK")).toBeInTheDocument()
     expect(screen.getByText("850M ISK")).toBeInTheDocument()
 
-    // The item row: name, quantity, aging, and both plain-English chips.
+    // The item row: name, quantity, and aging.
     expect(screen.getByText("Tritanium")).toBeInTheDocument()
     expect(screen.getByText("150")).toBeInTheDocument()
-    expect(screen.getByText("45 days")).toBeInTheDocument()
-    expect(screen.getByText("Sitting a while")).toBeInTheDocument()
-    // "Estimated value" appears as the summary card's label and the item's chip.
-    expect(screen.getAllByText("Estimated value")).toHaveLength(2)
+    // Stale aging is the day count itself turned danger-red, explained on hover.
+    const days = screen.getByText("45 days")
+    expect(days).toHaveClass("stale-days")
+    expect(days).toHaveAttribute("title", "Sitting a while")
+    // "Estimated value" appears as the summary card's label and the item's chip —
+    // the chip rides the price cell, next to what we paid.
+    const chips = screen
+      .getAllByText("Estimated value")
+      .filter((el) => el.classList.contains("status"))
+    expect(chips).toHaveLength(1)
+    expect(chips[0].closest("td")).toHaveTextContent("4.2B")
   })
 
   it("expands an item into its individual buys", async () => {
@@ -102,9 +109,14 @@ describe("Inventory", () => {
     // Per-buy detail: exact unit prices and each buy's own aging + flags.
     expect(screen.getByText("4.00 ISK each")).toBeInTheDocument()
     expect(screen.getByText("5.00 ISK each")).toBeInTheDocument()
-    expect(screen.getAllByText("Sitting a while")).toHaveLength(2) // item + old buy
-    // Summary card + the item's chip + the estimated buy's chip.
-    expect(screen.getAllByText("Estimated value")).toHaveLength(3)
+    // The item's oldest-days readout + the old buy's own: both red with the tooltip.
+    expect(screen.getAllByTitle("Sitting a while")).toHaveLength(2)
+    // Estimated chips: the item's (price cell) + the estimated buy's (its price cell).
+    const chips = screen
+      .getAllByText("Estimated value")
+      .filter((el) => el.classList.contains("status"))
+    expect(chips).toHaveLength(2)
+    expect(chips[1].closest("td")).toHaveTextContent("5.00 ISK each")
   })
 
   it("shows the how-to-pay panel instead of data without access (402)", async () => {
