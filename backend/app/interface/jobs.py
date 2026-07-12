@@ -12,7 +12,14 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
-from app.application import corp_contracts, corp_roster, market_refresh, payments
+from app.application import (
+    corp_contracts,
+    corp_roster,
+    entitlements,
+    lots,
+    market_refresh,
+    payments,
+)
 from app.config import get_settings
 from app.data.db import SessionLocal
 from app.data.repositories import corp_esi_token as tokens_repo
@@ -99,6 +106,39 @@ async def run_payments_reconcile(app: FastAPI) -> None:
     except Exception as exc:  # noqa: BLE001 — a recurring job must survive any failure
         # Bearer-token ESI calls — log `repr(exc)` only, never `exc_info` (#75).
         log.warning("payment reconciliation failed: %r", exc)
+
+
+async def run_accounting_write_downs(app: FastAPI) -> None:
+    """Scheduler entrypoint (ADR-0043, #153): for every corp with an active accounting
+    entitlement, write open lots down to market value where it fell below cost and book
+    the loss. Pure DB work (cached prices only — no ESI, no tokens); each corp runs in
+    its own session and try/except so one corp's failure never aborts the sweep."""
+    settings = get_settings()
+    try:
+        async with SessionLocal() as session:
+            access = await entitlements.list_corp_access(session, feature="accounting")
+    except Exception:  # noqa: BLE001 — a recurring job must survive any failure
+        log.exception("write-down sweep: listing entitled corps failed")
+        return
+    for corp in access:
+        if not corp.active:
+            continue
+        try:
+            async with SessionLocal() as session:
+                written = await lots.apply_write_downs(
+                    session,
+                    corporation_eve_id=corp.corporation_id,
+                    sales_tax_rate=settings.accounting_sales_tax_rate,
+                    now=datetime.now(UTC),
+                )
+            if written:
+                log.info(
+                    "write-down sweep: %d lot(s) written down for corp %s",
+                    written,
+                    corp.corporation_id,
+                )
+        except Exception:  # noqa: BLE001 — one corp's failure must not abort the sweep
+            log.exception("write-down sweep failed for corp %s", corp.corporation_id)
 
 
 async def run_contracts_refresh(app: FastAPI) -> None:

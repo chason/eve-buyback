@@ -15,6 +15,7 @@ from app.application.errors import ApplicationError
 from app.config import INSECURE_SESSION_SECRET, Settings, get_settings
 from app.interface.errors import application_error_handler
 from app.interface.jobs import (
+    run_accounting_write_downs,
     run_contracts_refresh,
     run_market_refresh,
     run_payments_reconcile,
@@ -94,6 +95,7 @@ def _start_scheduler(
         or settings.roster_background_refresh_enabled
         or settings.contracts_background_refresh_enabled
         or settings.payments_background_refresh_enabled
+        or settings.accounting_writedown_enabled
     ):
         return None
     scheduler = AsyncIOScheduler()
@@ -144,6 +146,19 @@ def _start_scheduler(
             coalesce=True,
             next_run_time=datetime.now()
             + timedelta(seconds=settings.payments_refresh_initial_delay_seconds),
+        )
+    if settings.accounting_writedown_enabled:
+        scheduler.add_job(
+            run_accounting_write_downs,
+            trigger=IntervalTrigger(
+                seconds=settings.accounting_writedown_interval_seconds
+            ),
+            args=[app],
+            id="accounting_write_downs",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.accounting_writedown_initial_delay_seconds),
         )
     scheduler.start()
     return scheduler

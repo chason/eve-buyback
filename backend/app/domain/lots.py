@@ -28,9 +28,10 @@ LotSource = Literal["buyback", "opening_balance", "manual", "reprocess"]
 # (off-game negotiated) deal.
 SaleChannel = Literal["market", "contract", "direct"]
 
-# Provenance of a ledger entry (ADR-0045): detected via ESI, or entered by a manager.
-# Orthogonal to `cost_is_estimated` (provenance vs cost confidence) — never conflate.
-EntrySource = Literal["esi", "manual"]
+# Provenance of a ledger entry (ADR-0045): detected via ESI, entered by a manager, or
+# booked by the app itself (the automatic write-down sweep, #153). Orthogonal to
+# `cost_is_estimated` (provenance vs cost confidence) — never conflate.
+EntrySource = Literal["esi", "manual", "system"]
 
 # Costs not embedded in a lot's basis (ADR-0043/0045): selling fees, outbound freight
 # (hauling is a SELLING cost in this app — members haul in, ADR-0030), write-downs,

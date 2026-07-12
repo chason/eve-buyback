@@ -34,6 +34,7 @@ def test_start_scheduler_returns_none_when_all_jobs_disabled():
             "roster_background_refresh_enabled": False,
             "contracts_background_refresh_enabled": False,
             "payments_background_refresh_enabled": False,
+            "accounting_writedown_enabled": False,
         }
     )
     assert _start_scheduler(SimpleNamespace(), settings) is None
@@ -54,6 +55,9 @@ async def test_start_scheduler_configures_enabled_jobs():
             "payments_background_refresh_enabled": True,
             "payments_refresh_interval_seconds": 1800,
             "payments_refresh_initial_delay_seconds": 120,
+            "accounting_writedown_enabled": True,
+            "accounting_writedown_interval_seconds": 86400,
+            "accounting_writedown_initial_delay_seconds": 300,
         }
     )
 
@@ -79,6 +83,11 @@ async def test_start_scheduler_configures_enabled_jobs():
         assert payments.trigger.interval.total_seconds() == 1800
         assert payments.max_instances == 1
         assert payments.coalesce is True
+        write_downs = scheduler.get_job("accounting_write_downs")
+        assert write_downs is not None
+        assert write_downs.trigger.interval.total_seconds() == 86400
+        assert write_downs.max_instances == 1
+        assert write_downs.coalesce is True
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

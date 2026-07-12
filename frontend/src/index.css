@@ -799,6 +799,13 @@ label:has(> .search-results) > input {
   cursor: help;
 }
 
+/* A holding worth less than we paid (#153): the figure reads danger-red (overriding
+   the .isk market-green), explained by its "Worth less than we paid" tooltip. */
+.worth-loss {
+  color: var(--bb-danger);
+  cursor: help;
+}
+
 /* The "Get paid" copy buttons swap label between Copy / Copied / Failed. Reserve a
    stable width so the wider state doesn't reflow the table column (and shift the row). */
 .copy-btn {

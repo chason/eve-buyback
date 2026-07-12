@@ -20,9 +20,11 @@ ManagerUser = Annotated[AuthenticatedUser, Depends(require_role("manager"))]
 
 @router.get("/inventory", response_model=InventoryOut)
 async def get_inventory(user: ManagerUser, session: SessionDep) -> InventoryOut:
+    settings = get_settings()
     view = await lots_app.get_inventory(
         session,
         corporation_eve_id=user.corporation_id,
-        stale_days=get_settings().accounting_stale_days,
+        stale_days=settings.accounting_stale_days,
+        sales_tax_rate=settings.accounting_sales_tax_rate,
     )
     return InventoryOut.model_validate(view.model_dump())

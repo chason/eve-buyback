@@ -833,6 +833,30 @@
               }
             ],
             "title": "Type Name"
+          },
+          "unrealized": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized"
+          },
+          "worth": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worth"
           }
         },
         "required": [
@@ -917,9 +941,23 @@
             "title": "Total Cost",
             "type": "string"
           },
+          "unpriced_types": {
+            "title": "Unpriced Types",
+            "type": "integer"
+          },
+          "unrealized_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unrealized Total",
+            "type": "string"
+          },
           "verified_cost": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Verified Cost",
+            "type": "string"
+          },
+          "worth_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Worth Total",
             "type": "string"
           }
         },
@@ -928,6 +966,9 @@
           "verified_cost",
           "estimated_cost",
           "stale_days",
+          "worth_total",
+          "unrealized_total",
+          "unpriced_types",
           "items"
         ],
         "title": "InventoryOut",
@@ -1925,7 +1966,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "90"
+    "version": "91"
   },
   "openapi": "3.1.0",
   "paths": {

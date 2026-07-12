@@ -13,7 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.entitlements import EntitlementSource, Feature
 from app.domain.locations import LocationKind
-from app.domain.lots import LotSource
+from app.domain.lots import EntrySource as LotEntrySource
+from app.domain.lots import ExpenseKind, LotSource
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 
@@ -305,6 +306,24 @@ class LotRecord(BaseModel):
     location_id: str | None = None
     written_down_to: Decimal | None = None
     notes: str | None = None
+
+
+class ExpenseRecord(BaseModel):
+    """One booked expense (ADR-0043/0045): a cost outside any lot's basis — a
+    write-down loss, a selling fee, outbound hauling, or a manual entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    corporation_id: uuid.UUID
+    kind: ExpenseKind
+    amount: Decimal
+    source: LotEntrySource
+    lot_id: uuid.UUID | None = None
+    external_ref: int | None = None
+    incurred_at: datetime
+    recorded_by_character_id: int | None = None
+    note: str | None = None
 
 
 class EntitlementRecord(BaseModel):

@@ -17,6 +17,9 @@ const INVENTORY: InventoryOut = {
   verified_cost: "3350000000.00",
   estimated_cost: "850000000.00",
   stale_days: 30,
+  worth_total: "4600000000.00",
+  unrealized_total: "400000000.00",
+  unpriced_types: 0,
   items: [
     {
       type_id: 34,
@@ -26,6 +29,8 @@ const INVENTORY: InventoryOut = {
       oldest_days: 45,
       stale: true,
       any_estimated: true,
+      worth: "4600000000.00",
+      unrealized: "400000000.00",
       lots: [
         {
           qty: 100,
@@ -144,11 +149,76 @@ describe("Inventory", () => {
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
       access: true,
       inventory: { ...INVENTORY, items: [], estimated_cost: "0", total_cost: "0",
-        verified_cost: "0" },
+        verified_cost: "0", worth_total: "0", unrealized_total: "0",
+        unpriced_types: 0 },
     })
 
     renderInventory()
 
     expect(await screen.findByText(/Nothing in stock yet/)).toBeInTheDocument()
+  })
+
+  it("shows worth-now, a signed gain card, and green figures when up (#153)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("If we sold it all today")).toBeInTheDocument()
+    expect(screen.getByText("4.6B ISK")).toBeInTheDocument()
+    // The gain card is signed and NOT marked as a loss.
+    const gain = screen.getByText("+400M ISK")
+    expect(gain).not.toHaveClass("worth-loss")
+    // The item's Worth now cell is plain green (no loss treatment).
+    expect(screen.getByText("4.6B").closest(".worth-loss")).toBeNull()
+  })
+
+  it("marks a losing position red with a plain-English tooltip", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        worth_total: "3900000000.00",
+        unrealized_total: "-300000000.00",
+        items: [{
+          ...INVENTORY.items[0],
+          worth: "3900000000.00",
+          unrealized: "-300000000.00",
+        }],
+      },
+    })
+
+    renderInventory()
+
+    // The loss card keeps its minus sign and reads danger-red.
+    expect(await screen.findByText("-300M ISK")).toHaveClass("worth-loss")
+    // The item's Worth now figure carries the tooltip'd loss treatment.
+    const cell = screen.getByTitle("Worth less than we paid")
+    expect(cell).toHaveClass("worth-loss")
+    expect(cell).toHaveTextContent("3.9B")
+  })
+
+  it("dashes unpriced items and counts them under the table", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        worth_total: "0",
+        unrealized_total: "0",
+        unpriced_types: 1,
+        items: [{ ...INVENTORY.items[0], worth: null, unrealized: null }],
+      },
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("—")).toBeInTheDocument()
+    expect(
+      screen.getByText(/1 item has no current market price/),
+    ).toBeInTheDocument()
+    // Nothing is priced → the valuation cards stay hidden.
+    expect(screen.queryByText("If we sold it all today")).not.toBeInTheDocument()
   })
 })
