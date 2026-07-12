@@ -9,6 +9,7 @@ import Callback from "./pages/Callback"
 import Config from "./pages/Config"
 import History from "./pages/History"
 import Home from "./pages/Home"
+import Inventory from "./pages/Inventory"
 import Locations from "./pages/Locations"
 import Managers from "./pages/Managers"
 import Privacy from "./pages/Privacy"
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/appraise" element={<Appraise />} />
           <Route path="/a/:publicId" element={<Appraisal />} />
           <Route path="/appraisals" element={<History />} />
+          <Route path="/stock" element={<Inventory />} />
           <Route path="/config" element={<Config />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/locations" element={<Locations />} />

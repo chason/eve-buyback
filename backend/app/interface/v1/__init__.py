@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.interface.v1 import (
+    accounting,
     admin,
     appraisals,
     auth,
@@ -26,3 +27,4 @@ api_router.include_router(roster.router)
 api_router.include_router(locations.router)
 api_router.include_router(admin.router)
 api_router.include_router(billing.router)
+api_router.include_router(accounting.router)

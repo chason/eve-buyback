@@ -74,6 +74,11 @@ export default function Layout() {
             {showManagerLinks && (
               <>
                 <li>
+                  <NavLink to="/stock" className={navClass}>
+                    Stock
+                  </NavLink>
+                </li>
+                <li>
                   <NavLink to="/config" className={navClass}>
                     Config
                   </NavLink>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatIsk } from "./format"
+import { formatIsk, formatIskCompact } from "./format"
 
 describe("formatIsk", () => {
   it("groups thousands and shows two decimal places", () => {
@@ -25,5 +25,31 @@ describe("formatIsk", () => {
     expect(formatIsk("1.2345E+2")).toBe("123.45 ISK")
     // No stray exponent marker survives to the output.
     expect(formatIsk("0E+29")).not.toContain("E")
+  })
+})
+
+describe("formatIskCompact", () => {
+  it("compacts to B / M / K with one decimal", () => {
+    expect(formatIskCompact("4235000000.00")).toBe("4.2B")
+    expect(formatIskCompact("850000000.00")).toBe("850M")
+    expect(formatIskCompact("12500.00")).toBe("12.5K")
+    expect(formatIskCompact("2100000000000")).toBe("2.1T")
+  })
+
+  it("drops the decimal when it's zero or the whole part fills three digits", () => {
+    expect(formatIskCompact("4000000000")).toBe("4B")
+    expect(formatIskCompact("999999999")).toBe("999M") // truncates, never rounds to 1B
+    expect(formatIskCompact("123400000")).toBe("123M")
+  })
+
+  it("shows small and zero values plainly", () => {
+    expect(formatIskCompact("850.75")).toBe("850")
+    expect(formatIskCompact("0")).toBe("0")
+    expect(formatIskCompact("0E+29")).toBe("0")
+  })
+
+  it("keeps the sign and survives unsafe-integer magnitudes", () => {
+    expect(formatIskCompact("-2500000000")).toBe("-2.5B")
+    expect(formatIskCompact("9007199254740993")).toBe("9007T")
   })
 })
