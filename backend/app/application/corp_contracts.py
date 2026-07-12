@@ -10,7 +10,9 @@ appraisal (exact items, price, location). Each appraisal gets its current best s
 This use case is pure orchestration: it acquires the token, fetches contracts + items, maps
 them into the plain `ContractObservation`/`AppraisalFacts` the pure resolver in
 `domain/contracts.py` consumes, and persists the result. The matching/priority/validation
-rules all live in the domain layer.
+rules all live in the domain layer. A link that lands `completed` also materializes the
+appraisal's inventory lots (ADR-0043, #151) in the same unit of work — see
+`application/lots.py`.
 
 Run off-request by the background job (`interface/jobs.py`). Reuses the stored token
 server-side; a missing contracts **scope or in-game role** yields a 403 that is logged and
@@ -24,6 +26,7 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import corp_esi_token as corp_esi_token_app
+from app.application import lots as lots_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     CorpEsiTokenExpired,
@@ -117,12 +120,18 @@ async def refresh_contracts(
     await links_repo.reconcile_for_corp(
         session, corporation_id=corp.id, links=list(best.values())
     )
+    # A completed contract is a purchase: its appraisal's accepted lines become
+    # inventory lots (ADR-0043, #151) — same unit of work as the link update.
+    lots_created = await lots_app.materialize_buyback_lots(
+        session, corporation_id=corp.id, links=list(best.values()), now=now
+    )
     await session.commit()
     if best:
         log.info(
-            "contract sync for corp %s: %d appraisal(s) linked",
+            "contract sync for corp %s: %d appraisal(s) linked, %d lot(s) created",
             corporation_id,
             len(best),
+            lots_created,
         )
 
 

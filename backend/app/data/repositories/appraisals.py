@@ -15,6 +15,7 @@ from app.data.models import (
     Character,
 )
 from app.data.records import (
+    AcceptedLineCostRecord,
     AppraisalLineRecord,
     AppraisalPreviewRecord,
     AppraisalRecord,
@@ -154,6 +155,41 @@ async def accepted_line_items(
     out: dict[uuid.UUID, dict[int, int]] = {}
     for appraisal_id, type_id, qty in rows:
         out.setdefault(appraisal_id, {})[type_id] = int(qty)
+    return out
+
+
+async def accepted_lines_for_lots(
+    session: AsyncSession, appraisal_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[AcceptedLineCostRecord]]:
+    """Per appraisal, the accepted lines' lot-creation facts (ADR-0043, #151): the
+    type, quantity, and exact unit price paid. Rejected lines, unresolved names
+    (null type_id), and — defensively — priceless lines are excluded."""
+    if not appraisal_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                AppraisalLine.appraisal_id,
+                AppraisalLine.type_id,
+                AppraisalLine.quantity,
+                AppraisalLine.unit_price,
+            )
+            .where(
+                AppraisalLine.appraisal_id.in_(appraisal_ids),
+                AppraisalLine.status == "accepted",
+                AppraisalLine.type_id.is_not(None),
+                AppraisalLine.unit_price.is_not(None),
+            )
+            .order_by(AppraisalLine.appraisal_id, AppraisalLine.position)
+        )
+    ).all()
+    out: dict[uuid.UUID, list[AcceptedLineCostRecord]] = {}
+    for appraisal_id, type_id, quantity, unit_price in rows:
+        out.setdefault(appraisal_id, []).append(
+            AcceptedLineCostRecord(
+                type_id=type_id, quantity=quantity, unit_price=unit_price
+            )
+        )
     return out
 
 
