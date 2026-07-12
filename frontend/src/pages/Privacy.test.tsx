@@ -47,6 +47,16 @@ describe("Privacy", () => {
     expect(
       screen.getByText(/contract id, its status, and the issue\/complete timestamps/i),
     ).toBeInTheDocument()
+    // Hangar reading (ADR-0044): corp assets scope, marked hangars only, counts only.
+    expect(
+      screen.getByRole("heading", { name: /reading the buyback hangar/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/item type and quantity counts for those marked hangars/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/never reads members' personal assets/i),
+    ).toBeInTheDocument()
     // Shared-link preview (ADR-0040): public, unauthenticated, value + location only.
     expect(
       screen.getByRole("heading", { name: /sharing an appraisal link/i }),

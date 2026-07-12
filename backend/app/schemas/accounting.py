@@ -4,7 +4,7 @@ buyback owns now, carried at cost, with verified and estimated cost kept apart."
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class InventoryLotOut(BaseModel):
@@ -33,6 +33,21 @@ class InventoryItemOut(BaseModel):
     worth: Decimal | None = None
     unrealized: Decimal | None = None
     lots: list[InventoryLotOut]
+
+
+class HangarOut(BaseModel):
+    """One configured buyback hangar (ADR-0044): a drop-off location + a corp hangar
+    division whose contents count as buyback stock."""
+
+    location_id: str
+    location_name: str
+    division: int
+
+
+class HangarCreateRequest(BaseModel):
+    # Must be one of the corp's drop-off locations (ADR-0030); 404 otherwise.
+    location_id: str
+    division: int = Field(ge=1, le=7)
 
 
 class InventoryOut(BaseModel):

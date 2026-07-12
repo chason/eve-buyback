@@ -3,6 +3,7 @@ from app.data.models.appraisal import Appraisal
 from app.data.models.appraisal_contract import AppraisalContract
 from app.data.models.appraisal_line import AppraisalLine
 from app.data.models.buyback_config import BuybackConfig
+from app.data.models.buyback_hangar import BuybackHangar
 from app.data.models.buyback_location import BuybackLocation
 from app.data.models.character import Character
 from app.data.models.corp_esi_token import CorpEsiToken
@@ -31,6 +32,7 @@ __all__ = [
     "AppraisalContract",
     "AppraisalLine",
     "BuybackConfig",
+    "BuybackHangar",
     "BuybackLocation",
     "Character",
     "CorpRosterMember",

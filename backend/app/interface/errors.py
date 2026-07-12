@@ -20,6 +20,7 @@ from app.application.errors import (
     EmptyAppraisal,
     EntitlementRequired,
     GrantExpiryInPast,
+    HangarLocationUnknown,
     LocationInvalid,
     LocationNotFound,
     ManagerAlreadyExists,
@@ -75,6 +76,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     # 402 Payment Required — the corp lacks an active paid-feature grant (ADR-0042).
     EntitlementRequired: 402,
     GrantExpiryInPast: 422,
+    HangarLocationUnknown: 404,
     OperatorWalletMissing: 409,
     OperatorWalletExpired: 409,
     PaymentNotFound: 404,

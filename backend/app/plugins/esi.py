@@ -24,6 +24,12 @@ class CorporationContractsForbidden(Exception):
     role. Transport-level; the watcher logs and skips without flagging the token failed."""
 
 
+class CorporationAssetsForbidden(Exception):
+    """ESI refused the corp assets list (401/403): the corp ESI token lacks the assets
+    scope (a grant predating ADR-0044) or the character lacks the Director role.
+    Transport-level; the hangar sync logs and skips without flagging the token failed."""
+
+
 class OpenWindowForbidden(Exception):
     """ESI refused the open-window call (401/403): the login token lacks the
     `esi-ui.open_window.v1` scope (the character logged in before ADR-0038). Transport-level;
@@ -75,6 +81,20 @@ class CorporationContract(BaseModel):
     date_issued: datetime
     date_completed: datetime | None = None
     date_expired: datetime | None = None
+
+
+class CorporationAsset(BaseModel):
+    """One corp asset row from `/corporations/{id}/assets/` (ADR-0044). Only the fields
+    the hangar reconciliation needs: `location_flag` is the hangar division
+    (`CorpSAG1`…`CorpSAG7`) and `location_id` the station/structure — or, for items
+    nested inside a container, the container's `item_id`."""
+
+    item_id: int
+    type_id: int
+    quantity: int
+    location_id: int
+    location_flag: str
+    is_singleton: bool = False
 
 
 class ContractItem(BaseModel):
@@ -202,6 +222,28 @@ class EsiClient:
                 break
             page += 1
         return contracts
+
+    async def get_corporation_assets(
+        self, corporation_id: int, access_token: str
+    ) -> list[CorporationAsset]:
+        """The corp's assets (ADR-0044), paginated. Needs the assets scope + the
+        Director role in game; 401/403 → `CorporationAssetsForbidden`."""
+        url = f"{ESI_BASE}/corporations/{corporation_id}/assets/"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        assets: list[CorporationAsset] = []
+        page = 1
+        while True:
+            resp = await self._client.get(
+                url, params={"page": page, "datasource": "tranquility"}, headers=headers
+            )
+            if page == 1 and scope_missing(resp):
+                raise CorporationAssetsForbidden()
+            resp.raise_for_status()
+            assets.extend(CorporationAsset.model_validate(a) for a in resp.json())
+            if page >= int(resp.headers.get("X-Pages", "1")):
+                break
+            page += 1
+        return assets
 
     async def get_corporation_contract_items(
         self, corporation_id: int, contract_id: int, access_token: str

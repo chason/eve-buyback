@@ -171,6 +171,10 @@ class Settings(BaseSettings):
     # background watcher can read the corp's contracts. Existing tokens granted before
     # this must reconnect to gain it.
     eve_contracts_scopes: str = "esi-contracts.read_corporation_contracts.v1"
+    # Corp-assets scope, folded into the Corp ESI access grant (ADR-0044) so the hangar
+    # reconciliation can read the buyback hangar's contents. Needs the Director role in
+    # game; tokens granted before this must reconnect to gain it.
+    eve_assets_scopes: str = "esi-assets.read_corporation_assets.v1"
     # Scopes for the OPERATOR wallet grant (ADR-0042): reading the operator's own
     # character wallet journal to reconcile incoming ISK access payments. This token
     # belongs to the instance operator, never to a tenant corp.
@@ -179,12 +183,13 @@ class Settings(BaseSettings):
     @property
     def eve_corp_token_scopes(self) -> str:
         """The full scope set for the one persisted Corp ESI access token (ADR-0036,
-        0037): structure-market access + corp-membership + corp-contracts, requested in a
-        single grant. Deduped, order-preserving (the sets share `publicData`)."""
+        0037, 0044): structure-market access + corp-membership + corp-contracts +
+        corp-assets, requested in a single grant. Deduped, order-preserving (the sets
+        share `publicData`)."""
         seen: dict[str, None] = {}
         combined = (
             f"{self.eve_structure_scopes} {self.eve_roster_scopes} "
-            f"{self.eve_contracts_scopes}"
+            f"{self.eve_contracts_scopes} {self.eve_assets_scopes}"
         )
         for scope in combined.split():
             seen.setdefault(scope, None)

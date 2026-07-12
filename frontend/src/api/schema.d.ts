@@ -338,6 +338,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/hangars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Hangars */
+        get: operations["list_hangars_api_v1_corporations_me_accounting_hangars_get"];
+        put?: never;
+        /** Add Hangar */
+        post: operations["add_hangar_api_v1_corporations_me_accounting_hangars_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/hangars/{location_id}/{division}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Hangar */
+        delete: operations["remove_hangar_api_v1_corporations_me_accounting_hangars__location_id___division__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/inventory": {
         parameters: {
             query?: never;
@@ -985,6 +1020,26 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HangarCreateRequest */
+        HangarCreateRequest: {
+            /** Division */
+            division: number;
+            /** Location Id */
+            location_id: string;
+        };
+        /**
+         * HangarOut
+         * @description One configured buyback hangar (ADR-0044): a drop-off location + a corp hangar
+         *     division whose contents count as buyback stock.
+         */
+        HangarOut: {
+            /** Division */
+            division: number;
+            /** Location Id */
+            location_id: string;
+            /** Location Name */
+            location_name: string;
         };
         /** InventoryItemOut */
         InventoryItemOut: {
@@ -2017,6 +2072,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountingAccessOut"];
+                };
+            };
+        };
+    };
+    list_hangars_api_v1_corporations_me_accounting_hangars_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HangarOut"][];
+                };
+            };
+        };
+    };
+    add_hangar_api_v1_corporations_me_accounting_hangars_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HangarCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HangarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_hangar_api_v1_corporations_me_accounting_hangars__location_id___division__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                division: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

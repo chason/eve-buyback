@@ -180,11 +180,13 @@ async def test_out_of_corp_character_rejected():
             )
 
 
-def test_connect_requests_both_scope_sets():
+def test_connect_requests_all_scope_sets():
     scopes = get_settings().eve_corp_token_scopes
     assert "esi-markets.structure_markets.v1" in scopes  # structures
     assert "esi-corporations.read_corporation_membership.v1" in scopes  # roster
-    assert scopes.split().count("publicData") == 1  # deduped across the two sets
+    assert "esi-contracts.read_corporation_contracts.v1" in scopes  # watcher
+    assert "esi-assets.read_corporation_assets.v1" in scopes  # hangar (ADR-0044)
+    assert scopes.split().count("publicData") == 1  # deduped across the sets
 
 
 async def test_director_authorize_stores_encrypted_token():
