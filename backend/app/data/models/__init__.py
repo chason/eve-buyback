@@ -10,11 +10,15 @@ from app.data.models.corp_roster_member import CorpRosterMember
 from app.data.models.corporation import Corporation
 from app.data.models.entitlement import Entitlement
 from app.data.models.instance_setting import InstanceSetting
+from app.data.models.lot import Lot
+from app.data.models.lot_expense import LotExpense
+from app.data.models.lot_transformation import LotTransformation
 from app.data.models.manager_assignment import ManagerAssignment
 from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
 from app.data.models.operator_wallet_token import OperatorWalletToken
 from app.data.models.pricing_rule import PricingRule
+from app.data.models.sale import Sale
 from app.data.models.sde_market_group import SdeMarketGroup
 from app.data.models.sde_metadata import SdeMetadata
 from app.data.models.sde_station import SdeStation
@@ -33,11 +37,15 @@ __all__ = [
     "Corporation",
     "Entitlement",
     "InstanceSetting",
+    "Lot",
+    "LotExpense",
+    "LotTransformation",
     "ManagerAssignment",
     "MarketHubRefresh",
     "MarketPrice",
     "OperatorWalletToken",
     "PricingRule",
+    "Sale",
     "SdeMarketGroup",
     "SdeMetadata",
     "SdeStation",

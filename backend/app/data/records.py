@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.entitlements import EntitlementSource, Feature
 from app.domain.locations import LocationKind
+from app.domain.lots import LotSource
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 
@@ -271,6 +272,30 @@ class AppraisalContractRecord(BaseModel):
     status: str
     issued_at: datetime
     completed_at: datetime | None = None
+
+
+class LotRecord(BaseModel):
+    """One inventory lot (ADR-0043). Landed unit cost is derived
+    (`domain/lots.landed_unit_cost`), never stored; state is derived from allocations,
+    never stored."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    corporation_id: uuid.UUID
+    item_type_id: int
+    qty_original: int
+    qty_remaining: int
+    unit_purchase_cost: Decimal
+    unit_hauling_cost: Decimal
+    acquired_at: datetime
+    source: LotSource
+    appraisal_id: uuid.UUID | None = None
+    source_lot_id: uuid.UUID | None = None
+    cost_is_estimated: bool = False
+    location_id: str | None = None
+    written_down_to: Decimal | None = None
+    notes: str | None = None
 
 
 class EntitlementRecord(BaseModel):
