@@ -17,6 +17,7 @@ from app.data.repositories import appraisal_contracts as links_repo
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import lots as lots_repo
 from app.domain.roles import Role
 from app.plugins.esi import (
     CharacterInfo,
@@ -150,6 +151,7 @@ async def _make_appraisal(
     accepted_total: Decimal = Decimal("1000.00"),
     location: str | None = LOCATION,
     items: dict[int, int] | None = None,
+    rejected_items: dict[int, int] | None = None,
 ) -> uuid.UUID:
     items = items if items is not None else {34: 100}
     lines = [
@@ -166,6 +168,20 @@ async def _make_appraisal(
             "reason": None,
         }
         for tid, qty in items.items()
+    ] + [
+        {
+            "type_id": tid,
+            "type_name": f"Type {tid}",
+            "quantity": qty,
+            "status": "rejected",
+            "basis": None,
+            "percentage": None,
+            "unit_value": None,
+            "unit_price": None,
+            "line_total": Decimal(0),
+            "reason": "not accepted",
+        }
+        for tid, qty in (rejected_items or {}).items()
     ]
     async with SessionLocal() as session:
         corp = await corporations_repo.get_by_eve_id(session, CORP_EVE_ID)
@@ -345,6 +361,103 @@ async def test_403_does_not_flag_token(caplog):
         token = await tokens_repo.get_for_corp(session, corp_uuid)
     # A scope/role 403 is not a refresh failure — the token stays healthy (#68).
     assert token.last_refresh_failed_at is None
+
+
+# --- lot materialization (ADR-0043, #151) ---
+
+
+async def _lots(corp_uuid: uuid.UUID):
+    async with SessionLocal() as session:
+        return await lots_repo.open_lots(session, corporation_id=corp_uuid)
+
+
+async def test_completed_contract_materializes_one_lot_per_accepted_line():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    # Two accepted lines and a rejected one (rejected items never enter inventory).
+    a_id = await _make_appraisal(
+        "apprLOTSaaaa", items={34: 100, 35: 50}, rejected_items={608: 1}
+    )
+    done = NOW - timedelta(minutes=5)
+    esi._contracts = [
+        _contract(30, title="apprLOTSaaaa", status="finished", completed=done)
+    ]
+    esi._items = {
+        30: [ContractItem(type_id=34, quantity=100),
+             ContractItem(type_id=35, quantity=50)]
+    }
+
+    await _run(esi)
+
+    lots = await _lots(corp_uuid)
+    assert {(lot.item_type_id, lot.qty_remaining) for lot in lots} == {
+        (34, 100),
+        (35, 50),
+    }
+    for lot in lots:
+        assert lot.source == "buyback"
+        assert lot.appraisal_id == a_id
+        assert lot.unit_purchase_cost == Decimal("0.9")
+        assert lot.unit_hauling_cost == Decimal(0)
+        assert lot.cost_is_estimated is False  # verified cost, ADR-0043
+        assert lot.location_id == LOCATION
+        assert lot.acquired_at == done
+
+
+async def test_rerunning_the_watcher_creates_no_duplicate_lots():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _make_appraisal("apprONCEaaaa")
+    esi._contracts = [
+        _contract(31, title="apprONCEaaaa", status="finished",
+                  completed=NOW - timedelta(minutes=5))
+    ]
+    esi._items = {31: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+    await _run(esi)  # the watcher fires repeatedly; lots are created once
+
+    lots = await _lots(corp_uuid)
+    assert [(lot.item_type_id, lot.qty_remaining) for lot in lots] == [(34, 100)]
+
+
+async def test_unfinished_and_mismatched_contracts_create_no_lots():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _make_appraisal("apprLIVEaaaa")
+    await _make_appraisal("apprBADQaaaa", items={34: 100})
+    esi._contracts = [
+        # Still outstanding — nothing bought yet.
+        _contract(32, title="apprLIVEaaaa", status="outstanding"),
+        # Finished but short on items → mismatch, not a verified purchase.
+        _contract(33, title="apprBADQaaaa", status="finished",
+                  completed=NOW - timedelta(minutes=5)),
+    ]
+    esi._items = {
+        32: [ContractItem(type_id=34, quantity=100)],
+        33: [ContractItem(type_id=34, quantity=99)],
+    }
+
+    await _run(esi)
+
+    assert await _status("apprLIVEaaaa") == "in_progress"
+    assert await _status("apprBADQaaaa") == "mismatch"
+    assert await _lots(corp_uuid) == []
+
+
+async def test_missing_completed_timestamp_falls_back_to_now():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _make_appraisal("apprNOTSaaaa")
+    esi._contracts = [
+        _contract(34, title="apprNOTSaaaa", status="finished", completed=None)
+    ]
+    esi._items = {34: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+
+    lots = await _lots(corp_uuid)
+    assert [lot.acquired_at for lot in lots] == [NOW]
 
 
 # --- list / detail ordering ---

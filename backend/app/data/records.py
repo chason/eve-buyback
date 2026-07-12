@@ -274,6 +274,15 @@ class AppraisalContractRecord(BaseModel):
     completed_at: datetime | None = None
 
 
+class AcceptedLineCostRecord(BaseModel):
+    """An accepted appraisal line reduced to the facts a buyback lot copies
+    (ADR-0043, #151): what was bought and the exact per-unit price paid for it."""
+
+    type_id: int
+    quantity: int
+    unit_price: Decimal
+
+
 class LotRecord(BaseModel):
     """One inventory lot (ADR-0043). Landed unit cost is derived
     (`domain/lots.landed_unit_cost`), never stored; state is derived from allocations,
