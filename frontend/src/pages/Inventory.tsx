@@ -95,15 +95,14 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
         <td>{item.type_name ?? `Type ${item.type_id}`}</td>
         <td className="num">{item.qty.toLocaleString()}</td>
         <td className="num isk">
+          {item.any_estimated && (
+            <>
+              <StatusChip variant="info">Estimated value</StatusChip>{" "}
+            </>
+          )}
           <span title={formatIsk(item.total_cost)}>
             {formatIskCompact(item.total_cost)}
           </span>
-          {item.any_estimated && (
-            <>
-              {" "}
-              <StatusChip variant="info">Estimated value</StatusChip>
-            </>
-          )}
         </td>
         <td>
           <DaysHeld days={item.oldest_days} stale={item.stale} />
@@ -136,15 +135,14 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
             </td>
             <td className="num isk">
               <small>
+                {lot.cost_is_estimated && (
+                  <>
+                    <StatusChip variant="info">Estimated value</StatusChip>{" "}
+                  </>
+                )}
                 <span title={formatIsk(lot.total_cost)}>
                   {formatIsk(lot.unit_cost)} each
                 </span>
-                {lot.cost_is_estimated && (
-                  <>
-                    {" "}
-                    <StatusChip variant="info">Estimated value</StatusChip>
-                  </>
-                )}
               </small>
             </td>
             <td>
