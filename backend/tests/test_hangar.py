@@ -64,9 +64,18 @@ async def test_assets_forbidden_maps_to_typed_error():
 # --- domain count -------------------------------------------------------------------
 
 
-def _stack(type_id, qty, *, location=60003760, flag="CorpSAG2") -> AssetStack:
+_NEXT_ITEM_ID = iter(range(9_000_000, 10_000_000))
+
+
+def _stack(
+    type_id, qty, *, location=60003760, flag="CorpSAG2", item_id=None
+) -> AssetStack:
     return AssetStack(
-        type_id=type_id, quantity=qty, location_id=location, location_flag=flag
+        item_id=item_id if item_id is not None else next(_NEXT_ITEM_ID),
+        type_id=type_id,
+        quantity=qty,
+        location_id=location,
+        location_flag=flag,
     )
 
 
@@ -84,13 +93,38 @@ def test_hangar_counts_filters_and_sums_per_location_and_type():
             _stack(35, 10),
             _stack(34, 999, flag="CorpSAG1"),  # other division — not buyback
             _stack(34, 999, location=1035000000001),  # other location
-            # Inside a container: location_id is the container's item_id, which
-            # never matches a configured hangar → deliberately excluded.
-            _stack(34, 999, location=1_000_000_000_555),
+            # Inside a container that is NOT in a marked hangar → excluded.
+            _stack(34, 999, location=1_000_000_000_555, flag="Unlocked"),
         ],
         hangars,
     )
     assert counts == {(JITA, 34): 150, (JITA, 35): 10}
+
+
+def test_hangar_counts_include_container_contents_recursively():
+    hangars = [HangarKey(location_id=JITA, division=2)]
+    # A station container in the marked hangar, holding minerals and a nested
+    # container that holds more — all of it is physically in the buyback hangar.
+    outer = _stack(17366, 1, item_id=5001)  # Station Container, type 17366
+    inner = _stack(3467, 1, location=5001, flag="Unlocked", item_id=5002)
+    counts = hangar_counts(
+        [
+            outer,
+            _stack(34, 100, location=5001, flag="Unlocked"),
+            inner,
+            _stack(35, 40, location=5002, flag="Unlocked"),
+            _stack(34, 25),  # loose in the hangar alongside the container
+        ],
+        hangars,
+    )
+    # Contents attribute to the STATION (the ledger's granularity), containers count
+    # as physical items themselves, and nesting resolves transitively.
+    assert counts == {
+        (JITA, 34): 125,
+        (JITA, 35): 40,
+        (JITA, 17366): 1,
+        (JITA, 3467): 1,
+    }
 
 
 def test_hangar_counts_spans_multiple_hangars():
