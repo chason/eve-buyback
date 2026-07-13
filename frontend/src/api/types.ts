@@ -48,6 +48,9 @@ export type InventoryLotOut = Schemas["InventoryLotOut"]
 // Buyback-hangar config for the hangar check (ADR-0044, #154).
 export type HangarOut = Schemas["HangarOut"]
 export type HangarCreateRequest = Schemas["HangarCreateRequest"]
+// Hangar reconciliation (ADR-0044, #155): the "Needs a look" log + manual check.
+export type ReconciliationEventOut = Schemas["ReconciliationEventOut"]
+export type HangarCheckResult = Schemas["HangarCheckResult"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

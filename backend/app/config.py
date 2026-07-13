@@ -121,6 +121,16 @@ class Settings(BaseSettings):
     accounting_writedown_enabled: bool = True
     accounting_writedown_interval_seconds: int = 86400  # 24 hours
     accounting_writedown_initial_delay_seconds: int = 300
+    # Hangar reconciliation (ADR-0044, #155): for every entitled corp with marked
+    # hangars, compare the physical hangar contents against the ledger — book
+    # unexplained excess as estimated-value lots, flag shortfalls, log everything.
+    # Hourly matches ESI's own corp-assets cache window.
+    hangar_reconcile_enabled: bool = True
+    hangar_reconcile_interval_seconds: int = 3600  # 1 hour (ESI assets cache TTL)
+    hangar_reconcile_initial_delay_seconds: int = 180
+    # Excess whose deemed value crosses this gets flagged for a look (ADR-0044's
+    # anomaly threshold) even though the lot is still auto-created.
+    accounting_excess_flag_isk: int = 1_000_000_000
     payments_background_refresh_enabled: bool = True
     payments_refresh_interval_seconds: int = 1800  # 30 minutes
     payments_refresh_initial_delay_seconds: int = 120  # first run after boot

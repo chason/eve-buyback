@@ -17,6 +17,7 @@ from app.interface.errors import application_error_handler
 from app.interface.jobs import (
     run_accounting_write_downs,
     run_contracts_refresh,
+    run_hangar_reconcile,
     run_market_refresh,
     run_payments_reconcile,
     run_roster_refresh,
@@ -96,6 +97,7 @@ def _start_scheduler(
         or settings.contracts_background_refresh_enabled
         or settings.payments_background_refresh_enabled
         or settings.accounting_writedown_enabled
+        or settings.hangar_reconcile_enabled
     ):
         return None
     scheduler = AsyncIOScheduler()
@@ -146,6 +148,19 @@ def _start_scheduler(
             coalesce=True,
             next_run_time=datetime.now()
             + timedelta(seconds=settings.payments_refresh_initial_delay_seconds),
+        )
+    if settings.hangar_reconcile_enabled:
+        scheduler.add_job(
+            run_hangar_reconcile,
+            trigger=IntervalTrigger(
+                seconds=settings.hangar_reconcile_interval_seconds
+            ),
+            args=[app],
+            id="hangar_reconcile",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.hangar_reconcile_initial_delay_seconds),
         )
     if settings.accounting_writedown_enabled:
         scheduler.add_job(

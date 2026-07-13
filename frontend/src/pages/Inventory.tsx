@@ -2,8 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { Link } from "react-router-dom"
 
-import { addHangar, getInventory, listHangars, removeHangar } from "../api/accounting"
-import type { InventoryItemOut } from "../api/accounting"
+import {
+  addHangar,
+  getInventory,
+  listHangars,
+  listReconciliationEvents,
+  removeHangar,
+  runHangarCheck,
+} from "../api/accounting"
+import type { InventoryItemOut, ReconciliationEventOut } from "../api/accounting"
 import { listLocations } from "../api/locations"
 import AccountingAccessPanel from "../components/AccountingAccessPanel"
 import { StatusChip } from "../components/StatusChip"
@@ -91,8 +98,100 @@ export default function Inventory() {
       )}
 
       <HangarsSection />
+      <ReconciliationSection />
     </>
   )
+}
+
+/** The hangar-check log (ADR-0044, #155): what each sync changed, flagged entries
+ * first-class — plus a button to run a check right now. Plain English only. */
+function ReconciliationSection() {
+  const queryClient = useQueryClient()
+  const events = useQuery({
+    queryKey: ["reconciliation"],
+    queryFn: listReconciliationEvents,
+  })
+  const check = useMutation({
+    mutationFn: runHangarCheck,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+      void queryClient.invalidateQueries({ queryKey: ["inventory"] })
+    },
+  })
+
+  return (
+    <section className="panel">
+      <h2>Hangar checks</h2>
+      <p>
+        <small className="field-hint">
+          The app regularly compares the books against what&apos;s actually in your
+          marked hangars: stock it finds beyond the books is added at estimated
+          value, and anything missing is flagged here.
+        </small>
+      </p>
+      <p>
+        <button
+          type="button"
+          className="secondary"
+          disabled={check.isPending}
+          onClick={() => check.mutate()}
+        >
+          {check.isPending ? "Checking…" : "Check the hangar now"}
+        </button>{" "}
+        {check.isSuccess && (
+          <small className="field-hint" role="status">
+            {checkSummary(check.data)}
+          </small>
+        )}
+        {check.isError && (
+          <small className="error">{(check.error as Error).message}</small>
+        )}
+      </p>
+      {events.data && events.data.length > 0 && (
+        <ul className="recon-list">
+          {events.data.map((e, i) => (
+            <li key={i} className={e.flagged ? "recon-flagged" : undefined}>
+              <small>
+                {new Date(e.occurred_at).toLocaleString()} — {eventText(e)}
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
+      {events.data && events.data.length === 0 && (
+        <p>
+          <small className="field-hint">Nothing to report yet.</small>
+        </p>
+      )}
+    </section>
+  )
+}
+
+function checkSummary(r: { lots_added: number; flagged: number }): string {
+  if (r.lots_added === 0 && r.flagged === 0) {
+    return "All good — the hangar matches the books."
+  }
+  const parts = []
+  if (r.lots_added > 0) {
+    parts.push(`${r.lots_added} ${r.lots_added === 1 ? "item" : "items"} added`)
+  }
+  if (r.flagged > 0) parts.push(`${r.flagged} flagged for a look`)
+  return `Done — ${parts.join(", ")}.`
+}
+
+function eventText(e: ReconciliationEventOut): string {
+  const item = e.type_name ?? `Type ${e.type_id}`
+  const where = e.location_name ?? e.location_id
+  const qty = e.qty.toLocaleString()
+  if (e.kind === "shortfall") {
+    return `${qty} ${item} missing at ${where} — sold or moved outside the app?`
+  }
+  if (!e.booked) {
+    return `Found ${qty} ${item} at ${where} — no market price to value it yet.`
+  }
+  return `Found ${qty} ${item} at ${where} — added at estimated value${
+    e.unit_cost ? ` (${formatIsk(e.unit_cost)} each)` : ""
+  }.`
 }
 
 /** Buyback-hangar config (ADR-0044, #154): which corp hangar divisions hold buyback

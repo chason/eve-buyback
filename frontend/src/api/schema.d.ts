@@ -338,6 +338,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/hangar-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Hangar Check
+         * @description The "Check the hangar now" button. Safe to click freely: ESI caches corp
+         *     assets for an hour, and the pass is idempotent on the delta (ADR-0044).
+         */
+        post: operations["run_hangar_check_api_v1_corporations_me_accounting_hangar_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/hangars": {
         parameters: {
             query?: never;
@@ -382,6 +403,23 @@ export interface paths {
         };
         /** Get Inventory */
         get: operations["get_inventory_api_v1_corporations_me_accounting_inventory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reconciliation Events */
+        get: operations["list_reconciliation_events_api_v1_corporations_me_accounting_reconciliation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1021,6 +1059,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HangarCheckResult */
+        HangarCheckResult: {
+            /** Flagged */
+            flagged: number;
+            /** Lots Added */
+            lots_added: number;
+        };
         /** HangarCreateRequest */
         HangarCreateRequest: {
             /** Division */
@@ -1240,6 +1285,39 @@ export interface components {
             received_at: string;
             /** Sender Name */
             sender_name?: string | null;
+        };
+        /**
+         * ReconciliationEventOut
+         * @description One "Needs a look" / hangar-check log entry (ADR-0044). `kind` is excess
+         *     (stock found beyond the books — normally booked as an estimated-value lot) or
+         *     shortfall (books expect more than the hangar holds — always a human's call).
+         */
+        ReconciliationEventOut: {
+            /** Booked */
+            booked: boolean;
+            /** Flagged */
+            flagged: boolean;
+            /** Kind */
+            kind: string;
+            /** Location Id */
+            location_id: string;
+            /** Location Name */
+            location_name?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Qty */
+            qty: number;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+            /** Unit Cost */
+            unit_cost?: string | null;
         };
         /**
          * ReprocessBreakdownOut
@@ -2076,6 +2154,26 @@ export interface operations {
             };
         };
     };
+    run_hangar_check_api_v1_corporations_me_accounting_hangar_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HangarCheckResult"];
+                };
+            };
+        };
+    };
     list_hangars_api_v1_corporations_me_accounting_hangars_get: {
         parameters: {
             query?: never;
@@ -2175,6 +2273,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InventoryOut"];
+                };
+            };
+        };
+    };
+    list_reconciliation_events_api_v1_corporations_me_accounting_reconciliation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationEventOut"][];
                 };
             };
         };

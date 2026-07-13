@@ -73,9 +73,10 @@ function renderInventory() {
 describe("Inventory", () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    // The hangar section always queries these; individual tests override.
+    // The hangar + check sections always query these; individual tests override.
     vi.mocked(accountingApi.listHangars).mockResolvedValue([])
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
   })
 
   it("shows holdings at what we paid, compact, with plain-English flags", async () => {
@@ -253,6 +254,61 @@ describe("Inventory", () => {
       "href",
       "/locations",
     )
+  })
+
+  it("tells the hangar-check story in plain English, flagged in red (#155)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "excess", type_id: 34, type_name: "Tritanium",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 40000, unit_cost: "3.60", booked: true, flagged: false,
+        note: null, occurred_at: "2026-07-14T10:00:00Z",
+      },
+      {
+        kind: "shortfall", type_id: 35, type_name: "Pyerite",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 12, unit_cost: null, booked: false, flagged: true,
+        note: null, occurred_at: "2026-07-14T09:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(
+        /Found 40,000 Tritanium at Jita IV - Moon 4 — added at estimated value \(3\.60 ISK each\)\./,
+      ),
+    ).toBeInTheDocument()
+    const missing = screen.getByText(
+      /12 Pyerite missing at Jita IV - Moon 4 — sold or moved outside the app\?/,
+    )
+    expect(missing.closest("li")).toHaveClass("recon-flagged")
+  })
+
+  it("runs a hangar check on demand and summarizes the result", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.runHangarCheck).mockResolvedValue({
+      lots_added: 2,
+      flagged: 1,
+    })
+
+    renderInventory()
+
+    await u.click(
+      await screen.findByRole("button", { name: "Check the hangar now" }),
+    )
+    expect(accountingApi.runHangarCheck).toHaveBeenCalled()
+    expect(
+      await screen.findByText(/Done — 2 items added, 1 flagged for a look\./),
+    ).toBeInTheDocument()
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

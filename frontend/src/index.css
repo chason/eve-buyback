@@ -806,6 +806,23 @@ label:has(> .search-results) > input {
   cursor: help;
 }
 
+/* The hangar-check log (#155): compact entries; flagged ones read danger-red so
+   "needs a look" is scannable. */
+.recon-list {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0;
+}
+
+.recon-list li {
+  list-style: none;
+  padding: 0.15rem 0;
+}
+
+.recon-list li.recon-flagged small {
+  color: var(--bb-danger);
+}
+
 /* The configured buyback hangars (#154): a compact list above the add controls. */
 .hangar-list {
   list-style: none;
