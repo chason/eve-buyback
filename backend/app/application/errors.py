@@ -198,3 +198,14 @@ class HangarLocationUnknown(ApplicationError):
         "That location isn't one of your corporation's drop-off locations — add it "
         "on the Locations page first"
     )
+
+
+class HangarReadUnavailable(ApplicationError):
+    """The hangar contents can't be read (ADR-0044): the corp ESI token is missing
+    the assets scope (a grant predating the feature) or the connecting character
+    lacks the Director role in game."""
+
+    default_detail = (
+        "Couldn't read your hangar — reconnect corp ESI access on the Config page "
+        "with a Director character to enable hangar tracking"
+    )

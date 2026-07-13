@@ -35,6 +35,7 @@ def test_start_scheduler_returns_none_when_all_jobs_disabled():
             "contracts_background_refresh_enabled": False,
             "payments_background_refresh_enabled": False,
             "accounting_writedown_enabled": False,
+            "hangar_reconcile_enabled": False,
         }
     )
     assert _start_scheduler(SimpleNamespace(), settings) is None
@@ -58,6 +59,9 @@ async def test_start_scheduler_configures_enabled_jobs():
             "accounting_writedown_enabled": True,
             "accounting_writedown_interval_seconds": 86400,
             "accounting_writedown_initial_delay_seconds": 300,
+            "hangar_reconcile_enabled": True,
+            "hangar_reconcile_interval_seconds": 3600,
+            "hangar_reconcile_initial_delay_seconds": 180,
         }
     )
 
@@ -88,6 +92,11 @@ async def test_start_scheduler_configures_enabled_jobs():
         assert write_downs.trigger.interval.total_seconds() == 86400
         assert write_downs.max_instances == 1
         assert write_downs.coalesce is True
+        hangar = scheduler.get_job("hangar_reconcile")
+        assert hangar is not None
+        assert hangar.trigger.interval.total_seconds() == 3600
+        assert hangar.max_instances == 1
+        assert hangar.coalesce is True
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

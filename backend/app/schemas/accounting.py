@@ -50,6 +50,30 @@ class HangarCreateRequest(BaseModel):
     division: int = Field(ge=1, le=7)
 
 
+class ReconciliationEventOut(BaseModel):
+    """One "Needs a look" / hangar-check log entry (ADR-0044). `kind` is excess
+    (stock found beyond the books — normally booked as an estimated-value lot) or
+    shortfall (books expect more than the hangar holds — always a human's call)."""
+
+    kind: str
+    type_id: int
+    type_name: str | None = None
+    location_id: str
+    location_name: str | None = None
+    qty: int
+    unit_cost: Decimal | None = None
+    # True when an excess was booked as a lot; False = couldn't be priced yet.
+    booked: bool
+    flagged: bool
+    note: str | None = None
+    occurred_at: datetime
+
+
+class HangarCheckResult(BaseModel):
+    lots_added: int
+    flagged: int
+
+
 class InventoryOut(BaseModel):
     total_cost: Decimal
     verified_cost: Decimal

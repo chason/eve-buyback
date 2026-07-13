@@ -17,6 +17,7 @@ from app.domain.lots import EntrySource as LotEntrySource
 from app.domain.lots import ExpenseKind, LotSource
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
+from app.domain.reconciliation import ReconciliationKind
 
 
 class CharacterRecord(BaseModel):
@@ -317,6 +318,25 @@ class BuybackHangarRecord(BaseModel):
     location_id: str
     location_name: str
     division: int
+
+
+class ReconciliationEventRecord(BaseModel):
+    """One logged hangar-sync difference (ADR-0044). `unit_cost`/`lot_id` are set
+    for excess that was booked as a deemed-cost lot; `flagged` marks the entries
+    the "Needs a look" list highlights."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    location_id: str
+    type_id: int
+    kind: ReconciliationKind
+    qty: int
+    unit_cost: Decimal | None = None
+    lot_id: uuid.UUID | None = None
+    flagged: bool
+    note: str | None = None
+    occurred_at: datetime
 
 
 class ExpenseRecord(BaseModel):

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import Lot
@@ -88,6 +88,34 @@ async def consume(
     lot.qty_remaining -= qty
     await session.flush()
     return LotRecord.model_validate(lot)
+
+
+async def idle_by_location_type(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    location_ids: list[str],
+) -> dict[tuple[str, int], int]:
+    """The ledger's expected physical stock per `(location_id, type_id)` at the given
+    locations — what the hangar reconciliation compares the real count against
+    (ADR-0044). Currently `qty_idle == qty_remaining`: nothing tracks market/contract
+    escrow or shipments yet (`domain/lots.qty_idle` subtracts them once allocations
+    exist, Phases 3–4). Lots with no recorded location can't be attributed to a
+    hangar and are excluded."""
+    if not location_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(Lot.location_id, Lot.item_type_id, func.sum(Lot.qty_remaining))
+            .where(
+                Lot.corporation_id == corporation_id,
+                Lot.qty_remaining > 0,
+                Lot.location_id.in_(location_ids),
+            )
+            .group_by(Lot.location_id, Lot.item_type_id)
+        )
+    ).all()
+    return {(loc, tid): int(qty) for loc, tid, qty in rows}
 
 
 async def write_down(

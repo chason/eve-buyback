@@ -789,6 +789,24 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HangarCheckResult": {
+        "properties": {
+          "flagged": {
+            "title": "Flagged",
+            "type": "integer"
+          },
+          "lots_added": {
+            "title": "Lots Added",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lots_added",
+          "flagged"
+        ],
+        "title": "HangarCheckResult",
+        "type": "object"
+      },
       "HangarCreateRequest": {
         "properties": {
           "division": {
@@ -1327,6 +1345,96 @@
           "matched"
         ],
         "title": "PaymentOut",
+        "type": "object"
+      },
+      "ReconciliationEventOut": {
+        "description": "One \"Needs a look\" / hangar-check log entry (ADR-0044). `kind` is excess\n(stock found beyond the books \u2014 normally booked as an estimated-value lot) or\nshortfall (books expect more than the hangar holds \u2014 always a human's call).",
+        "properties": {
+          "booked": {
+            "title": "Booked",
+            "type": "boolean"
+          },
+          "flagged": {
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
+          }
+        },
+        "required": [
+          "kind",
+          "type_id",
+          "location_id",
+          "qty",
+          "booked",
+          "flagged",
+          "occurred_at"
+        ],
+        "title": "ReconciliationEventOut",
         "type": "object"
       },
       "ReprocessBreakdownOut": {
@@ -2010,7 +2118,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "92"
+    "version": "93"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2690,6 +2798,28 @@
         ]
       }
     },
+    "/api/v1/corporations/me/accounting/hangar-check": {
+      "post": {
+        "description": "The \"Check the hangar now\" button. Safe to click freely: ESI caches corp\nassets for an hour, and the pass is idempotent on the delta (ADR-0044).",
+        "operationId": "run_hangar_check_api_v1_corporations_me_accounting_hangar_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HangarCheckResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Hangar Check",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
     "/api/v1/corporations/me/accounting/hangars": {
       "get": {
         "operationId": "list_hangars_api_v1_corporations_me_accounting_hangars_get",
@@ -2814,6 +2944,31 @@
           }
         },
         "summary": "Get Inventory",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/reconciliation": {
+      "get": {
+        "operationId": "list_reconciliation_events_api_v1_corporations_me_accounting_reconciliation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReconciliationEventOut"
+                  },
+                  "title": "Response List Reconciliation Events Api V1 Corporations Me Accounting Reconciliation Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Reconciliation Events",
         "tags": [
           "accounting"
         ]

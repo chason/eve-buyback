@@ -1,11 +1,18 @@
 import { apiGet, apiSend, throwApiError } from "./client"
-import type { HangarOut, InventoryOut } from "./types"
+import type {
+  HangarCheckResult,
+  HangarOut,
+  InventoryOut,
+  ReconciliationEventOut,
+} from "./types"
 
 export type {
+  HangarCheckResult,
   HangarOut,
   InventoryItemOut,
   InventoryLotOut,
   InventoryOut,
+  ReconciliationEventOut,
 } from "./types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1"
@@ -51,4 +58,15 @@ export async function removeHangar(
     `/corporations/me/accounting/hangars/${locationId}/${division}`,
   )
   if (!res.ok) await throwApiError(res, "Removing the hangar failed")
+}
+
+/** The recent hangar-check log (ADR-0044) — the "Needs a look" list's data. */
+export const listReconciliationEvents = () =>
+  apiGet<ReconciliationEventOut[]>("/corporations/me/accounting/reconciliation")
+
+/** Run a hangar check right now instead of waiting for the hourly sync. */
+export async function runHangarCheck(): Promise<HangarCheckResult> {
+  const res = await apiSend("POST", "/corporations/me/accounting/hangar-check")
+  if (!res.ok) await throwApiError(res, "The hangar check failed")
+  return (await res.json()) as HangarCheckResult
 }
