@@ -56,7 +56,10 @@ async def _seed_corp(*, entitled: bool = True):
         return corp.id
 
 
-async def _lot(corp_id, *, type_id=34, qty=100, cost="4.00", days_ago=0, **kwargs):
+async def _lot(
+    corp_id, *, type_id=34, qty=100, cost="4.00", days_ago=0, acquired_at=None,
+    **kwargs,
+):
     async with SessionLocal() as session:
         lot = await lots_repo.create_lot(
             session,
@@ -64,7 +67,7 @@ async def _lot(corp_id, *, type_id=34, qty=100, cost="4.00", days_ago=0, **kwarg
             item_type_id=type_id,
             qty=qty,
             unit_purchase_cost=Decimal(cost),
-            acquired_at=NOW - timedelta(days=days_ago),
+            acquired_at=acquired_at or NOW - timedelta(days=days_ago),
             source=kwargs.pop("source", "buyback"),
             location_id=JITA,
             **kwargs,
@@ -218,7 +221,10 @@ async def test_unrealized_loss_is_negative():
 
 async def test_endpoint_returns_inventory_for_entitled_manager():
     corp_id = await _seed_corp()
-    await _lot(corp_id, qty=100, cost="4.00", days_ago=3)
+    # The endpoint runs on the REAL clock, so anchor this lot to it (a fixed NOW
+    # here was a time bomb: the gap grows a day every day the suite ages).
+    await _lot(corp_id, qty=100, cost="4.00",
+               acquired_at=datetime.now(UTC) - timedelta(days=3))
     async with make_client(CeoEsi()) as http:
         await login(http)
         resp = await http.get("/api/v1/corporations/me/accounting/inventory")
@@ -226,9 +232,7 @@ async def test_endpoint_returns_inventory_for_entitled_manager():
     body = resp.json()
     assert Decimal(body["total_cost"]) == Decimal("400.00")
     assert body["items"][0]["type_name"] == "Tritanium"
-    # The endpoint runs on the real clock; a lot acquired at fixed-NOW − 3d reads
-    # 2 or 3 days depending on the time of day the suite runs.
-    assert body["items"][0]["lots"][0]["days_held"] in (2, 3)
+    assert body["items"][0]["lots"][0]["days_held"] == 3
 
 
 async def test_endpoint_402_without_entitlement():

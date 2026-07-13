@@ -116,6 +116,7 @@ async def fetch_hangar_counts(
     return hangar_counts(
         [
             AssetStack(
+                item_id=a.item_id,
                 type_id=a.type_id,
                 quantity=a.quantity,
                 location_id=a.location_id,
