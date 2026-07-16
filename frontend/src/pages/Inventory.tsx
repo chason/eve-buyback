@@ -5,12 +5,18 @@ import { Link } from "react-router-dom"
 import {
   addHangar,
   getInventory,
+  getReprocessPreview,
   listHangars,
   listReconciliationEvents,
+  recordReprocess,
   removeHangar,
   runHangarCheck,
 } from "../api/accounting"
-import type { InventoryItemOut, ReconciliationEventOut } from "../api/accounting"
+import type {
+  InventoryItemOut,
+  InventoryOut,
+  ReconciliationEventOut,
+} from "../api/accounting"
 import { listLocations } from "../api/locations"
 import AccountingAccessPanel from "../components/AccountingAccessPanel"
 import { StatusChip } from "../components/StatusChip"
@@ -39,9 +45,18 @@ export default function Inventory() {
     )
   }
 
-  const inv = result.data.inventory
+  return <StockView inv={result.data.inventory} />
+}
+
+function StockView({ inv }: { inv: InventoryOut }) {
+  // The reprocess record dialog (#177), opened from a buy row or a hangar-check
+  // suggestion; one at a time, keyed by the source lot.
+  const [reprocessLotId, setReprocessLotId] = useState<string | null>(null)
   // Valuation cards only make sense once something is priced (#153).
   const anythingPriced = inv.items.length > inv.unpriced_types
+  // A suggestion targets a TYPE; the oldest buy of it is the FIFO-correct source.
+  const oldestLotOf = (typeId: number) =>
+    inv.items.find((i) => i.type_id === typeId)?.lots[0]?.id ?? null
   return (
     <>
       <hgroup>
@@ -83,7 +98,11 @@ export default function Inventory() {
             </thead>
             <tbody>
               {inv.items.map((item) => (
-                <ItemRows key={item.type_id} item={item} />
+                <ItemRows
+                  key={item.type_id}
+                  item={item}
+                  onReprocess={setReprocessLotId}
+                />
               ))}
             </tbody>
           </table>
@@ -97,15 +116,150 @@ export default function Inventory() {
         </div>
       )}
 
+      {reprocessLotId && (
+        <ReprocessPanel
+          lotId={reprocessLotId}
+          onClose={() => setReprocessLotId(null)}
+        />
+      )}
+
       <HangarsSection />
-      <ReconciliationSection />
+      <ReconciliationSection
+        onRecordReprocess={(typeId) => {
+          const lotId = oldestLotOf(typeId)
+          if (lotId) setReprocessLotId(lotId)
+        }}
+      />
     </>
   )
 }
 
+/** The reprocess record form (ADR-0047, #177): "Turned into minerals — what we
+ * paid carries over." Output quantities pre-fill from the game's base yields and
+ * stay editable, because real yields vary with skills and structures. */
+function ReprocessPanel({
+  lotId,
+  onClose,
+}: {
+  lotId: string
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const preview = useQuery({
+    queryKey: ["reprocessPreview", lotId],
+    queryFn: () => getReprocessPreview(lotId),
+  })
+  const [qty, setQty] = useState<number | null>(null)
+  const [quantities, setQuantities] = useState<Record<number, number> | null>(
+    null,
+  )
+  const record = useMutation({
+    mutationFn: () =>
+      recordReprocess(
+        lotId,
+        qty ?? preview.data?.qty_remaining ?? 0,
+        Object.entries(quantities ?? prefill())
+          .map(([tid, quantity]) => ({ type_id: Number(tid), quantity }))
+          .filter((o) => o.quantity > 0),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["inventory"] })
+      void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+      onClose()
+    },
+  })
+
+  const prefill = (): Record<number, number> =>
+    Object.fromEntries(
+      (preview.data?.outputs ?? []).map((o) => [o.type_id, o.quantity]),
+    )
+
+  if (preview.isLoading) return <p aria-busy="true">Loading…</p>
+  if (preview.isError || !preview.data) {
+    return <p className="error">Could not load the reprocess form.</p>
+  }
+  const p = preview.data
+  const outputs = quantities ?? prefill()
+
+  return (
+    <section className="panel">
+      <h2>Turned into minerals</h2>
+      <p>
+        <small className="field-hint">
+          Record what {p.type_name ?? `Type ${p.type_id}`} was reprocessed into —
+          what we paid for it carries over into the minerals. Adjust the amounts
+          to what you actually got.
+        </small>
+      </p>
+      <div className="access-actions">
+        <label>
+          Units reprocessed
+          <input
+            type="number"
+            min={1}
+            max={p.qty_remaining}
+            value={qty ?? p.qty_remaining}
+            onChange={(e) => setQty(Number(e.target.value))}
+          />
+        </label>
+      </div>
+      {p.outputs.length === 0 && (
+        <p>
+          <small className="field-hint">
+            No game data for this item&apos;s yields — this form can&apos;t
+            pre-fill it yet.
+          </small>
+        </p>
+      )}
+      <div className="access-actions">
+        {p.outputs.map((o) => (
+          <label key={o.type_id}>
+            {o.type_name ?? `Type ${o.type_id}`}
+            <input
+              type="number"
+              min={0}
+              value={outputs[o.type_id] ?? 0}
+              onChange={(e) =>
+                setQuantities({
+                  ...outputs,
+                  [o.type_id]: Number(e.target.value),
+                })
+              }
+            />
+          </label>
+        ))}
+      </div>
+      <p>
+        <button
+          type="button"
+          className="secondary"
+          disabled={
+            record.isPending ||
+            Object.values(outputs).every((q) => !q || q <= 0)
+          }
+          onClick={() => record.mutate()}
+        >
+          {record.isPending ? "Recording…" : "Record it"}
+        </button>{" "}
+        <button type="button" className="linkbtn" onClick={onClose}>
+          Cancel
+        </button>
+        {record.isError && (
+          <small className="error">{(record.error as Error).message}</small>
+        )}
+      </p>
+    </section>
+  )
+}
+
 /** The hangar-check log (ADR-0044, #155): what each sync changed, flagged entries
- * first-class — plus a button to run a check right now. Plain English only. */
-function ReconciliationSection() {
+ * first-class — plus a button to run a check right now. Plain English only. A
+ * reprocess suggestion (#177) carries a "Record it" button into the form. */
+function ReconciliationSection({
+  onRecordReprocess,
+}: {
+  onRecordReprocess: (typeId: number) => void
+}) {
   const queryClient = useQueryClient()
   const events = useQuery({
     queryKey: ["reconciliation"],
@@ -153,6 +307,18 @@ function ReconciliationSection() {
             <li key={i} className={e.flagged ? "recon-flagged" : undefined}>
               <small>
                 {new Date(e.occurred_at).toLocaleString()} — {eventText(e)}
+                {e.kind === "reprocess_hint" && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => onRecordReprocess(e.type_id)}
+                    >
+                      Record it
+                    </button>
+                  </>
+                )}
               </small>
             </li>
           ))}
@@ -183,6 +349,9 @@ function eventText(e: ReconciliationEventOut): string {
   const item = e.type_name ?? `Type ${e.type_id}`
   const where = e.location_name ?? e.location_id
   const qty = e.qty.toLocaleString()
+  if (e.kind === "reprocess_hint") {
+    return `Looks like ${qty} ${item} at ${where} was turned into minerals — record it to carry what we paid into them.`
+  }
   if (e.kind === "shortfall") {
     return `${qty} ${item} missing at ${where} — sold or moved outside the app?`
   }
@@ -317,7 +486,13 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ItemRows({ item }: { item: InventoryItemOut }) {
+function ItemRows({
+  item,
+  onReprocess,
+}: {
+  item: InventoryItemOut
+  onReprocess: (lotId: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const multiple = item.lots.length > 1
   return (
@@ -342,7 +517,7 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
           <DaysHeld days={item.oldest_days} stale={item.stale} />
         </td>
         <td>
-          {multiple && (
+          {multiple ? (
             <button
               type="button"
               className="linkbtn"
@@ -351,6 +526,16 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
             >
               {open ? "Hide" : `${item.lots.length} buys`}
             </button>
+          ) : (
+            item.lots.length === 1 && (
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => onReprocess(item.lots[0].id)}
+              >
+                Turned into minerals
+              </button>
+            )
           )}
         </td>
       </tr>
@@ -385,7 +570,15 @@ function ItemRows({ item }: { item: InventoryItemOut }) {
                 <DaysHeld days={lot.days_held} stale={lot.stale} />
               </small>
             </td>
-            <td />
+            <td>
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => onReprocess(lot.id)}
+              >
+                <small>Turned into minerals</small>
+              </button>
+            </td>
           </tr>
         ))}
     </>

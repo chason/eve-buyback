@@ -934,7 +934,7 @@
         "type": "object"
       },
       "InventoryLotOut": {
-        "description": "One open purchase of the item: what's left of it, what one unit is carried\nat, and how long it has been sitting.",
+        "description": "One open purchase of the item: what's left of it, what one unit is carried\nat, and how long it has been sitting. `id` keys the reprocess action (#177).",
         "properties": {
           "acquired_at": {
             "format": "date-time",
@@ -948,6 +948,11 @@
           "days_held": {
             "title": "Days Held",
             "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
           "qty": {
             "title": "Qty",
@@ -969,6 +974,7 @@
           }
         },
         "required": [
+          "id",
           "qty",
           "unit_cost",
           "total_cost",
@@ -1506,6 +1512,139 @@
           "value"
         ],
         "title": "ReprocessMineralOut",
+        "type": "object"
+      },
+      "ReprocessOutputIn": {
+        "properties": {
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type_id",
+          "quantity"
+        ],
+        "title": "ReprocessOutputIn",
+        "type": "object"
+      },
+      "ReprocessOutputOut": {
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          }
+        },
+        "required": [
+          "type_id",
+          "quantity"
+        ],
+        "title": "ReprocessOutputOut",
+        "type": "object"
+      },
+      "ReprocessPreviewOut": {
+        "description": "The pre-filled record form: the source lot's facts + base-yield outputs\n(empty when the type has no yield data \u2014 outputs are then hand-entered).",
+        "properties": {
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/ReprocessOutputOut"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "qty_remaining": {
+            "title": "Qty Remaining",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          }
+        },
+        "required": [
+          "lot_id",
+          "type_id",
+          "qty_remaining",
+          "outputs"
+        ],
+        "title": "ReprocessPreviewOut",
+        "type": "object"
+      },
+      "ReprocessRequest": {
+        "description": "Record a reprocess (ADR-0047): how many units left the lot, and what\nactually came out (editable \u2014 real yields vary with skills/structures).",
+        "properties": {
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/ReprocessOutputIn"
+            },
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          },
+          "qty": {
+            "exclusiveMinimum": 0.0,
+            "title": "Qty",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "qty",
+          "outputs"
+        ],
+        "title": "ReprocessRequest",
+        "type": "object"
+      },
+      "ReprocessResultOut": {
+        "description": "What the record created, in plain terms: one child stock entry per material,\ncarrying the source's cost.",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/ReprocessOutputOut"
+            },
+            "title": "Children",
+            "type": "array"
+          }
+        },
+        "required": [
+          "children"
+        ],
+        "title": "ReprocessResultOut",
         "type": "object"
       },
       "RosterStatusOut": {
@@ -2118,7 +2257,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "93"
+    "version": "94"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2944,6 +3083,102 @@
           }
         },
         "summary": "Get Inventory",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/lots/{lot_id}/reprocess": {
+      "post": {
+        "operationId": "record_reprocess_api_v1_corporations_me_accounting_lots__lot_id__reprocess_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReprocessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReprocessResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Reprocess",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/lots/{lot_id}/reprocess-preview": {
+      "get": {
+        "operationId": "reprocess_preview_api_v1_corporations_me_accounting_lots__lot_id__reprocess_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReprocessPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reprocess Preview",
         "tags": [
           "accounting"
         ]
