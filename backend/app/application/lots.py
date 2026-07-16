@@ -64,8 +64,10 @@ async def _nrv_by_type(
 
 class InventoryLotView(BaseModel):
     """One open lot as the inventory view shows it (#152): what's left, what one
-    unit is carried at (landed, write-down floored), and how long it's been sitting."""
+    unit is carried at (landed, write-down floored), and how long it's been sitting.
+    `id` lets the UI act on the lot (the reprocess record action, #177)."""
 
+    id: uuid.UUID
     qty: int
     unit_cost: Decimal
     total_cost: Decimal
@@ -149,6 +151,7 @@ async def get_inventory(
         days_held = max(0, (now - lot.acquired_at).days)
         by_type.setdefault(lot.item_type_id, []).append(
             InventoryLotView(
+                id=lot.id,
                 qty=lot.qty_remaining,
                 unit_cost=unit_cost,
                 total_cost=lot.qty_remaining * unit_cost,

@@ -51,6 +51,9 @@ export type HangarCreateRequest = Schemas["HangarCreateRequest"]
 // Hangar reconciliation (ADR-0044, #155): the "Needs a look" log + manual check.
 export type ReconciliationEventOut = Schemas["ReconciliationEventOut"]
 export type HangarCheckResult = Schemas["HangarCheckResult"]
+// Reprocess transformations (ADR-0047, #177).
+export type ReprocessPreviewOut = Schemas["ReprocessPreviewOut"]
+export type ReprocessResultOut = Schemas["ReprocessResultOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

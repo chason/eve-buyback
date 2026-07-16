@@ -1,6 +1,7 @@
 """Accounting add-on API DTOs (ADR-0043). The inventory view (#152): what the corp's
 buyback owns now, carried at cost, with verified and estimated cost kept apart."""
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
@@ -9,8 +10,9 @@ from pydantic import BaseModel, Field
 
 class InventoryLotOut(BaseModel):
     """One open purchase of the item: what's left of it, what one unit is carried
-    at, and how long it has been sitting."""
+    at, and how long it has been sitting. `id` keys the reprocess action (#177)."""
 
+    id: uuid.UUID
     qty: int
     unit_cost: Decimal
     total_cost: Decimal
@@ -72,6 +74,43 @@ class ReconciliationEventOut(BaseModel):
 class HangarCheckResult(BaseModel):
     lots_added: int
     flagged: int
+
+
+class ReprocessOutputIn(BaseModel):
+    type_id: int
+    quantity: int = Field(gt=0)
+
+
+class ReprocessRequest(BaseModel):
+    """Record a reprocess (ADR-0047): how many units left the lot, and what
+    actually came out (editable — real yields vary with skills/structures)."""
+
+    qty: int = Field(gt=0)
+    outputs: list[ReprocessOutputIn] = Field(min_length=1)
+
+
+class ReprocessOutputOut(BaseModel):
+    type_id: int
+    type_name: str | None = None
+    quantity: int
+
+
+class ReprocessPreviewOut(BaseModel):
+    """The pre-filled record form: the source lot's facts + base-yield outputs
+    (empty when the type has no yield data — outputs are then hand-entered)."""
+
+    lot_id: uuid.UUID
+    type_id: int
+    type_name: str | None = None
+    qty_remaining: int
+    outputs: list[ReprocessOutputOut]
+
+
+class ReprocessResultOut(BaseModel):
+    """What the record created, in plain terms: one child stock entry per material,
+    carrying the source's cost."""
+
+    children: list[ReprocessOutputOut]
 
 
 class InventoryOut(BaseModel):

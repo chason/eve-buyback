@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 # What a sync observed for one (location, type): more in the hangar than the books
-# expect (off-app buyback / opening stock), or less (an unrecorded sale or move).
-ReconciliationKind = Literal["excess", "shortfall"]
+# expect (off-app buyback / opening stock), less (an unrecorded sale or move), or a
+# shortfall-plus-materials pattern that looks like an unrecorded reprocess
+# (ADR-0047) — surfaced as a suggestion, never auto-applied.
+ReconciliationKind = Literal["excess", "shortfall", "reprocess_hint"]
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,7 @@ from app.application.errors import (
     HangarReadUnavailable,
     LocationInvalid,
     LocationNotFound,
+    LotNotFound,
     ManagerAlreadyExists,
     ManagerNotFound,
     MarketHubInvalid,
@@ -38,6 +39,7 @@ from app.application.errors import (
     PaymentTooSmall,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
+    ReprocessQtyUnavailable,
     RosterAccessDenied,
     RosterRefreshTooSoon,
     SsoNotConfigured,
@@ -84,6 +86,8 @@ _STATUS: dict[type[ApplicationError], int] = {
     PaymentNotFound: 404,
     PaymentAlreadyMatched: 409,
     PaymentTooSmall: 422,
+    LotNotFound: 404,
+    ReprocessQtyUnavailable: 422,
 }
 
 

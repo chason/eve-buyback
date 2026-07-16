@@ -354,6 +354,49 @@ async def test_shortfall_flags_without_inventing_a_lot_and_does_not_spam():
     assert events[0].qty == 700  # newest first
 
 
+async def test_reprocess_pattern_becomes_a_hint_not_a_loss_plus_windfall():
+    """ADR-0047: Veldspar short + yield-consistent Tritanium excess → one
+    `reprocess_hint`, no shortfall flag, and NO deemed-cost Tritanium lot (that
+    would sever the cost lineage the reprocess record preserves)."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    VELD = 1230
+    async with SessionLocal() as session:
+        corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
+        await sde_repo.bulk_upsert_types(session, [
+            {"type_id": VELD, "name": "Veldspar", "group_id": 462,
+             "market_group_id": 1857, "volume": 0.1, "portion_size": 100,
+             "published": True},
+        ])
+        await sde_repo.bulk_upsert_type_materials(session, [
+            {"type_id": VELD, "material_type_id": TRIT, "quantity": 400},
+        ])
+        # The books hold 600 Veldspar; the hangar holds none of it but does hold
+        # Tritanium the reprocess would explain (≤ 6 batches × 400 = 2400).
+        await lots_repo.create_lot(
+            session, corporation_id=corp.id, item_type_id=VELD, qty=600,
+            unit_purchase_cost=Decimal("10.00"), acquired_at=NOW,
+            source="buyback", location_id=JITA,
+        )
+        await session.commit()
+    esi.hangar = {TRIT: 2175}
+
+    result = await _run(esi)
+
+    assert result.lots_added == 0  # the Tritanium was NOT booked as deemed cost
+    assert result.flagged == 1
+    lots, events = await _state()
+    assert {lot.item_type_id for lot in lots} == {VELD}  # nothing invented
+    (event,) = events
+    assert event.kind == "reprocess_hint"
+    assert (event.type_id, event.qty, event.flagged) == (VELD, 600, True)
+
+    # The suggestion repeats-without-spamming until someone records it.
+    await _run(esi)
+    _, events = await _state()
+    assert len(events) == 1
+
+
 # --- API -----------------------------------------------------------------------------
 
 

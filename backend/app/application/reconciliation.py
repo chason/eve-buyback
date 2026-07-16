@@ -35,6 +35,7 @@ from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
 from app.domain.reconciliation import Delta, reconcile
+from app.domain.transformations import match_reprocess_hints
 from app.plugins.esi import CorporationAssetsForbidden, EsiClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
@@ -97,6 +98,17 @@ async def reconcile_hangars(
     if not deltas:
         return HangarCheckResult(lots_added=0, flagged=0)
 
+    # A reprocessable-type shortfall + yield-consistent materials excess looks like
+    # an unrecorded reprocess (ADR-0047): suggest it instead of flagging a loss and
+    # booking re-estimated materials — that would sever the cost lineage the manual
+    # record action exists to preserve. Matched slots skip the normal paths for
+    # this pass; the suggestion repeats until recorded (or the pattern changes).
+    hints = await _reprocess_hints(session, deltas)
+    hinted_sources = {(h.location_id, h.type_id) for h in hints}
+    hinted_materials = {
+        (h.location_id, tid) for h in hints for tid in h.material_type_ids
+    }
+
     deemed = await _deemed_unit_costs(
         session, corp.id, sorted({d.type_id for d in deltas if d.kind == "excess"})
     )
@@ -104,7 +116,32 @@ async def reconcile_hangars(
 
     lots_added = 0
     flagged = 0
+    for hint in hints:
+        hint_delta = Delta(
+            location_id=hint.location_id,
+            type_id=hint.type_id,
+            kind="reprocess_hint",
+            qty=hint.qty,
+        )
+        if _already_logged(latest, hint_delta, lot_id_present=None):
+            continue
+        await recon_repo.add_event(
+            session,
+            corporation_id=corp.id,
+            location_id=hint.location_id,
+            type_id=hint.type_id,
+            kind="reprocess_hint",
+            qty=hint.qty,
+            occurred_at=now,
+            flagged=True,
+        )
+        flagged += 1
     for delta in deltas:
+        slot = (delta.location_id, delta.type_id)
+        if delta.kind == "shortfall" and slot in hinted_sources:
+            continue  # explained by the suggestion, not a loss to flag
+        if delta.kind == "excess" and slot in hinted_materials:
+            continue  # would be re-estimated materials; the reprocess records them
         if delta.kind == "excess":
             unit_cost = deemed.get(delta.type_id)
             if unit_cost is None:
@@ -175,6 +212,30 @@ async def reconcile_hangars(
             flagged,
         )
     return HangarCheckResult(lots_added=lots_added, flagged=flagged)
+
+
+async def _reprocess_hints(session: AsyncSession, deltas: list[Delta]):
+    """Feed the shortfall/excess pattern to the pure matcher (ADR-0047). Yield data
+    and portion sizes come from the SDE — absent types simply never match."""
+    shortfalls = [
+        (d.location_id, d.type_id, d.qty) for d in deltas if d.kind == "shortfall"
+    ]
+    if not shortfalls:
+        return []
+    excesses = [
+        (d.location_id, d.type_id, d.qty) for d in deltas if d.kind == "excess"
+    ]
+    if not excesses:
+        return []
+    source_type_ids = sorted({tid for _, tid, _ in shortfalls})
+    materials = await sde_repo.get_type_materials(session, source_type_ids)
+    types = await sde_repo.get_types(session, source_type_ids)
+    return match_reprocess_hints(
+        shortfalls,
+        excesses,
+        materials,
+        {tid: t.portion_size for tid, t in types.items()},
+    )
 
 
 def _already_logged(

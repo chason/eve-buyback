@@ -90,6 +90,21 @@ async def consume(
     return LotRecord.model_validate(lot)
 
 
+async def get_for_corp(
+    session: AsyncSession, *, corporation_id: uuid.UUID, lot_id: uuid.UUID
+) -> LotRecord | None:
+    """One lot, corp-scoped — None for another corp's lot as much as for a missing
+    one, so cross-tenant probing is indistinguishable from absence."""
+    row = (
+        await session.execute(
+            select(Lot).where(
+                Lot.id == lot_id, Lot.corporation_id == corporation_id
+            )
+        )
+    ).scalar_one_or_none()
+    return LotRecord.model_validate(row) if row else None
+
+
 async def idle_by_location_type(
     session: AsyncSession,
     *,
