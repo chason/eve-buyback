@@ -2,6 +2,7 @@
 entitlement gate (ADR-0042) is enforced in the application layer and surfaces here
 as 402 via the error mapping."""
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Depends, status
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
 from app.application import reconciliation as reconciliation_app
+from app.application import transformations as transformations_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
 from app.interface.deps import SessionDep
@@ -22,6 +24,10 @@ from app.schemas.accounting import (
     HangarOut,
     InventoryOut,
     ReconciliationEventOut,
+    ReprocessOutputOut,
+    ReprocessPreviewOut,
+    ReprocessRequest,
+    ReprocessResultOut,
 )
 
 router = APIRouter(prefix="/corporations/me/accounting", tags=["accounting"])
@@ -104,6 +110,50 @@ async def list_reconciliation_events(
         )
         for v in views
     ]
+
+
+@router.get(
+    "/lots/{lot_id}/reprocess-preview", response_model=ReprocessPreviewOut
+)
+async def reprocess_preview(
+    lot_id: uuid.UUID, user: ManagerUser, session: SessionDep
+) -> ReprocessPreviewOut:
+    preview = await transformations_app.preview_reprocess(
+        session, corporation_eve_id=user.corporation_id, lot_id=lot_id
+    )
+    return ReprocessPreviewOut(
+        lot_id=preview.lot.id,
+        type_id=preview.lot.item_type_id,
+        type_name=preview.source_type_name,
+        qty_remaining=preview.lot.qty_remaining,
+        outputs=[
+            ReprocessOutputOut(type_id=tid, type_name=name, quantity=qty)
+            for tid, name, qty in preview.outputs
+        ],
+    )
+
+
+@router.post("/lots/{lot_id}/reprocess", response_model=ReprocessResultOut)
+async def record_reprocess(
+    lot_id: uuid.UUID,
+    payload: ReprocessRequest,
+    user: ManagerUser,
+    session: SessionDep,
+) -> ReprocessResultOut:
+    children = await transformations_app.record_reprocess(
+        session,
+        corporation_eve_id=user.corporation_id,
+        lot_id=lot_id,
+        qty=payload.qty,
+        outputs={o.type_id: o.quantity for o in payload.outputs},
+        recorded_by_character_id=user.character_id,
+    )
+    return ReprocessResultOut(
+        children=[
+            ReprocessOutputOut(type_id=c.item_type_id, quantity=c.qty_original)
+            for c in children
+        ]
+    )
 
 
 @router.post("/hangar-check", response_model=HangarCheckResult)

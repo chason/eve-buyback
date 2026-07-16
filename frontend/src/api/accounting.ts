@@ -4,6 +4,8 @@ import type {
   HangarOut,
   InventoryOut,
   ReconciliationEventOut,
+  ReprocessPreviewOut,
+  ReprocessResultOut,
 } from "./types"
 
 export type {
@@ -13,6 +15,8 @@ export type {
   InventoryLotOut,
   InventoryOut,
   ReconciliationEventOut,
+  ReprocessPreviewOut,
+  ReprocessResultOut,
 } from "./types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1"
@@ -69,4 +73,27 @@ export async function runHangarCheck(): Promise<HangarCheckResult> {
   const res = await apiSend("POST", "/corporations/me/accounting/hangar-check")
   if (!res.ok) await throwApiError(res, "The hangar check failed")
   return (await res.json()) as HangarCheckResult
+}
+
+/** The pre-filled reprocess form for a lot (ADR-0047): base-yield outputs where
+ * the game data knows them — editable, because real yields vary. */
+export const getReprocessPreview = (lotId: string) =>
+  apiGet<ReprocessPreviewOut>(
+    `/corporations/me/accounting/lots/${lotId}/reprocess-preview`,
+  )
+
+/** Record a reprocess: what we paid for the consumed units carries over into the
+ * material stock entries. */
+export async function recordReprocess(
+  lotId: string,
+  qty: number,
+  outputs: { type_id: number; quantity: number }[],
+): Promise<ReprocessResultOut> {
+  const res = await apiSend(
+    "POST",
+    `/corporations/me/accounting/lots/${lotId}/reprocess`,
+    { qty, outputs },
+  )
+  if (!res.ok) await throwApiError(res, "Recording the reprocess failed")
+  return (await res.json()) as ReprocessResultOut
 }

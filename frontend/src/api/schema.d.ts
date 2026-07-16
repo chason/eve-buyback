@@ -411,6 +411,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/lots/{lot_id}/reprocess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Reprocess */
+        post: operations["record_reprocess_api_v1_corporations_me_accounting_lots__lot_id__reprocess_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/lots/{lot_id}/reprocess-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reprocess Preview */
+        get: operations["reprocess_preview_api_v1_corporations_me_accounting_lots__lot_id__reprocess_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/reconciliation": {
         parameters: {
             query?: never;
@@ -1112,7 +1146,7 @@ export interface components {
         /**
          * InventoryLotOut
          * @description One open purchase of the item: what's left of it, what one unit is carried
-         *     at, and how long it has been sitting.
+         *     at, and how long it has been sitting. `id` keys the reprocess action (#177).
          */
         InventoryLotOut: {
             /**
@@ -1124,6 +1158,11 @@ export interface components {
             cost_is_estimated: boolean;
             /** Days Held */
             days_held: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /** Qty */
             qty: number;
             /** Stale */
@@ -1344,6 +1383,62 @@ export interface components {
             unit_value: string | null;
             /** Value */
             value: string;
+        };
+        /** ReprocessOutputIn */
+        ReprocessOutputIn: {
+            /** Quantity */
+            quantity: number;
+            /** Type Id */
+            type_id: number;
+        };
+        /** ReprocessOutputOut */
+        ReprocessOutputOut: {
+            /** Quantity */
+            quantity: number;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+        };
+        /**
+         * ReprocessPreviewOut
+         * @description The pre-filled record form: the source lot's facts + base-yield outputs
+         *     (empty when the type has no yield data — outputs are then hand-entered).
+         */
+        ReprocessPreviewOut: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Outputs */
+            outputs: components["schemas"]["ReprocessOutputOut"][];
+            /** Qty Remaining */
+            qty_remaining: number;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+        };
+        /**
+         * ReprocessRequest
+         * @description Record a reprocess (ADR-0047): how many units left the lot, and what
+         *     actually came out (editable — real yields vary with skills/structures).
+         */
+        ReprocessRequest: {
+            /** Outputs */
+            outputs: components["schemas"]["ReprocessOutputIn"][];
+            /** Qty */
+            qty: number;
+        };
+        /**
+         * ReprocessResultOut
+         * @description What the record created, in plain terms: one child stock entry per material,
+         *     carrying the source's cost.
+         */
+        ReprocessResultOut: {
+            /** Children */
+            children: components["schemas"]["ReprocessOutputOut"][];
         };
         /**
          * RosterStatusOut
@@ -2273,6 +2368,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InventoryOut"];
+                };
+            };
+        };
+    };
+    record_reprocess_api_v1_corporations_me_accounting_lots__lot_id__reprocess_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReprocessResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reprocess_preview_api_v1_corporations_me_accounting_lots__lot_id__reprocess_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReprocessPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

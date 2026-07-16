@@ -35,6 +35,7 @@ const INVENTORY: InventoryOut = {
       unrealized: "400000000.00",
       lots: [
         {
+          id: "lot-old",
           qty: 100,
           unit_cost: "4.00",
           total_cost: "400.00",
@@ -44,6 +45,7 @@ const INVENTORY: InventoryOut = {
           cost_is_estimated: false,
         },
         {
+          id: "lot-new",
           qty: 50,
           unit_cost: "5.00",
           total_cost: "250.00",
@@ -309,6 +311,77 @@ describe("Inventory", () => {
     expect(
       await screen.findByText(/Done — 2 items added, 1 flagged for a look\./),
     ).toBeInTheDocument()
+  })
+
+  it("records a reprocess from a buy row with pre-filled outputs (#177)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.getReprocessPreview).mockResolvedValue({
+      lot_id: "lot-old",
+      type_id: 34,
+      type_name: "Veldspar",
+      qty_remaining: 100,
+      outputs: [
+        { type_id: 34, type_name: "Tritanium", quantity: 362 },
+        { type_id: 35, type_name: "Pyerite", quantity: 9 },
+      ],
+    })
+    vi.mocked(accountingApi.recordReprocess).mockResolvedValue({ children: [] })
+
+    renderInventory()
+
+    // Open the buys, then the record form from the oldest one.
+    await u.click(await screen.findByRole("button", { name: "2 buys" }))
+    await u.click(
+      screen.getAllByRole("button", { name: "Turned into minerals" })[0],
+    )
+    expect(accountingApi.getReprocessPreview).toHaveBeenCalledWith("lot-old")
+    expect(
+      await screen.findByText(/what we paid for it carries over/i),
+    ).toBeInTheDocument()
+    // Pre-filled from base yields, editable.
+    const trit = screen.getByLabelText("Tritanium")
+    expect(trit).toHaveValue(362)
+    await u.clear(trit)
+    await u.type(trit, "360")
+
+    await u.click(screen.getByRole("button", { name: "Record it" }))
+    expect(accountingApi.recordReprocess).toHaveBeenCalledWith("lot-old", 100, [
+      { type_id: 34, quantity: 360 },
+      { type_id: 35, quantity: 9 },
+    ])
+  })
+
+  it("offers Record it on a reprocess suggestion (#177)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "reprocess_hint", type_id: 34, type_name: "Tritanium",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 600, unit_cost: null, booked: false, flagged: true,
+        note: null, occurred_at: "2026-07-14T10:00:00Z",
+      },
+    ])
+    vi.mocked(accountingApi.getReprocessPreview).mockResolvedValue({
+      lot_id: "lot-old", type_id: 34, type_name: "Tritanium",
+      qty_remaining: 100, outputs: [],
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(/was turned into minerals — record it/i),
+    ).toBeInTheDocument()
+    // "Record it" opens the form against the type's oldest buy (FIFO).
+    await u.click(screen.getByRole("button", { name: "Record it" }))
+    expect(accountingApi.getReprocessPreview).toHaveBeenCalledWith("lot-old")
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

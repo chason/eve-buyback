@@ -209,3 +209,13 @@ class HangarReadUnavailable(ApplicationError):
         "Couldn't read your hangar — reconnect corp ESI access on the Config page "
         "with a Director character to enable hangar tracking"
     )
+
+
+class LotNotFound(ApplicationError):
+    default_detail = "That stock entry no longer exists"
+
+
+class ReprocessQtyUnavailable(ApplicationError):
+    """A reprocess can't consume more units than the lot still holds (ADR-0047)."""
+
+    default_detail = "You can't reprocess more units than this stock entry still has"
