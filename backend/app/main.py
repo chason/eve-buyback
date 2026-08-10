@@ -21,6 +21,7 @@ from app.interface.jobs import (
     run_market_refresh,
     run_payments_reconcile,
     run_roster_refresh,
+    run_sales_ingest,
 )
 from app.interface.middleware import CsrfHeaderMiddleware
 from app.interface.og import router as og_router
@@ -98,6 +99,7 @@ def _start_scheduler(
         or settings.payments_background_refresh_enabled
         or settings.accounting_writedown_enabled
         or settings.hangar_reconcile_enabled
+        or settings.sales_ingest_enabled
     ):
         return None
     scheduler = AsyncIOScheduler()
@@ -148,6 +150,17 @@ def _start_scheduler(
             coalesce=True,
             next_run_time=datetime.now()
             + timedelta(seconds=settings.payments_refresh_initial_delay_seconds),
+        )
+    if settings.sales_ingest_enabled:
+        scheduler.add_job(
+            run_sales_ingest,
+            trigger=IntervalTrigger(seconds=settings.sales_ingest_interval_seconds),
+            args=[app],
+            id="sales_ingest",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.now()
+            + timedelta(seconds=settings.sales_ingest_initial_delay_seconds),
         )
     if settings.hangar_reconcile_enabled:
         scheduler.add_job(

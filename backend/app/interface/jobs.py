@@ -20,12 +20,18 @@ from app.application import (
     market_refresh,
     payments,
     reconciliation,
+    sales,
 )
 from app.application.errors import CorpEsiTokenExpired, CorpEsiTokenMissing
 from app.config import get_settings
 from app.data.db import SessionLocal
 from app.data.repositories import corp_esi_token as tokens_repo
-from app.plugins.esi import CorporationAssetsForbidden, EsiClient
+from app.plugins.esi import (
+    CorporationAssetsForbidden,
+    CorporationOrdersForbidden,
+    CorporationWalletForbidden,
+    EsiClient,
+)
 from app.plugins.esi_market import EsiMarketClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
@@ -184,6 +190,51 @@ async def run_hangar_reconcile(app: FastAPI) -> None:
             # Bearer-token ESI calls — log `repr(exc)` only, never `exc_info` (#75).
             log.warning(
                 "hangar reconcile failed for corp %s: %r", corp.corporation_id, exc
+            )
+
+
+async def run_sales_ingest(app: FastAPI) -> None:
+    """Scheduler entrypoint (ADR-0045, #156): for every corp with an active accounting
+    entitlement, ingest market sales/fees/orders from the configured buyback wallet
+    division. Unconfigured corps no-op inside the use case; a missing scope/role is a
+    reconnect problem, skipped quietly without flagging the token failed."""
+    settings = get_settings()
+    esi = EsiClient(app.state.http)
+    sso = EveSsoClient(settings, app.state.http)
+    cipher = TokenCipher(settings.token_encryption_key)
+    try:
+        async with SessionLocal() as session:
+            access = await entitlements.list_corp_access(session, feature="accounting")
+    except Exception:  # noqa: BLE001 — a recurring job must survive any failure
+        log.exception("sales ingest: listing entitled corps failed")
+        return
+    for corp in access:
+        if not corp.active:
+            continue
+        try:
+            async with SessionLocal() as session:
+                await sales.ingest_market_sales(
+                    session,
+                    sso,
+                    esi,
+                    corporation_eve_id=corp.corporation_id,
+                    cipher=cipher,
+                    now=datetime.now(UTC),
+                )
+        except (
+            CorpEsiTokenMissing,
+            CorpEsiTokenExpired,
+            CorporationWalletForbidden,
+            CorporationOrdersForbidden,
+        ):
+            log.info(
+                "sales ingest skipped for corp %s (token/scope unavailable)",
+                corp.corporation_id,
+            )
+        except Exception as exc:  # noqa: BLE001 — one corp must not abort the sweep
+            # Bearer-token ESI calls — log `repr(exc)` only, never `exc_info` (#75).
+            log.warning(
+                "sales ingest failed for corp %s: %r", corp.corporation_id, exc
             )
 
 

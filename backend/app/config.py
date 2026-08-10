@@ -131,6 +131,12 @@ class Settings(BaseSettings):
     # Excess whose deemed value crosses this gets flagged for a look (ADR-0044's
     # anomaly threshold) even though the lot is still auto-created.
     accounting_excess_flag_isk: int = 1_000_000_000
+    # Market-sales ingestion (ADR-0045, #156): for every entitled corp with a
+    # configured buyback wallet division, read the division's fills + journal and
+    # the corp's market orders — record sales (FIFO), taxes, and broker fees.
+    sales_ingest_enabled: bool = True
+    sales_ingest_interval_seconds: int = 900  # 15 minutes
+    sales_ingest_initial_delay_seconds: int = 240
     payments_background_refresh_enabled: bool = True
     payments_refresh_interval_seconds: int = 1800  # 30 minutes
     payments_refresh_initial_delay_seconds: int = 120  # first run after boot
@@ -185,6 +191,12 @@ class Settings(BaseSettings):
     # reconciliation can read the buyback hangar's contents. Needs the Director role in
     # game; tokens granted before this must reconnect to gain it.
     eve_assets_scopes: str = "esi-assets.read_corporation_assets.v1"
+    # Corp-wallet + corp-orders scopes, folded into the Corp ESI access grant
+    # (ADR-0045) so the sales ingestion can read the configured buyback wallet
+    # division's fills/journal and the corp's market orders. The wallet needs the
+    # Accountant (or Junior Accountant) role in game; earlier grants must reconnect.
+    eve_corp_wallet_scopes: str = "esi-wallet.read_corporation_wallets.v1"
+    eve_corp_orders_scopes: str = "esi-markets.read_corporation_orders.v1"
     # Scopes for the OPERATOR wallet grant (ADR-0042): reading the operator's own
     # character wallet journal to reconcile incoming ISK access payments. This token
     # belongs to the instance operator, never to a tenant corp.
@@ -193,13 +205,14 @@ class Settings(BaseSettings):
     @property
     def eve_corp_token_scopes(self) -> str:
         """The full scope set for the one persisted Corp ESI access token (ADR-0036,
-        0037, 0044): structure-market access + corp-membership + corp-contracts +
-        corp-assets, requested in a single grant. Deduped, order-preserving (the sets
-        share `publicData`)."""
+        0037, 0044, 0045): structure-market access + corp-membership + corp-contracts
+        + corp-assets + corp-wallet + corp-orders, requested in a single grant.
+        Deduped, order-preserving (the sets share `publicData`)."""
         seen: dict[str, None] = {}
         combined = (
             f"{self.eve_structure_scopes} {self.eve_roster_scopes} "
-            f"{self.eve_contracts_scopes} {self.eve_assets_scopes}"
+            f"{self.eve_contracts_scopes} {self.eve_assets_scopes} "
+            f"{self.eve_corp_wallet_scopes} {self.eve_corp_orders_scopes}"
         )
         for scope in combined.split():
             seen.setdefault(scope, None)

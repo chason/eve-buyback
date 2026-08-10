@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, status
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
 from app.application import reconciliation as reconciliation_app
+from app.application import sales as sales_app
 from app.application import transformations as transformations_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
@@ -28,6 +29,8 @@ from app.schemas.accounting import (
     ReprocessPreviewOut,
     ReprocessRequest,
     ReprocessResultOut,
+    WalletDivisionOut,
+    WalletDivisionUpdateRequest,
 )
 
 router = APIRouter(prefix="/corporations/me/accounting", tags=["accounting"])
@@ -85,6 +88,28 @@ async def remove_hangar(
         location_id=location_id,
         division=division,
     )
+
+
+@router.get("/wallet-division", response_model=WalletDivisionOut)
+async def get_wallet_division(
+    user: ManagerUser, session: SessionDep
+) -> WalletDivisionOut:
+    division = await sales_app.get_wallet_division(
+        session, corporation_eve_id=user.corporation_id
+    )
+    return WalletDivisionOut(division=division)
+
+
+@router.put("/wallet-division", response_model=WalletDivisionOut)
+async def set_wallet_division(
+    payload: WalletDivisionUpdateRequest, user: ManagerUser, session: SessionDep
+) -> WalletDivisionOut:
+    division = await sales_app.set_wallet_division(
+        session,
+        corporation_eve_id=user.corporation_id,
+        division=payload.division,
+    )
+    return WalletDivisionOut(division=division)
 
 
 @router.get("/reconciliation", response_model=list[ReconciliationEventOut])

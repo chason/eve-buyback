@@ -2252,12 +2252,49 @@
         ],
         "title": "WalletAuthorizeResponse",
         "type": "object"
+      },
+      "WalletDivisionOut": {
+        "description": "The corp wallet division buyback sales pay into (ADR-0045). None = sell-side\ningestion off.",
+        "properties": {
+          "division": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          }
+        },
+        "title": "WalletDivisionOut",
+        "type": "object"
+      },
+      "WalletDivisionUpdateRequest": {
+        "properties": {
+          "division": {
+            "anyOf": [
+              {
+                "maximum": 7.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          }
+        },
+        "title": "WalletDivisionUpdateRequest",
+        "type": "object"
       }
     }
   },
   "info": {
     "title": "Buyback API",
-    "version": "94"
+    "version": "95"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3204,6 +3241,66 @@
           }
         },
         "summary": "List Reconciliation Events",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/wallet-division": {
+      "get": {
+        "operationId": "get_wallet_division_api_v1_corporations_me_accounting_wallet_division_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDivisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Wallet Division",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "put": {
+        "operationId": "set_wallet_division_api_v1_corporations_me_accounting_wallet_division_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletDivisionUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDivisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Wallet Division",
         "tags": [
           "accounting"
         ]

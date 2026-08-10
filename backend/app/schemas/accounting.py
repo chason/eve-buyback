@@ -52,6 +52,17 @@ class HangarCreateRequest(BaseModel):
     division: int = Field(ge=1, le=7)
 
 
+class WalletDivisionOut(BaseModel):
+    """The corp wallet division buyback sales pay into (ADR-0045). None = sell-side
+    ingestion off."""
+
+    division: int | None = None
+
+
+class WalletDivisionUpdateRequest(BaseModel):
+    division: int | None = Field(default=None, ge=1, le=7)
+
+
 class ReconciliationEventOut(BaseModel):
     """One "Needs a look" / hangar-check log entry (ADR-0044). `kind` is excess
     (stock found beyond the books — normally booked as an estimated-value lot) or

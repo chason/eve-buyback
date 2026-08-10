@@ -57,6 +57,16 @@ describe("Privacy", () => {
     expect(
       screen.getByText(/never reads members' personal assets/i),
     ).toBeInTheDocument()
+    // Sales reading (ADR-0045): one picked division only, opt-in via that pick.
+    expect(
+      screen.getByRole("heading", { name: /reading buyback sales/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/other wallet divisions are never read/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/never reads any member's personal wallet or orders/i),
+    ).toBeInTheDocument()
     // Shared-link preview (ADR-0040): public, unauthenticated, value + location only.
     expect(
       screen.getByRole("heading", { name: /sharing an appraisal link/i }),

@@ -79,6 +79,7 @@ describe("Inventory", () => {
     vi.mocked(accountingApi.listHangars).mockResolvedValue([])
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
+    vi.mocked(accountingApi.getWalletDivision).mockResolvedValue({ division: null })
   })
 
   it("shows holdings at what we paid, compact, with plain-English flags", async () => {
@@ -382,6 +383,23 @@ describe("Inventory", () => {
     // "Record it" opens the form against the type's oldest buy (FIFO).
     await u.click(screen.getByRole("button", { name: "Record it" }))
     expect(accountingApi.getReprocessPreview).toHaveBeenCalledWith("lot-old")
+  })
+
+  it("picks the buyback wallet division to switch sales recording on (#156)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.setWalletDivision).mockResolvedValue({ division: 3 })
+
+    renderInventory()
+
+    const select = await screen.findByRole("combobox", {
+      name: "Buyback wallet division",
+    })
+    await u.selectOptions(select, "3")
+    expect(accountingApi.setWalletDivision).toHaveBeenCalledWith(3)
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

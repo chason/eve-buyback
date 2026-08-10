@@ -186,6 +186,8 @@ def test_connect_requests_all_scope_sets():
     assert "esi-corporations.read_corporation_membership.v1" in scopes  # roster
     assert "esi-contracts.read_corporation_contracts.v1" in scopes  # watcher
     assert "esi-assets.read_corporation_assets.v1" in scopes  # hangar (ADR-0044)
+    assert "esi-wallet.read_corporation_wallets.v1" in scopes  # sales (ADR-0045)
+    assert "esi-markets.read_corporation_orders.v1" in scopes  # orders (ADR-0045)
     assert scopes.split().count("publicData") == 1  # deduped across the sets
 
 

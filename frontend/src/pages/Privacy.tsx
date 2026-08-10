@@ -93,7 +93,9 @@ export default function Privacy() {
               It&apos;s <strong>one token per corporation</strong>, carrying the scopes
               to read a structure&apos;s market orders, search and resolve structures,
               read the corporation&apos;s member list, read the corporation&apos;s
-              contracts, and read the corporation&apos;s assets.
+              contracts, read the corporation&apos;s assets, read the
+              corporation&apos;s wallets, and read the corporation&apos;s market
+              orders.
             </li>
             <li>
               The <strong>refresh token is encrypted at rest</strong> (Fernet) before it
@@ -158,6 +160,25 @@ export default function Privacy() {
             If the token lacks the assets scope (grants made before this feature), or
             the connecting character isn&apos;t a Director in game, the app simply
             skips this — reconnecting corp ESI access adds the scope.
+          </p>
+        </section>
+
+        <section>
+          <h2>Reading buyback sales</h2>
+          <p>
+            When the corp ESI token can read corporation wallets and market orders,
+            and a manager has picked the <strong>one wallet division</strong> buyback
+            sales pay into, the app periodically reads <strong>that
+            division&apos;s</strong> market transactions and journal (sales, taxes,
+            and broker fees) plus the corporation&apos;s own market-order list, so
+            profit can be tracked automatically. Other wallet divisions are never
+            read, and it never reads any member&apos;s personal wallet or orders. If
+            no division is picked, none of this runs.
+          </p>
+          <p>
+            If the token lacks these scopes (grants made before this feature), or the
+            connecting character lacks the Accountant role in game, the app simply
+            skips this — reconnecting corp ESI access adds the scopes.
           </p>
         </section>
 

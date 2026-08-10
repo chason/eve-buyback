@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.entitlements import EntitlementSource, Feature
 from app.domain.locations import LocationKind
 from app.domain.lots import EntrySource as LotEntrySource
-from app.domain.lots import ExpenseKind, LotSource
+from app.domain.lots import ExpenseKind, LotSource, SaleChannel
 from app.domain.market import HubKind
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 from app.domain.reconciliation import ReconciliationKind
@@ -149,6 +149,8 @@ class BuybackConfigRecord(BaseModel):
     aggregate_field: AggregateField
     # Global-default accept flag (ADR-0007): False → whitelist-only buyback.
     default_accepted: bool = True
+    # The wallet division buyback sales pay into (ADR-0045); NULL = sales ingestion off.
+    wallet_division: int | None = None
 
 
 class PricingRuleRecord(BaseModel):
@@ -318,6 +320,26 @@ class BuybackHangarRecord(BaseModel):
     location_id: str
     location_name: str
     division: int
+
+
+class SaleRecord(BaseModel):
+    """One realized sale event against one lot (ADR-0043/0045). Realized profit is
+    derived (`domain/lots.realized_profit`), never stored."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    corporation_id: uuid.UUID
+    lot_id: uuid.UUID
+    qty: int
+    unit_proceeds: Decimal
+    sales_tax: Decimal
+    channel: SaleChannel
+    source: LotEntrySource
+    external_ref: int | None = None
+    sold_at: datetime
+    recorded_by_character_id: int | None = None
+    note: str | None = None
 
 
 class ReconciliationEventRecord(BaseModel):
