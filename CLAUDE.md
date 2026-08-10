@@ -165,6 +165,10 @@ docker build -t buyback .                # build the image alone (e.g. for Cooli
   a PR** — parallel PRs would claim the same number. Served at `/api/v1/version`,
   shown in the UI top bar. This is the whole scheme — no tags or semver.
 - Match the style of surrounding code. Add tests alongside new behavior.
+- **No multi-line list comprehensions.** If a comprehension doesn't fit on one
+  line, either extract the body/condition into a small named helper so it collapses
+  to one line (`[c for c in xs if _pred(c)]`, `[_row(o) for o in xs]`) or use a
+  plain `for` loop with `.append(...)`.
 - Don't commit secrets — use `.env` files (already gitignored).
 - **Token-use changes must update the Privacy page.** Any change to how an EVE token
   is used, stored, scoped, or refreshed — a new scope, a new ESI call made with a token,
