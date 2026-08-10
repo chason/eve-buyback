@@ -20,6 +20,8 @@ class InventoryLotOut(BaseModel):
     days_held: int
     stale: bool
     cost_is_estimated: bool
+    # Provenance (#158): buyback | opening_balance | manual | reprocess.
+    source: str
 
 
 class InventoryItemOut(BaseModel):
@@ -61,6 +63,65 @@ class WalletDivisionOut(BaseModel):
 
 class WalletDivisionUpdateRequest(BaseModel):
     division: int | None = Field(default=None, ge=1, le=7)
+
+
+class ManualSaleRequest(BaseModel):
+    """An off-game sale a manager records by hand (ADR-0045, #158). The note is
+    required — provenance without a why is half a record."""
+
+    type_id: int
+    qty: int = Field(gt=0)
+    unit_proceeds: Decimal = Field(ge=0)
+    location_id: str
+    note: str = Field(min_length=3)
+    sold_at: datetime | None = None
+
+
+class ManualSaleResult(BaseModel):
+    # True when the books didn't have (all of) that stock — the deemed-cost
+    # fallback fired and a flagged entry landed in the hangar-check log.
+    stock_was_missing: bool
+
+
+class ManualLotRequest(BaseModel):
+    """Off-app stock with a known (or best-guess) cost. `cost_is_estimated` is the
+    manager's honesty switch: False = the price is known, True = a guess."""
+
+    type_id: int
+    qty: int = Field(gt=0)
+    unit_cost: Decimal = Field(ge=0)
+    location_id: str
+    note: str = Field(min_length=3)
+    cost_is_estimated: bool = False
+    acquired_at: datetime | None = None
+
+
+class ManualExpenseRequest(BaseModel):
+    """A cost ESI didn't book. A NEGATIVE amount is a correction — a reversing
+    entry whose note says what it offsets (never an edit or delete)."""
+
+    kind: str = Field(pattern="^(broker_fee|relist_fee|hauling|other)$")
+    amount: Decimal
+    note: str = Field(min_length=3)
+    incurred_at: datetime | None = None
+
+
+class ReceivableCreateRequest(BaseModel):
+    amount: Decimal = Field(gt=0)
+    note: str = Field(min_length=3)
+
+
+class ReceivableClearRequest(BaseModel):
+    note: str | None = None
+
+
+class ReceivableOut(BaseModel):
+    id: uuid.UUID
+    amount: Decimal
+    note: str
+    incurred_at: datetime
+    cleared_at: datetime | None = None
+    cleared_note: str | None = None
 
 
 class ReconciliationEventOut(BaseModel):

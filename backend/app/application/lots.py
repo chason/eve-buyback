@@ -27,7 +27,12 @@ from app.data.repositories import lots as lots_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import sde as sde_repo
 from app.domain.contracts import ContractLink
-from app.domain.lots import landed_unit_cost, nrv_per_unit, write_down_target
+from app.domain.lots import (
+    LotSource,
+    landed_unit_cost,
+    nrv_per_unit,
+    write_down_target,
+)
 
 
 async def _nrv_by_type(
@@ -75,6 +80,9 @@ class InventoryLotView(BaseModel):
     days_held: int
     stale: bool
     cost_is_estimated: bool
+    # Provenance (#158): how the entry got into the books — surfaced so manual
+    # entries and reprocess children carry a plain-English badge.
+    source: LotSource
 
 
 class InventoryItemView(BaseModel):
@@ -152,6 +160,7 @@ async def get_inventory(
         by_type.setdefault(lot.item_type_id, []).append(
             InventoryLotView(
                 id=lot.id,
+                source=lot.source,
                 qty=lot.qty_remaining,
                 unit_cost=unit_cost,
                 total_cost=lot.qty_remaining * unit_cost,

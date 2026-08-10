@@ -958,6 +958,10 @@
             "title": "Qty",
             "type": "integer"
           },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
           "stale": {
             "title": "Stale",
             "type": "boolean"
@@ -981,7 +985,8 @@
           "acquired_at",
           "days_held",
           "stale",
-          "cost_is_estimated"
+          "cost_is_estimated",
+          "source"
         ],
         "title": "InventoryLotOut",
         "type": "object"
@@ -1193,6 +1198,184 @@
         "title": "ManagerOut",
         "type": "object"
       },
+      "ManualExpenseRequest": {
+        "description": "A cost ESI didn't book. A NEGATIVE amount is a correction \u2014 a reversing\nentry whose note says what it offsets (never an edit or delete).",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "incurred_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incurred At"
+          },
+          "kind": {
+            "pattern": "^(broker_fee|relist_fee|hauling|other)$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "minLength": 3,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "amount",
+          "note"
+        ],
+        "title": "ManualExpenseRequest",
+        "type": "object"
+      },
+      "ManualLotRequest": {
+        "description": "Off-app stock with a known (or best-guess) cost. `cost_is_estimated` is the\nmanager's honesty switch: False = the price is known, True = a guess.",
+        "properties": {
+          "acquired_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "cost_is_estimated": {
+            "default": false,
+            "title": "Cost Is Estimated",
+            "type": "boolean"
+          },
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "note": {
+            "minLength": 3,
+            "title": "Note",
+            "type": "string"
+          },
+          "qty": {
+            "exclusiveMinimum": 0.0,
+            "title": "Qty",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Unit Cost"
+          }
+        },
+        "required": [
+          "type_id",
+          "qty",
+          "unit_cost",
+          "location_id",
+          "note"
+        ],
+        "title": "ManualLotRequest",
+        "type": "object"
+      },
+      "ManualSaleRequest": {
+        "description": "An off-game sale a manager records by hand (ADR-0045, #158). The note is\nrequired \u2014 provenance without a why is half a record.",
+        "properties": {
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "note": {
+            "minLength": 3,
+            "title": "Note",
+            "type": "string"
+          },
+          "qty": {
+            "exclusiveMinimum": 0.0,
+            "title": "Qty",
+            "type": "integer"
+          },
+          "sold_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold At"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "unit_proceeds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Unit Proceeds"
+          }
+        },
+        "required": [
+          "type_id",
+          "qty",
+          "unit_proceeds",
+          "location_id",
+          "note"
+        ],
+        "title": "ManualSaleRequest",
+        "type": "object"
+      },
+      "ManualSaleResult": {
+        "properties": {
+          "stock_was_missing": {
+            "title": "Stock Was Missing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stock_was_missing"
+        ],
+        "title": "ManualSaleResult",
+        "type": "object"
+      },
       "MarketGroupOut": {
         "properties": {
           "market_group_id": {
@@ -1351,6 +1534,105 @@
           "matched"
         ],
         "title": "PaymentOut",
+        "type": "object"
+      },
+      "ReceivableClearRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ReceivableClearRequest",
+        "type": "object"
+      },
+      "ReceivableCreateRequest": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "note": {
+            "minLength": 3,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "note"
+        ],
+        "title": "ReceivableCreateRequest",
+        "type": "object"
+      },
+      "ReceivableOut": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "cleared_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleared At"
+          },
+          "cleared_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleared Note"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "incurred_at": {
+            "format": "date-time",
+            "title": "Incurred At",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "note",
+          "incurred_at"
+        ],
+        "title": "ReceivableOut",
         "type": "object"
       },
       "ReconciliationEventOut": {
@@ -2294,7 +2576,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "95"
+    "version": "98"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3216,6 +3498,242 @@
           }
         },
         "summary": "Reprocess Preview",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/manual/expense": {
+      "post": {
+        "operationId": "record_manual_expense_api_v1_corporations_me_accounting_manual_expense_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Manual Expense",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/manual/lot": {
+      "post": {
+        "operationId": "record_manual_lot_api_v1_corporations_me_accounting_manual_lot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualLotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Manual Lot",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/manual/sale": {
+      "post": {
+        "operationId": "record_manual_sale_api_v1_corporations_me_accounting_manual_sale_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualSaleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualSaleResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Manual Sale",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/receivables": {
+      "get": {
+        "operationId": "list_receivables_api_v1_corporations_me_accounting_receivables_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReceivableOut"
+                  },
+                  "title": "Response List Receivables Api V1 Corporations Me Accounting Receivables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Receivables",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "operationId": "create_receivable_api_v1_corporations_me_accounting_receivables_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceivableCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Receivable",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/receivables/{receivable_id}/clear": {
+      "post": {
+        "operationId": "clear_receivable_api_v1_corporations_me_accounting_receivables__receivable_id__clear_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receivable_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receivable Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceivableClearRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Receivable",
         "tags": [
           "accounting"
         ]

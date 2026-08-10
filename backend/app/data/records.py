@@ -342,6 +342,21 @@ class SaleRecord(BaseModel):
     note: str | None = None
 
 
+class ReceivableRecord(BaseModel):
+    """ISK the buyback is owed (ADR-0045, #158). Open until `cleared_at` is set."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    amount: Decimal
+    note: str
+    incurred_at: datetime
+    entered_by_character_id: int
+    cleared_at: datetime | None = None
+    cleared_by_character_id: int | None = None
+    cleared_note: str | None = None
+
+
 class ReconciliationEventRecord(BaseModel):
     """One logged hangar-sync difference (ADR-0044). `unit_cost`/`lot_id` are set
     for excess that was booked as a deemed-cost lot; `flagged` marks the entries

@@ -27,7 +27,13 @@ from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sales as sales_repo
 from app.data.repositories.market_orders import OrderRow
-from app.domain.lots import LotConsumption, OpenLot, SaleChannel, plan_fifo
+from app.domain.lots import (
+    EntrySource,
+    LotConsumption,
+    OpenLot,
+    SaleChannel,
+    plan_fifo,
+)
 from app.domain.transformations import allocate_amount
 from app.plugins.esi import (
     ContractItem,
@@ -184,16 +190,20 @@ async def consume_and_record_sale(
     unit_proceeds: Decimal,
     location_id: str,
     channel: SaleChannel,
-    external_ref: int,
     sold_at: datetime,
     now: datetime,
+    external_ref: int | None = None,
+    source: EntrySource = "esi",
+    recorded_by_character_id: int | None = None,
+    note: str | None = None,
 ) -> bool:
-    """Turn one detected disposal (a market fill or an outgoing contract's line)
-    into FIFO-consuming sale rows — one per lot touched (ADR-0043). Stock the books
-    didn't have — the no-lot sale (ADR-0045) — books a deemed-cost lot for the
-    shortfall (`cost_is_estimated=TRUE`, so the estimate propagates into realized
-    profit), consumes it, and flags the event in the reconciliation log. Returns
-    True when that fallback fired. Does not commit; callers own the UoW."""
+    """Turn one detected disposal (a market fill, an outgoing contract's line, or a
+    manager's manual entry, #158) into FIFO-consuming sale rows — one per lot
+    touched (ADR-0043). Stock the books didn't have — the no-lot sale (ADR-0045) —
+    books a deemed-cost lot for the shortfall (`cost_is_estimated=TRUE`, so the
+    estimate propagates into realized profit), consumes it, and flags the event in
+    the reconciliation log. Returns True when that fallback fired. Does not commit;
+    callers own the UoW."""
     lots = await lots_repo.open_lots(
         session,
         corporation_id=corporation_id,
@@ -258,9 +268,11 @@ async def consume_and_record_sale(
             qty=consumption.qty,
             unit_proceeds=unit_proceeds,
             channel=channel,
-            source="esi",
+            source=source,
             sold_at=sold_at,
             external_ref=external_ref,
+            recorded_by_character_id=recorded_by_character_id,
+            note=note,
         )
     return unmatched
 

@@ -3,6 +3,10 @@ import type {
   HangarCheckResult,
   HangarOut,
   InventoryOut,
+  ManualExpenseRequest,
+  ManualLotRequest,
+  ManualSaleRequest,
+  ReceivableOut,
   ReconciliationEventOut,
   ReprocessPreviewOut,
   ReprocessResultOut,
@@ -14,6 +18,10 @@ export type {
   InventoryItemOut,
   InventoryLotOut,
   InventoryOut,
+  ManualExpenseRequest,
+  ManualLotRequest,
+  ManualSaleRequest,
+  ReceivableOut,
   ReconciliationEventOut,
   ReprocessPreviewOut,
   ReprocessResultOut,
@@ -90,6 +98,59 @@ export async function setWalletDivision(
   })
   if (!res.ok) await throwApiError(res, "Saving the wallet pick failed")
   return (await res.json()) as { division: number | null }
+}
+
+/** Manual entries (ADR-0045, #158): what ESI can't see, recorded by hand. */
+export async function recordManualSale(
+  payload: ManualSaleRequest,
+): Promise<{ stock_was_missing: boolean }> {
+  const res = await apiSend("POST", "/corporations/me/accounting/manual/sale", payload)
+  if (!res.ok) await throwApiError(res, "Recording the sale failed")
+  return (await res.json()) as { stock_was_missing: boolean }
+}
+
+export async function recordManualLot(payload: ManualLotRequest): Promise<void> {
+  const res = await apiSend("POST", "/corporations/me/accounting/manual/lot", payload)
+  if (!res.ok) await throwApiError(res, "Recording the stock failed")
+}
+
+export async function recordManualExpense(
+  payload: ManualExpenseRequest,
+): Promise<void> {
+  const res = await apiSend(
+    "POST",
+    "/corporations/me/accounting/manual/expense",
+    payload,
+  )
+  if (!res.ok) await throwApiError(res, "Recording the expense failed")
+}
+
+export const listReceivables = () =>
+  apiGet<ReceivableOut[]>("/corporations/me/accounting/receivables")
+
+export async function createReceivable(
+  amount: string,
+  note: string,
+): Promise<ReceivableOut> {
+  const res = await apiSend("POST", "/corporations/me/accounting/receivables", {
+    amount,
+    note,
+  })
+  if (!res.ok) await throwApiError(res, "Recording the owed ISK failed")
+  return (await res.json()) as ReceivableOut
+}
+
+export async function clearReceivable(
+  id: string,
+  note?: string,
+): Promise<ReceivableOut> {
+  const res = await apiSend(
+    "POST",
+    `/corporations/me/accounting/receivables/${id}/clear`,
+    { note: note ?? null },
+  )
+  if (!res.ok) await throwApiError(res, "Marking it paid failed")
+  return (await res.json()) as ReceivableOut
 }
 
 /** The pre-filled reprocess form for a lot (ADR-0047): base-yield outputs where

@@ -7,12 +7,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import * as accountingApi from "../api/accounting"
 import * as billingApi from "../api/billing"
 import * as locationsApi from "../api/locations"
+import * as sdeApi from "../api/sde"
 import type { InventoryOut } from "../api/types"
 import Inventory from "./Inventory"
 
 vi.mock("../api/accounting")
 vi.mock("../api/billing")
 vi.mock("../api/locations")
+vi.mock("../api/sde")
 
 const INVENTORY: InventoryOut = {
   total_cost: "4200000000.00",
@@ -43,6 +45,7 @@ const INVENTORY: InventoryOut = {
           days_held: 45,
           stale: true,
           cost_is_estimated: false,
+          source: "buyback",
         },
         {
           id: "lot-new",
@@ -53,6 +56,7 @@ const INVENTORY: InventoryOut = {
           days_held: 2,
           stale: false,
           cost_is_estimated: true,
+          source: "manual",
         },
       ],
     },
@@ -80,6 +84,7 @@ describe("Inventory", () => {
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
     vi.mocked(accountingApi.getWalletDivision).mockResolvedValue({ division: null })
+    vi.mocked(accountingApi.listReceivables).mockResolvedValue([])
   })
 
   it("shows holdings at what we paid, compact, with plain-English flags", async () => {
@@ -400,6 +405,116 @@ describe("Inventory", () => {
     })
     await u.selectOptions(select, "3")
     expect(accountingApi.setWalletDivision).toHaveBeenCalledWith(3)
+  })
+
+  it("records an off-game sale by hand with a required note (#158)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([
+      { location_id: "60003760", kind: "npc_station", name: "Jita IV - Moon 4",
+        system_name: "Jita" },
+    ])
+    vi.mocked(sdeApi.searchTypes).mockResolvedValue([
+      { type_id: 34, name: "Tritanium", market_group_id: 1857 },
+    ])
+    vi.mocked(accountingApi.recordManualSale).mockResolvedValue({
+      stock_was_missing: false,
+    })
+
+    renderInventory()
+
+    // Sale is the default kind; pick the item, fill the rest.
+    await u.type(
+      await screen.findByPlaceholderText("Search items…"), "trit",
+    )
+    await u.click(await screen.findByRole("button", { name: "Tritanium" }))
+    await u.type(screen.getByLabelText("How many"), "60")
+    await u.selectOptions(
+      screen.getByRole("combobox", { name: "Where" }), "60003760",
+    )
+    await u.type(screen.getByLabelText("ISK per unit"), "5.00")
+    const record = screen.getByRole("button", { name: "Add to the books" })
+    expect(record).toBeDisabled() // no note yet — the note is required
+    await u.type(screen.getByPlaceholderText(/What happened/), "sold on comms")
+    await u.click(record)
+
+    // The number input normalizes "5.00" to "5" — an equivalent Decimal string.
+    expect(accountingApi.recordManualSale).toHaveBeenCalledWith({
+      type_id: 34, qty: 60, unit_proceeds: "5",
+      location_id: "60003760", note: "sold on comms",
+    })
+    expect(await screen.findByText("Recorded.")).toBeInTheDocument()
+  })
+
+  it("prefills the sale form from a shortfall's Record the sale (#158)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "shortfall", type_id: 34, type_name: "Tritanium",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 600, unit_cost: null, booked: false, flagged: true,
+        note: null, occurred_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    await u.click(
+      await screen.findByRole("button", { name: "Record the sale" }),
+    )
+    // The form now targets the missing stock: item picked, quantity prefilled.
+    expect(screen.getByRole("button", { name: "Change item" })).toBeInTheDocument()
+    expect(screen.getByLabelText("How many")).toHaveValue(600)
+  })
+
+  it("lists open owed ISK and marks it paid (#158)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReceivables).mockResolvedValue([
+      { id: "r1", amount: "50000000.00",
+        note: "Buyer paid into division 1 by mistake",
+        incurred_at: "2026-08-11T09:00:00Z", cleared_at: null,
+        cleared_note: null },
+    ])
+    vi.mocked(accountingApi.clearReceivable).mockResolvedValue({
+      id: "r1", amount: "50000000.00", note: "…",
+      incurred_at: "2026-08-11T09:00:00Z",
+      cleared_at: "2026-08-11T12:00:00Z", cleared_note: null,
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByRole("heading", { name: "ISK owed to us" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Buyer paid into division 1 by mistake/),
+    ).toBeInTheDocument()
+    await u.click(screen.getByRole("button", { name: "Mark paid" }))
+    expect(accountingApi.clearReceivable).toHaveBeenCalledWith("r1")
+  })
+
+  it("badges hand-entered buys (#158)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+
+    renderInventory()
+
+    await u.click(await screen.findByRole("button", { name: "2 buys" }))
+    expect(screen.getByText("Entered by hand")).toBeInTheDocument()
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

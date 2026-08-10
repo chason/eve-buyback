@@ -219,3 +219,7 @@ class ReprocessQtyUnavailable(ApplicationError):
     """A reprocess can't consume more units than the lot still holds (ADR-0047)."""
 
     default_detail = "You can't reprocess more units than this stock entry still has"
+
+
+class ReceivableNotFound(ApplicationError):
+    default_detail = "That owed-ISK entry no longer exists"

@@ -20,6 +20,7 @@ from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
 from app.data.models.operator_wallet_token import OperatorWalletToken
 from app.data.models.pricing_rule import PricingRule
+from app.data.models.receivable import Receivable
 from app.data.models.reconciliation_event import ReconciliationEvent
 from app.data.models.sale import Sale
 from app.data.models.sde_market_group import SdeMarketGroup
@@ -50,6 +51,7 @@ __all__ = [
     "MarketPrice",
     "OperatorWalletToken",
     "PricingRule",
+    "Receivable",
     "ReconciliationEvent",
     "Sale",
     "SdeMarketGroup",
