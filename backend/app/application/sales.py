@@ -27,8 +27,13 @@ from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sales as sales_repo
 from app.domain.lots import LotConsumption, OpenLot, SaleChannel, plan_fifo
-from app.domain.transformations import OutputLine, allocate_source_cost
-from app.plugins.esi import CorpMarketOrder, CorporationContract, EsiClient
+from app.domain.transformations import allocate_amount
+from app.plugins.esi import (
+    ContractItem,
+    CorpMarketOrder,
+    CorporationContract,
+    EsiClient,
+)
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
 
@@ -382,38 +387,65 @@ async def record_outgoing_contract_sales(
     for contract in outgoing:
         if contract.contract_id in seen:
             continue
-        items = await esi.get_corporation_contract_items(
-            corporation_eve_id, contract.contract_id, access_token
-        )
-        disposed: dict[int, int] = {}
-        for item in items:
-            if item.is_included:
-                disposed[item.type_id] = disposed.get(item.type_id, 0) + item.quantity
-        if not disposed:
-            continue  # an ISK-only contract disposes nothing
-        values = await transformations_app.split_off_values(
-            session, corporation_uuid, sorted(disposed)
-        )
-        lines: list[OutputLine] = []
-        for tid, qty in sorted(disposed.items()):
-            lines.append(
-                OutputLine(type_id=tid, quantity=qty, unit_value=values.get(tid))
-            )
-        allocated = allocate_source_cost(contract.price, lines)
-        sold_at = contract.date_completed or now
-        location_id = str(contract.start_location_id or "")
-        for out in allocated:
-            await consume_and_record_sale(
-                session,
-                corporation_uuid,
-                type_id=out.type_id,
-                qty=out.quantity,
-                unit_proceeds=out.unit_cost,  # the allocator's per-unit share
-                location_id=location_id,
-                channel="contract",
-                external_ref=contract.contract_id,
-                sold_at=sold_at,
-                now=now,
-            )
-        recorded += 1
+        if await _record_one_outgoing_contract(
+            session,
+            esi,
+            corporation_uuid=corporation_uuid,
+            corporation_eve_id=corporation_eve_id,
+            contract=contract,
+            access_token=access_token,
+            now=now,
+        ):
+            recorded += 1
     return recorded
+
+
+def _disposed_quantities(items: list[ContractItem]) -> dict[int, int]:
+    """The items the contract hands over (the disposed stock), summed per type —
+    included items only; whatever the buyer gives back is not a disposal."""
+    disposed: dict[int, int] = {}
+    for item in items:
+        if item.is_included:
+            disposed[item.type_id] = disposed.get(item.type_id, 0) + item.quantity
+    return disposed
+
+
+async def _record_one_outgoing_contract(
+    session: AsyncSession,
+    esi: EsiClient,
+    *,
+    corporation_uuid: uuid.UUID,
+    corporation_eve_id: int,
+    contract: CorporationContract,
+    access_token: str,
+    now: datetime,
+) -> bool:
+    """One outgoing contract → sale rows: fetch its items, split the price across
+    them by market value (`domain/transformations.allocate_amount`), and push each
+    type through the shared disposal path. False = nothing disposed (an ISK-only
+    contract)."""
+    items = await esi.get_corporation_contract_items(
+        corporation_eve_id, contract.contract_id, access_token
+    )
+    disposed = _disposed_quantities(items)
+    if not disposed:
+        return False
+    values = await transformations_app.split_off_values(
+        session, corporation_uuid, sorted(disposed)
+    )
+    sold_at = contract.date_completed or now
+    location_id = str(contract.start_location_id or "")
+    for out in allocate_amount(contract.price, disposed, values):
+        await consume_and_record_sale(
+            session,
+            corporation_uuid,
+            type_id=out.type_id,
+            qty=out.quantity,
+            unit_proceeds=out.unit_cost,  # the allocator's per-unit share
+            location_id=location_id,
+            channel="contract",
+            external_ref=contract.contract_id,
+            sold_at=sold_at,
+            now=now,
+        )
+    return True
