@@ -928,7 +928,8 @@ function ItemRows({
               {open ? "Hide" : `${item.lots.length} buys`}
             </button>
           ) : (
-            item.lots.length === 1 && (
+            item.lots.length === 1 &&
+            item.reprocessable && (
               <button
                 type="button"
                 className="linkbtn"
@@ -984,13 +985,15 @@ function ItemRows({
               </small>
             </td>
             <td>
-              <button
-                type="button"
-                className="linkbtn"
-                onClick={() => onReprocess(lot.id)}
-              >
-                <small>Turned into minerals</small>
-              </button>
+              {item.reprocessable && (
+                <button
+                  type="button"
+                  className="linkbtn"
+                  onClick={() => onReprocess(lot.id)}
+                >
+                  <small>Turned into minerals</small>
+                </button>
+              )}
             </td>
           </tr>
         ))}

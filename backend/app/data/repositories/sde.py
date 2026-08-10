@@ -236,6 +236,19 @@ async def get_type_materials(
     return result
 
 
+async def types_with_materials(
+    session: AsyncSession, type_ids: Sequence[int]
+) -> set[int]:
+    """Which of the given types have any reprocessing yield rows — i.e. can be
+    reprocessed at all. Used to gate the reprocess record action (#177)."""
+    if not type_ids:
+        return set()
+    stmt = select(SdeTypeMaterial.type_id).distinct().where(
+        SdeTypeMaterial.type_id.in_(type_ids)
+    )
+    return set((await session.execute(stmt)).scalars().all())
+
+
 async def bulk_upsert_market_groups(
     session: AsyncSession, rows: Sequence[SdeMarketGroupRow]
 ) -> int:

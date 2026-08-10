@@ -51,6 +51,13 @@ reference table `sde_type_materials` (`type_id, material_type_id, quantity` from
 are ordinary seeded types, so they price through the same Fuzzwork path; the appraisal
 unions the ore's mineral ids into its single price fetch.
 
+> **Amended 2026-08-11:** the ore-only seed filter is lifted — `sde_type_materials` now
+> holds yields for **every seeded type** (still only published, market-tradeable ones).
+> [ADR-0047](0047-lot-transformations-reprocessing.md)'s source-agnostic reprocess
+> recording depends on yields existing for modules/ships/salvage, and the presence of
+> yield rows is what tells the inventory UI a type can be reprocessed at all. The
+> ore-only pricing behavior of this ADR is unchanged. Re-run the seed after deploying.
+
 ## Consequences
 
 - A new, composable pricing mode that reuses the rule hierarchy — no separate config

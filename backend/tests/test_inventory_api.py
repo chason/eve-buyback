@@ -147,6 +147,35 @@ async def test_empty_inventory_is_all_zeros():
     assert view.items == []
 
 
+async def test_reprocessable_flags_types_with_yield_data():
+    """#177: only a type with seeded reprocessing yields can be recorded as
+    reprocessed — minerals and other yield-less types must not offer the action."""
+    corp_id = await _seed_corp()
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_types(session, [
+            {"type_id": 1230, "name": "Veldspar", "group_id": 465,
+             "market_group_id": 2, "volume": 0.1, "published": True,
+             "portion_size": 100},
+        ])
+        await sde_repo.bulk_upsert_type_materials(session, [
+            {"type_id": 1230, "material_type_id": 34, "quantity": 415},
+        ])
+        await session.commit()
+    await _lot(corp_id, type_id=1230, qty=100, cost="10.00")
+    await _lot(corp_id, type_id=34, qty=100, cost="4.00")
+
+    async with SessionLocal() as session:
+        view = await lots_app.get_inventory(
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW,
+        )
+
+    veld = next(i for i in view.items if i.type_id == 1230)
+    trit = next(i for i in view.items if i.type_id == 34)
+    assert veld.reprocessable is True
+    assert trit.reprocessable is False  # a mineral has no yields
+
+
 async def _configure_market(*, prices: dict[int, str]) -> None:
     """Give the corp a default hub (Jita, buy percentile) and cache buy prices."""
     async with SessionLocal() as session:
@@ -232,6 +261,7 @@ async def test_endpoint_returns_inventory_for_entitled_manager():
     body = resp.json()
     assert Decimal(body["total_cost"]) == Decimal("400.00")
     assert body["items"][0]["type_name"] == "Tritanium"
+    assert body["items"][0]["reprocessable"] is False  # no yields seeded here
     assert body["items"][0]["lots"][0]["days_held"] == 3
 
 

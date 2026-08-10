@@ -100,6 +100,9 @@ class InventoryItemView(BaseModel):
     any_estimated: bool
     worth: Decimal | None = None
     unrealized: Decimal | None = None
+    # Whether the type has any seeded reprocessing yields — i.e. can be
+    # reprocessed at all; gates the "Turned into minerals" action (#177).
+    reprocessable: bool
     lots: list[InventoryLotView]
 
 
@@ -143,6 +146,7 @@ async def get_inventory(
     lots = await lots_repo.open_lots(session, corporation_id=corp.id)
     type_ids = sorted({lot.item_type_id for lot in lots})
     names = await sde_repo.get_types(session, type_ids)
+    reprocessable_ids = await sde_repo.types_with_materials(session, type_ids)
     nrv = await _nrv_by_type(
         session,
         corporation_id=corp.id,
@@ -190,6 +194,7 @@ async def get_inventory(
                 any_estimated=estimated_flags[type_id],
                 worth=worth,
                 unrealized=worth - total_cost if worth is not None else None,
+                reprocessable=type_id in reprocessable_ids,
                 lots=views,
             )
         )

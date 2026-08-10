@@ -32,8 +32,11 @@ TYPES = [
 MATERIALS = [
     # The ore (46680) reprocesses to Tritanium — kept.
     SdeTypeMaterialRow(type_id=46680, material_type_id=34, quantity=333),
-    # A non-ore type's materials (34 is a mineral) — filtered out by the seed.
+    # A non-ore kept type's materials — kept too (ADR-0047: reprocess recording
+    # is source-agnostic, so yields cover more than ore).
     SdeTypeMaterialRow(type_id=34, material_type_id=99, quantity=1),
+    # Materials of a type the seed drops (unpublished) — filtered out.
+    SdeTypeMaterialRow(type_id=11111, material_type_id=34, quantity=5),
 ]
 
 STATIONS = [
@@ -96,7 +99,7 @@ async def test_seed_keeps_only_published_market_types():
         assert {g.market_group_id for g in groups} == {1, 2}
 
 
-async def test_seed_tags_category_portion_and_ore_materials():
+async def test_seed_tags_category_portion_and_materials():
     source = FakeSdeSource(TYPES, GROUPS)
     async with SessionLocal() as session:
         await seed_reference_data(session, source, source_label="test")
@@ -104,9 +107,13 @@ async def test_seed_tags_category_portion_and_ore_materials():
     async with SessionLocal() as session:
         ore = await sde_repo.get_type(session, 46680)
         assert ore.category_id == 25 and ore.portion_size == 100
-        # Only the ore's materials are seeded; the mineral's row is filtered out.
-        mats = await sde_repo.get_type_materials(session, [46680, 34])
-        assert mats == {46680: [(34, 333)]}
+        # Every kept type's materials are seeded (ADR-0047); rows belonging to
+        # types the seed dropped are filtered out.
+        mats = await sde_repo.get_type_materials(session, [46680, 34, 11111])
+        assert mats == {46680: [(34, 333)], 34: [(99, 1)]}
+        # The existence check that gates the UI's reprocess action (#177).
+        with_mats = await sde_repo.types_with_materials(session, [46680, 34, 22222])
+        assert with_mats == {46680, 34}
 
 
 async def test_seed_stations_join_system_name():

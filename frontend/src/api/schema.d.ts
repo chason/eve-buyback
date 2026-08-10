@@ -1315,6 +1315,8 @@ export interface components {
             oldest_days: number;
             /** Qty */
             qty: number;
+            /** Reprocessable */
+            reprocessable: boolean;
             /** Stale */
             stale: boolean;
             /** Total Cost */
