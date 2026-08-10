@@ -110,7 +110,7 @@ async def record_reprocess(
     consumed_cost = qty * landed_unit_cost(
         lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
     )
-    values = await _split_off_values(session, corp.id, sorted(outputs))
+    values = await split_off_values(session, corp.id, sorted(outputs))
     allocated = allocate_source_cost(
         consumed_cost,
         [
@@ -149,7 +149,7 @@ async def record_reprocess(
     return children
 
 
-async def _split_off_values(
+async def split_off_values(
     session: AsyncSession, corporation_id: uuid.UUID, type_ids: list[int]
 ) -> dict[int, Decimal]:
     """Market unit value per output type at split-off: the buy-side aggregate at

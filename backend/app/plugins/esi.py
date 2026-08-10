@@ -89,6 +89,10 @@ class CorporationContract(BaseModel):
     price: Decimal = Decimal(0)
     start_location_id: int | None = None
     issuer_id: int | None = None
+    # Which corp issued it, and whether on the corp's behalf (from corp hangars) —
+    # together they identify OUTGOING corp sales (ADR-0045, #157).
+    issuer_corporation_id: int | None = None
+    for_corporation: bool = False
     acceptor_id: int | None = None
     date_issued: datetime
     date_completed: datetime | None = None
