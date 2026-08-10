@@ -338,6 +338,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/divisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Division Names
+         * @description The corp's real division names for the wallet/hangar pickers (ADR-0048).
+         *     Best-effort: empty lists when the corp token can't read them — the frontend
+         *     falls back to generic labels.
+         */
+        get: operations["get_division_names_api_v1_corporations_me_accounting_divisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/hangar-check": {
         parameters: {
             query?: never;
@@ -1230,6 +1252,26 @@ export interface components {
             registered_at: string;
             /** Registered By Character Id */
             registered_by_character_id: number;
+        };
+        /** DivisionNameOut */
+        DivisionNameOut: {
+            /** Division */
+            division: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * DivisionNamesOut
+         * @description The corp's named wallet/hangar divisions (ADR-0048), for the Stock page's
+         *     pickers. Only named divisions appear — the frontend falls back to generic
+         *     labels for the rest, and both lists are empty when the corp token can't read
+         *     them (no grant, a pre-ADR-0048 grant, or a non-Director character).
+         */
+        DivisionNamesOut: {
+            /** Hangar */
+            hangar: components["schemas"]["DivisionNameOut"][];
+            /** Wallet */
+            wallet: components["schemas"]["DivisionNameOut"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2536,6 +2578,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountingAccessOut"];
+                };
+            };
+        };
+    };
+    get_division_names_api_v1_corporations_me_accounting_divisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DivisionNamesOut"];
                 };
             };
         };

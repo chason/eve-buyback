@@ -1,5 +1,6 @@
 import { apiGet, apiSend, throwApiError } from "./client"
 import type {
+  DivisionNamesOut,
   HangarCheckResult,
   HangarOut,
   InventoryOut,
@@ -15,6 +16,7 @@ import type {
 
 export type {
   ChannelProfitOut,
+  DivisionNamesOut,
   HangarCheckResult,
   HangarOut,
   InventoryItemOut,
@@ -108,6 +110,12 @@ export async function runHangarCheck(): Promise<HangarCheckResult> {
   if (!res.ok) await throwApiError(res, "The hangar check failed")
   return (await res.json()) as HangarCheckResult
 }
+
+/** The corp's real division names for the wallet/hangar pickers (ADR-0048).
+ * Best-effort: empty lists when the corp token can't read them — the pickers
+ * fall back to generic labels. */
+export const getDivisionNames = () =>
+  apiGet<DivisionNamesOut>("/corporations/me/accounting/divisions")
 
 /** The one corp wallet division buyback sales pay into (ADR-0045); null = the
  * sell side is off. */

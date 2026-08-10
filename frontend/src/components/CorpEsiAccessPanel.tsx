@@ -176,6 +176,16 @@ export default function CorpEsiAccessPanel({
                 </p>
               )}
 
+            {connected &&
+              !status.data?.scopes?.includes(
+                "esi-corporations.read_divisions.v1",
+              ) && (
+                <p className="field-hint" role="status">
+                  ⚠️ Reconnect to enable division names (the Stock page&apos;s
+                  wallet and hangar pickers) — your authorization predates it.
+                </p>
+              )}
+
             <button
               type="button"
               className="secondary"

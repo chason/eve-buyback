@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -85,6 +85,11 @@ describe("Inventory", () => {
     vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
     vi.mocked(accountingApi.getWalletDivision).mockResolvedValue({ division: null })
     vi.mocked(accountingApi.listReceivables).mockResolvedValue([])
+    // No division names by default — pickers fall back to generic labels.
+    vi.mocked(accountingApi.getDivisionNames).mockResolvedValue({
+      wallet: [],
+      hangar: [],
+    })
   })
 
   it("shows holdings at what we paid, compact, with plain-English flags", async () => {
@@ -245,6 +250,53 @@ describe("Inventory", () => {
     )
     await u.click(screen.getByRole("button", { name: "Add hangar" }))
     expect(accountingApi.addHangar).toHaveBeenCalledWith("60003760", 3)
+  })
+
+  it("labels wallet and hangar pickers with the corp's real division names (ADR-0048)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.getDivisionNames).mockResolvedValue({
+      wallet: [{ division: 3, name: "Buyback ISK" }],
+      hangar: [{ division: 2, name: "Deliveries" }],
+    })
+    vi.mocked(accountingApi.listHangars).mockResolvedValue([
+      { location_id: "60003760", location_name: "Jita IV - Moon 4", division: 2 },
+      { location_id: "60003760", location_name: "Jita IV - Moon 4", division: 5 },
+    ])
+    vi.mocked(locationsApi.listLocations).mockResolvedValue([
+      { location_id: "60003760", kind: "npc_station", name: "Jita IV - Moon 4",
+        system_name: "Jita" },
+    ])
+
+    renderInventory()
+
+    // The configured-hangar list uses the real name, falling back per division.
+    expect(
+      await screen.findByText(/Jita IV - Moon 4 — Deliveries/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Jita IV - Moon 4 — hangar 5/)).toBeInTheDocument()
+
+    // The hangar picker: named division by name, the rest generic.
+    const hangarSelect = screen.getByRole("combobox", { name: "Hangar division" })
+    expect(
+      within(hangarSelect).getByRole("option", { name: "Deliveries" }),
+    ).toHaveValue("2")
+    expect(
+      within(hangarSelect).getByRole("option", { name: "Hangar 3" }),
+    ).toBeInTheDocument()
+
+    // The wallet picker: same treatment.
+    const walletSelect = screen.getByRole("combobox", {
+      name: "Buyback wallet division",
+    })
+    expect(
+      within(walletSelect).getByRole("option", { name: "Buyback ISK" }),
+    ).toHaveValue("3")
+    expect(
+      within(walletSelect).getByRole("option", { name: "Wallet division 1" }),
+    ).toBeInTheDocument()
   })
 
   it("points at the Locations page when no drop-offs exist yet", async () => {

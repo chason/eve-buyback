@@ -819,6 +819,49 @@
         "title": "CorporationOut",
         "type": "object"
       },
+      "DivisionNameOut": {
+        "properties": {
+          "division": {
+            "title": "Division",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "division",
+          "name"
+        ],
+        "title": "DivisionNameOut",
+        "type": "object"
+      },
+      "DivisionNamesOut": {
+        "description": "The corp's named wallet/hangar divisions (ADR-0048), for the Stock page's\npickers. Only named divisions appear \u2014 the frontend falls back to generic\nlabels for the rest, and both lists are empty when the corp token can't read\nthem (no grant, a pre-ADR-0048 grant, or a non-Director character).",
+        "properties": {
+          "hangar": {
+            "items": {
+              "$ref": "#/components/schemas/DivisionNameOut"
+            },
+            "title": "Hangar",
+            "type": "array"
+          },
+          "wallet": {
+            "items": {
+              "$ref": "#/components/schemas/DivisionNameOut"
+            },
+            "title": "Wallet",
+            "type": "array"
+          }
+        },
+        "required": [
+          "wallet",
+          "hangar"
+        ],
+        "title": "DivisionNamesOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2725,7 +2768,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "98"
+    "version": "100"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3402,6 +3445,28 @@
         "summary": "Get Accounting Access",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/divisions": {
+      "get": {
+        "description": "The corp's real division names for the wallet/hangar pickers (ADR-0048).\nBest-effort: empty lists when the corp token can't read them \u2014 the frontend\nfalls back to generic labels.",
+        "operationId": "get_division_names_api_v1_corporations_me_accounting_divisions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionNamesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Division Names",
+        "tags": [
+          "accounting"
         ]
       }
     },
