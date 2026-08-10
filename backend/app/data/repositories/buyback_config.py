@@ -71,6 +71,24 @@ async def upsert_config(
     return BuybackConfigRecord.model_validate(row)
 
 
+async def set_wallet_division(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    division: int | None,
+) -> BuybackConfigRecord | None:
+    """Set (or clear, None) the buyback wallet division (ADR-0045). Untouched by
+    `upsert_config` — the pricing form must never reset the accounting switch. None
+    result = the corp has no config row yet."""
+    row = await _row(session, corporation_id)
+    if row is None:
+        return None
+    row.wallet_division = division
+    await session.flush()
+    await session.refresh(row)
+    return BuybackConfigRecord.model_validate(row)
+
+
 async def _row(
     session: AsyncSession, corporation_id: uuid.UUID
 ) -> BuybackConfig | None:

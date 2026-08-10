@@ -24,6 +24,18 @@ class CorporationContractsForbidden(Exception):
     role. Transport-level; the watcher logs and skips without flagging the token failed."""
 
 
+class CorporationWalletForbidden(Exception):
+    """ESI refused the corp wallet transactions/journal (401/403): the corp ESI token
+    lacks the corp-wallet scope (a grant predating ADR-0045) or the character lacks
+    the Accountant/Junior Accountant role. Transport-level; the sales ingestion logs
+    and skips without flagging the token failed."""
+
+
+class CorporationOrdersForbidden(Exception):
+    """ESI refused the corp market orders (401/403): missing orders scope (pre-ADR-0045
+    grant) or in-game role. Transport-level; same skip semantics as the wallet."""
+
+
 class CorporationAssetsForbidden(Exception):
     """ESI refused the corp assets list (401/403): the corp ESI token lacks the assets
     scope (a grant predating ADR-0044) or the character lacks the Director role.
@@ -81,6 +93,51 @@ class CorporationContract(BaseModel):
     date_issued: datetime
     date_completed: datetime | None = None
     date_expired: datetime | None = None
+
+
+class CorpWalletTransaction(BaseModel):
+    """One market fill from a corp wallet division (ADR-0045). `is_buy` False = a
+    sale (the fills the ledger records); `transaction_id` is the idempotency key;
+    `journal_ref_id` links the journal's tax entry back to this fill."""
+
+    transaction_id: int
+    date: datetime
+    type_id: int
+    quantity: int
+    unit_price: Decimal
+    is_buy: bool
+    location_id: int
+    journal_ref_id: int | None = None
+
+
+class CorpJournalEntry(BaseModel):
+    """One corp wallet-journal entry (ADR-0045). Only what the ingestion needs:
+    `transaction_tax` and `brokers_fee` ref types; `context_id` carries the market
+    transaction id for tax entries. `amount` is signed (fees/taxes negative)."""
+
+    id: int
+    ref_type: str
+    amount: Decimal | None = None
+    date: datetime
+    context_id: int | None = None
+    context_id_type: str | None = None
+
+
+class CorpMarketOrder(BaseModel):
+    """One corp market order (ADR-0045): the listed state (sell-order escrow has
+    physically left the hangar) and the division guard (`wallet_division` is chosen
+    per order by the trader)."""
+
+    order_id: int
+    type_id: int
+    is_buy_order: bool = False
+    price: Decimal
+    volume_remain: int
+    volume_total: int
+    location_id: int
+    wallet_division: int
+    issued: datetime
+    state: str | None = None  # set on history entries (e.g. cancelled/expired)
 
 
 class CorporationAsset(BaseModel):
@@ -222,6 +279,75 @@ class EsiClient:
                 break
             page += 1
         return contracts
+
+    async def get_corporation_wallet_transactions(
+        self, corporation_id: int, division: int, access_token: str
+    ) -> list[CorpWalletTransaction]:
+        """The configured division's market fills (ADR-0045), most recent first. Only
+        the latest page is read — the ingestion polls far more often than one page's
+        worth of fills, and `transaction_id` dedupes downstream. Money is parsed
+        JSON-number → Decimal (ADR-0020). 401/403 → `CorporationWalletForbidden`."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/corporations/{corporation_id}/wallets/{division}"
+            "/transactions/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if scope_missing(resp):
+            raise CorporationWalletForbidden()
+        resp.raise_for_status()
+        return [
+            CorpWalletTransaction.model_validate(raw)
+            for raw in json.loads(resp.text, parse_float=Decimal)
+        ]
+
+    async def get_corporation_wallet_journal(
+        self, corporation_id: int, division: int, access_token: str
+    ) -> list[CorpJournalEntry]:
+        """The configured division's journal (ADR-0045) — the tax and broker-fee
+        entries. First page only, same rationale as transactions. 401/403 →
+        `CorporationWalletForbidden`."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/corporations/{corporation_id}/wallets/{division}/journal/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if scope_missing(resp):
+            raise CorporationWalletForbidden()
+        resp.raise_for_status()
+        return [
+            CorpJournalEntry.model_validate(raw)
+            for raw in json.loads(resp.text, parse_float=Decimal)
+        ]
+
+    async def get_corporation_orders(
+        self, corporation_id: int, access_token: str
+    ) -> list[CorpMarketOrder]:
+        """The corp's LIVE market orders (ADR-0045), paginated. 401/403 →
+        `CorporationOrdersForbidden`."""
+        return await self._orders(
+            f"{ESI_BASE}/corporations/{corporation_id}/orders/", access_token
+        )
+
+    async def _orders(
+        self, url: str, access_token: str
+    ) -> list[CorpMarketOrder]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        orders: list[CorpMarketOrder] = []
+        page = 1
+        while True:
+            resp = await self._client.get(
+                url, params={"page": page, "datasource": "tranquility"}, headers=headers
+            )
+            if page == 1 and scope_missing(resp):
+                raise CorporationOrdersForbidden()
+            resp.raise_for_status()
+            orders.extend(
+                CorpMarketOrder.model_validate(raw)
+                for raw in json.loads(resp.text, parse_float=Decimal)
+            )
+            if page >= int(resp.headers.get("X-Pages", "1")):
+                break
+            page += 1
+        return orders
 
     async def get_corporation_assets(
         self, corporation_id: int, access_token: str

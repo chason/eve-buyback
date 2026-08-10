@@ -6,11 +6,13 @@ import {
   addHangar,
   getInventory,
   getReprocessPreview,
+  getWalletDivision,
   listHangars,
   listReconciliationEvents,
   recordReprocess,
   removeHangar,
   runHangarCheck,
+  setWalletDivision,
 } from "../api/accounting"
 import type {
   InventoryItemOut,
@@ -124,6 +126,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
       )}
 
       <HangarsSection />
+      <WalletSection />
       <ReconciliationSection
         onRecordReprocess={(typeId) => {
           const lotId = oldestLotOf(typeId)
@@ -131,6 +134,54 @@ function StockView({ inv }: { inv: InventoryOut }) {
         }}
       />
     </>
+  )
+}
+
+/** The buyback wallet division (ADR-0045, #156): the one corp wallet sales pay
+ * into. Picking it switches on automatic sale/fee recording; "Not set" keeps the
+ * sell side off. */
+function WalletSection() {
+  const queryClient = useQueryClient()
+  const division = useQuery({
+    queryKey: ["walletDivision"],
+    queryFn: getWalletDivision,
+  })
+  const save = useMutation({
+    mutationFn: (d: number | null) => setWalletDivision(d),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["walletDivision"] }),
+  })
+
+  return (
+    <section className="panel">
+      <h2>Our wallet</h2>
+      <p>
+        <small className="field-hint">
+          Which corp wallet do buyback sales pay into? Once picked, the app records
+          market sales, taxes, and broker fees from that wallet automatically —
+          sell orders paying into a different wallet get flagged below.
+        </small>
+      </p>
+      <div className="access-actions">
+        <select
+          aria-label="Buyback wallet division"
+          value={division.data?.division ?? ""}
+          onChange={(e) =>
+            save.mutate(e.target.value === "" ? null : Number(e.target.value))
+          }
+        >
+          <option value="">Not set — sales aren&apos;t recorded</option>
+          {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+            <option key={d} value={d}>
+              Wallet division {d}
+            </option>
+          ))}
+        </select>
+        {save.isError && (
+          <small className="error">{(save.error as Error).message}</small>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -351,6 +402,12 @@ function eventText(e: ReconciliationEventOut): string {
   const qty = e.qty.toLocaleString()
   if (e.kind === "reprocess_hint") {
     return `Looks like ${qty} ${item} at ${where} was turned into minerals — record it to carry what we paid into them.`
+  }
+  if (e.kind === "unmatched_sale") {
+    return `Sold ${qty} ${item} at ${where} the books didn't have — recorded at estimated value.`
+  }
+  if (e.kind === "unexpected_division") {
+    return `A sell order for ${qty} ${item} at ${where} pays into a different corp wallet than the buyback's.`
   }
   if (e.kind === "shortfall") {
     return `${qty} ${item} missing at ${where} — sold or moved outside the app?`

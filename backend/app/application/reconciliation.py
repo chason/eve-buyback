@@ -29,6 +29,7 @@ from app.data.records import ReconciliationEventRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
+from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import reconciliation as recon_repo
@@ -94,6 +95,15 @@ async def reconcile_hangars(
     expected = await lots_repo.idle_by_location_type(
         session, corporation_id=corp.id, location_ids=locations
     )
+    # Units in sell-order escrow have physically left the hangar (ADR-0043's
+    # qty_idle; the snapshot comes from the sales ingestion, ADR-0045) — the hangar
+    # not holding them is correct, not a shortfall.
+    listed = await orders_repo.listed_by_location_type(
+        session, corporation_id=corp.id
+    )
+    for slot, qty in listed.items():
+        if slot in expected:
+            expected[slot] = max(0, expected[slot] - qty)
     deltas = reconcile(counted, expected)
     if not deltas:
         return HangarCheckResult(lots_added=0, flagged=0)
@@ -109,7 +119,7 @@ async def reconcile_hangars(
         (h.location_id, tid) for h in hints for tid in h.material_type_ids
     }
 
-    deemed = await _deemed_unit_costs(
+    deemed = await deemed_unit_costs(
         session, corp.id, sorted({d.type_id for d in deltas if d.kind == "excess"})
     )
     latest = await recon_repo.latest_by_slot(session, corporation_id=corp.id)
@@ -255,7 +265,7 @@ def _already_logged(
     return True
 
 
-async def _deemed_unit_costs(
+async def deemed_unit_costs(
     session: AsyncSession, corporation_id: uuid.UUID, type_ids: list[int]
 ) -> dict[int, Decimal]:
     """The deemed cost per unit for discovered stock (ADR-0044): what the corp's own

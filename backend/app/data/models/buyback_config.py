@@ -43,3 +43,7 @@ class BuybackConfig(Base):
     default_accepted: Mapped[bool] = mapped_column(
         default=True, server_default=text("true")
     )
+    # The corp wallet division buyback sales pay into (ADR-0045; probe-confirmed that
+    # proceeds follow the order's division). NULL = not configured → the sales
+    # ingestion no-ops. 1..7; accounting add-on only.
+    wallet_division: Mapped[int | None] = mapped_column(default=None)

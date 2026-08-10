@@ -75,6 +75,23 @@ export async function runHangarCheck(): Promise<HangarCheckResult> {
   return (await res.json()) as HangarCheckResult
 }
 
+/** The one corp wallet division buyback sales pay into (ADR-0045); null = the
+ * sell side is off. */
+export const getWalletDivision = () =>
+  apiGet<{ division: number | null }>(
+    "/corporations/me/accounting/wallet-division",
+  )
+
+export async function setWalletDivision(
+  division: number | null,
+): Promise<{ division: number | null }> {
+  const res = await apiSend("PUT", "/corporations/me/accounting/wallet-division", {
+    division,
+  })
+  if (!res.ok) await throwApiError(res, "Saving the wallet pick failed")
+  return (await res.json()) as { division: number | null }
+}
+
 /** The pre-filled reprocess form for a lot (ADR-0047): base-yield outputs where
  * the game data knows them — editable, because real yields vary. */
 export const getReprocessPreview = (lotId: string) =>

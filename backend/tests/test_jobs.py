@@ -36,6 +36,7 @@ def test_start_scheduler_returns_none_when_all_jobs_disabled():
             "payments_background_refresh_enabled": False,
             "accounting_writedown_enabled": False,
             "hangar_reconcile_enabled": False,
+            "sales_ingest_enabled": False,
         }
     )
     assert _start_scheduler(SimpleNamespace(), settings) is None
@@ -62,6 +63,9 @@ async def test_start_scheduler_configures_enabled_jobs():
             "hangar_reconcile_enabled": True,
             "hangar_reconcile_interval_seconds": 3600,
             "hangar_reconcile_initial_delay_seconds": 180,
+            "sales_ingest_enabled": True,
+            "sales_ingest_interval_seconds": 900,
+            "sales_ingest_initial_delay_seconds": 240,
         }
     )
 
@@ -97,6 +101,11 @@ async def test_start_scheduler_configures_enabled_jobs():
         assert hangar.trigger.interval.total_seconds() == 3600
         assert hangar.max_instances == 1
         assert hangar.coalesce is True
+        ingest = scheduler.get_job("sales_ingest")
+        assert ingest is not None
+        assert ingest.trigger.interval.total_seconds() == 900
+        assert ingest.max_instances == 1
+        assert ingest.coalesce is True
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

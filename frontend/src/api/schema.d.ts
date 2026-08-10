@@ -462,6 +462,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/wallet-division": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Wallet Division */
+        get: operations["get_wallet_division_api_v1_corporations_me_accounting_wallet_division_get"];
+        /** Set Wallet Division */
+        put: operations["set_wallet_division_api_v1_corporations_me_accounting_wallet_division_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/config": {
         parameters: {
             query?: never;
@@ -1682,6 +1700,20 @@ export interface components {
             /** State */
             state: string;
         };
+        /**
+         * WalletDivisionOut
+         * @description The corp wallet division buyback sales pay into (ADR-0045). None = sell-side
+         *     ingestion off.
+         */
+        WalletDivisionOut: {
+            /** Division */
+            division?: number | null;
+        };
+        /** WalletDivisionUpdateRequest */
+        WalletDivisionUpdateRequest: {
+            /** Division */
+            division?: number | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -2454,6 +2486,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationEventOut"][];
+                };
+            };
+        };
+    };
+    get_wallet_division_api_v1_corporations_me_accounting_wallet_division_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletDivisionOut"];
+                };
+            };
+        };
+    };
+    set_wallet_division_api_v1_corporations_me_accounting_wallet_division_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalletDivisionUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletDivisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

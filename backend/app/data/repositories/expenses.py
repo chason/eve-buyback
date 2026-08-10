@@ -44,6 +44,23 @@ async def create_expense(
     return ExpenseRecord.model_validate(expense)
 
 
+async def external_refs(
+    session: AsyncSession, *, corporation_id: uuid.UUID
+) -> set[int]:
+    """The already-booked EVE journal ids — the fee ingestion's dedupe set
+    (ADR-0045); `external_ref` is unique, so this prevents the IntegrityError
+    rather than relying on it."""
+    rows = (
+        await session.execute(
+            select(LotExpense.external_ref).where(
+                LotExpense.corporation_id == corporation_id,
+                LotExpense.external_ref.is_not(None),
+            )
+        )
+    ).scalars()
+    return set(rows)
+
+
 async def list_for_corp(
     session: AsyncSession, *, corporation_id: uuid.UUID
 ) -> list[ExpenseRecord]:

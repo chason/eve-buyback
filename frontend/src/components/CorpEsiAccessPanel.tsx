@@ -161,6 +161,21 @@ export default function CorpEsiAccessPanel({
                 </p>
               )}
 
+            {connected &&
+              !(
+                status.data?.scopes?.includes(
+                  "esi-wallet.read_corporation_wallets.v1",
+                ) &&
+                status.data?.scopes?.includes(
+                  "esi-markets.read_corporation_orders.v1",
+                )
+              ) && (
+                <p className="field-hint" role="status">
+                  ⚠️ Reconnect to enable sales tracking (recording market sales
+                  automatically) — your authorization predates it.
+                </p>
+              )}
+
             <button
               type="button"
               className="secondary"

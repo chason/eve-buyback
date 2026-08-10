@@ -7,6 +7,7 @@ from app.data.models.buyback_hangar import BuybackHangar
 from app.data.models.buyback_location import BuybackLocation
 from app.data.models.character import Character
 from app.data.models.corp_esi_token import CorpEsiToken
+from app.data.models.corp_market_order import CorpMarketOrder
 from app.data.models.corp_roster_member import CorpRosterMember
 from app.data.models.corporation import Corporation
 from app.data.models.entitlement import Entitlement
@@ -35,6 +36,7 @@ __all__ = [
     "BuybackConfig",
     "BuybackHangar",
     "BuybackLocation",
+    "CorpMarketOrder",
     "Character",
     "CorpRosterMember",
     "Corporation",
