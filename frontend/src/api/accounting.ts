@@ -6,6 +6,7 @@ import type {
   ManualExpenseRequest,
   ManualLotRequest,
   ManualSaleRequest,
+  ProfitOut,
   ReceivableOut,
   ReconciliationEventOut,
   ReprocessPreviewOut,
@@ -13,6 +14,7 @@ import type {
 } from "./types"
 
 export type {
+  ChannelProfitOut,
   HangarCheckResult,
   HangarOut,
   InventoryItemOut,
@@ -21,6 +23,7 @@ export type {
   ManualExpenseRequest,
   ManualLotRequest,
   ManualSaleRequest,
+  ProfitOut,
   ReceivableOut,
   ReconciliationEventOut,
   ReprocessPreviewOut,
@@ -42,6 +45,29 @@ export const getInventory = async (): Promise<InventoryResult> => {
   if (res.status === 402) return { access: false }
   if (!res.ok) throw new Error(`Couldn't load inventory (error ${res.status}).`)
   return { access: true, inventory: (await res.json()) as InventoryOut }
+}
+
+/** The "How we're doing" profit fetch (#159) — same 402 split as the inventory,
+ * so the page can show the how-to-pay panel instead of an error blurb. */
+export type ProfitResult =
+  | { access: true; profit: ProfitOut }
+  | { access: false }
+
+export const getProfit = async (
+  since: string | null,
+  until: string | null,
+): Promise<ProfitResult> => {
+  const params = new URLSearchParams()
+  if (since) params.set("since", since)
+  if (until) params.set("until", until)
+  const query = params.size > 0 ? `?${params.toString()}` : ""
+  const res = await fetch(
+    `${API_BASE}/corporations/me/accounting/profit${query}`,
+    { credentials: "include" },
+  )
+  if (res.status === 402) return { access: false }
+  if (!res.ok) throw new Error(`Couldn't load the numbers (error ${res.status}).`)
+  return { access: true, profit: (await res.json()) as ProfitOut }
 }
 
 /** The corp hangar divisions counted as buyback stock (ADR-0044). Reached only

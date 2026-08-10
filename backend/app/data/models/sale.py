@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Numeric,
@@ -27,8 +28,13 @@ class Sale(Base):
     `external_ref` is the EVE-side idempotency key — the wallet `transaction_id` for
     market fills, the `contract_id` for contract sales — unique per channel so
     re-polling never double-records; NULL for manual (off-game) sales. `source` is
-    provenance (esi | manual, ADR-0045) — orthogonal to the lot's
-    `cost_is_estimated`, which rides in via the lot."""
+    provenance (esi | manual, ADR-0045) — orthogonal to `cost_is_estimated`.
+
+    `unit_cost` and `cost_is_estimated` are SNAPSHOTS of the consumed lot's landed
+    cost at sale time (#159): a later write-down floors the lot, and deriving COGS
+    from the floored lot would retroactively inflate old sales' profit while the
+    write-down loss is also expensed — double counting. Realized profit sums from
+    these frozen facts."""
 
     __tablename__ = "sales"
     __table_args__ = (
@@ -44,6 +50,9 @@ class Sale(Base):
     lot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lots.id", ondelete="CASCADE"))
     qty: Mapped[int] = mapped_column(BigInteger)
     unit_proceeds: Mapped[Decimal] = mapped_column(Numeric)
+    # Landed unit cost of the consumed lot AT SALE TIME (#159) — COGS, frozen.
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric)
+    cost_is_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
     # Tax attributed to THIS row's share of the fill (a multi-lot fill splits it).
     sales_tax: Mapped[Decimal] = mapped_column(Numeric, default=Decimal(0))
     channel: Mapped[SaleChannel] = mapped_column(

@@ -59,6 +59,9 @@ export type ManualSaleRequest = Schemas["ManualSaleRequest"]
 export type ManualLotRequest = Schemas["ManualLotRequest"]
 export type ManualExpenseRequest = Schemas["ManualExpenseRequest"]
 export type ReceivableOut = Schemas["ReceivableOut"]
+// The "How we're doing" profit view (#159).
+export type ProfitOut = Schemas["ProfitOut"]
+export type ChannelProfitOut = Schemas["ChannelProfitOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]

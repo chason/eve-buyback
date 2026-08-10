@@ -32,6 +32,7 @@ from app.domain.lots import (
     LotConsumption,
     OpenLot,
     SaleChannel,
+    landed_unit_cost,
     plan_fifo,
 )
 from app.domain.transformations import allocate_amount
@@ -210,6 +211,7 @@ async def consume_and_record_sale(
         item_type_id=type_id,
         location_id=location_id,
     )
+    by_id = {lot.id: lot for lot in lots}
     open_lots: list[OpenLot] = []
     for lot in lots:
         open_lots.append(
@@ -242,6 +244,7 @@ async def consume_and_record_sale(
             location_id=location_id,
             notes="Sold before the books knew we had it (ADR-0045)",
         )
+        by_id[shortfall_lot.id] = shortfall_lot
         consumptions.append(
             LotConsumption(lot_id=shortfall_lot.id, qty=plan.shortfall)
         )
@@ -261,12 +264,19 @@ async def consume_and_record_sale(
         await lots_repo.consume(
             session, lot_id=consumption.lot_id, qty=consumption.qty
         )
+        # Snapshot the lot's landed cost NOW (#159): a later write-down floors the
+        # lot, but this sale's COGS is a done fact.
+        lot = by_id[consumption.lot_id]
         await sales_repo.create_sale(
             session,
             corporation_id=corporation_id,
             lot_id=consumption.lot_id,
             qty=consumption.qty,
             unit_proceeds=unit_proceeds,
+            unit_cost=landed_unit_cost(
+                lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
+            ),
+            cost_is_estimated=lot.cost_is_estimated,
             channel=channel,
             source=source,
             sold_at=sold_at,

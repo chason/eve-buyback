@@ -496,6 +496,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Profit
+         * @description The "How we're doing" view (#159): sales sold in [since, until) and the
+         *     expenses incurred in it, folded. Both bounds optional (open-ended).
+         */
+        get: operations["get_profit_api_v1_corporations_me_accounting_profit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/receivables": {
         parameters: {
             query?: never;
@@ -1082,6 +1103,24 @@ export interface components {
             /** Price Isk */
             price_isk: number;
         };
+        /**
+         * ChannelProfitOut
+         * @description One sales channel's slice of the period: market | contract | direct.
+         */
+        ChannelProfitOut: {
+            /** Channel */
+            channel: string;
+            /** Cost Of Goods */
+            cost_of_goods: string;
+            /** Margin */
+            margin: string;
+            /** Revenue */
+            revenue: string;
+            /** Sale Count */
+            sale_count: number;
+            /** Sales Tax */
+            sales_tax: string;
+        };
         /** ConfigOut */
         ConfigOut: {
             /**
@@ -1493,6 +1532,42 @@ export interface components {
             received_at: string;
             /** Sender Name */
             sender_name?: string | null;
+        };
+        /**
+         * ProfitOut
+         * @description The "How we're doing" period fold (#159). `margin` = revenue − tax − cost
+         *     of goods; `profit` subtracts the period's expenses on top. `measured_margin` +
+         *     `estimated_margin` == `margin` — deemed-cost results stay visibly apart.
+         */
+        ProfitOut: {
+            /** Channels */
+            channels: components["schemas"]["ChannelProfitOut"][];
+            /** Cost Of Goods */
+            cost_of_goods: string;
+            /** Estimated Margin */
+            estimated_margin: string;
+            /** Fees */
+            fees: string;
+            /** Margin */
+            margin: string;
+            /** Measured Margin */
+            measured_margin: string;
+            /** Other Expenses */
+            other_expenses: string;
+            /** Profit */
+            profit: string;
+            /** Revenue */
+            revenue: string;
+            /** Sale Count */
+            sale_count: number;
+            /** Sales Tax */
+            sales_tax: string;
+            /** Since */
+            since?: string | null;
+            /** Until */
+            until?: string | null;
+            /** Write Downs */
+            write_downs: string;
         };
         /** ReceivableClearRequest */
         ReceivableClearRequest: {
@@ -2740,6 +2815,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualSaleResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profit_api_v1_corporations_me_accounting_profit_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitOut"];
                 };
             };
             /** @description Validation Error */

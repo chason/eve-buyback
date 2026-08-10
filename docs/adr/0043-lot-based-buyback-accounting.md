@@ -91,3 +91,13 @@ constraint binds ADR-0043/0044/0045 alike.
 - **Store lot state as a status column** — a lot spans states (part listed, part idle); derive
   from allocations instead. Rejected.
 - **Float money** — precision loss on trillion-ISK sums; Decimal per ADR-0020. Rejected.
+
+## Amendment (#159): COGS is snapshotted at sale time
+
+Each `sales` row stores `unit_cost` (the consumed lot's landed cost **at sale time**) and a copy
+of `cost_is_estimated`. Deriving COGS from the lot at read time is wrong once a write-down
+intervenes: the write-down floors the lot **and** books its loss as an expense, so recomputing an
+*earlier* sale's COGS from the floored lot would retroactively inflate that sale's profit —
+double counting the same ISK. Realized profit is still **derived** (never stored) — but from the
+sale row's frozen facts, so past periods never shift. Units sold *after* a write-down snapshot
+the floored cost, as they should.

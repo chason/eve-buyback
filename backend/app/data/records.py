@@ -324,7 +324,9 @@ class BuybackHangarRecord(BaseModel):
 
 class SaleRecord(BaseModel):
     """One realized sale event against one lot (ADR-0043/0045). Realized profit is
-    derived (`domain/lots.realized_profit`), never stored."""
+    derived (`domain/lots.realized_profit`), never stored; `unit_cost` /
+    `cost_is_estimated` are the sale-time snapshot of the consumed lot's landed
+    cost (#159), so later write-downs never rewrite past profit."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -333,6 +335,8 @@ class SaleRecord(BaseModel):
     lot_id: uuid.UUID
     qty: int
     unit_proceeds: Decimal
+    unit_cost: Decimal
+    cost_is_estimated: bool
     sales_tax: Decimal
     channel: SaleChannel
     source: LotEntrySource
