@@ -66,7 +66,11 @@ allocated across the outputs pro-rata by market value at split-off.**
   2. **Hangar-assisted (with ADR-0044):** when reconciliation sees a shortfall of a
      reprocessable type and a materials excess **consistent with that type's yields**,
      it offers a one-click *"record a reprocess?"* suggestion in the "Needs a look"
-     list instead of flagging a loss and inventing deemed-cost material lots.
+     list instead of flagging a loss and inventing deemed-cost material lots. Matching
+     is **within a hangar**; stock moved to another hangar and reprocessed *there*
+     before a sync puts the shortfall and the yield-consistent excess at different
+     locations — pairing that composed case would be a cross-location extension of
+     this matching (noted as a limit in ADR-0049), not covered here.
 - **Schema hook lands with the base ledger.** The lots table carries `source_lot_id`
   (nullable self-FK) and the ledger includes a `lot_transformations` event table from
   the start (#150) — the columns are near-free now and avoid a migration + backfill
