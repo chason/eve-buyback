@@ -13,11 +13,15 @@ from app.application import corp_contracts as contracts_app
 from app.application import corp_esi_token as corp_esi_token_app
 from app.application.auth import AuthenticatedUser
 from app.data.db import SessionLocal
+from app.data.models import MarketPrice
 from app.data.repositories import appraisal_contracts as links_repo
 from app.data.repositories import appraisals as appraisals_repo
+from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import corp_esi_token as tokens_repo
 from app.data.repositories import corporations as corporations_repo
+from app.data.repositories import entitlements as entitlements_repo
 from app.data.repositories import lots as lots_repo
+from app.data.repositories import sales as sales_repo
 from app.domain.roles import Role
 from app.plugins.esi import (
     CharacterInfo,
@@ -113,6 +117,8 @@ def _contract(
     completed: datetime | None = None,
     expired: datetime | None = None,
     issued: datetime = ISSUED,
+    issuer_corporation_id: int | None = None,
+    for_corporation: bool = False,
 ) -> CorporationContract:
     return CorporationContract(
         contract_id=contract_id,
@@ -122,10 +128,32 @@ def _contract(
         price=price,
         start_location_id=location,
         issuer_id=CHAR_ID,
+        issuer_corporation_id=issuer_corporation_id,
+        for_corporation=for_corporation,
         acceptor_id=0,
         date_issued=issued,
         date_completed=completed,
         date_expired=expired,
+    )
+
+
+def _outgoing(
+    contract_id: int,
+    *,
+    price: Decimal,
+    status: str = "finished",
+    completed: datetime | None = None,
+) -> CorporationContract:
+    """A contract the corp itself issued on its own behalf — an outgoing sale
+    candidate (ADR-0045, #157)."""
+    return _contract(
+        contract_id,
+        title=None,
+        status=status,
+        price=price,
+        completed=completed or NOW - timedelta(minutes=5),
+        issuer_corporation_id=CORP_EVE_ID,
+        for_corporation=True,
     )
 
 
@@ -458,6 +486,159 @@ async def test_missing_completed_timestamp_falls_back_to_now():
 
     lots = await _lots(corp_uuid)
     assert [lot.acquired_at for lot in lots] == [NOW]
+
+
+# --- outgoing contract sales (ADR-0045, #157) ---
+
+
+async def _entitle_and_stock(
+    corp_uuid, *, qty=100, cost="3.60", type_id=34, prices=None
+):
+    """Give the corp the accounting entitlement, a lot at LOCATION, and (optionally)
+    cached prices at a Jita default hub for proceeds allocation."""
+    async with SessionLocal() as session:
+        await entitlements_repo.upsert(
+            session, corporation_id=corp_uuid, feature="accounting",
+            source="admin", expires_at=None,
+        )
+        await config_repo.upsert_config(
+            session, corporation_id=corp_uuid, market_hub_id="60003760",
+            default_basis="buy", default_percentage=90,
+            aggregate_field="percentile",
+        )
+        lot = await lots_repo.create_lot(
+            session, corporation_id=corp_uuid, item_type_id=type_id, qty=qty,
+            unit_purchase_cost=Decimal(cost), acquired_at=ISSUED,
+            source="buyback", location_id=LOCATION,
+        )
+        for tid, buy in (prices or {}).items():
+            b = Decimal(buy)
+            session.add(MarketPrice(
+                hub_id="60003760", type_id=tid,
+                buy_weighted_average=b, buy_max=b, buy_min=b, buy_median=b,
+                buy_percentile=b, buy_volume=Decimal(1000), buy_order_count=10,
+                sell_weighted_average=b, sell_max=b, sell_min=b, sell_median=b,
+                sell_percentile=b, sell_volume=Decimal(1000), sell_order_count=10,
+                fetched_at=NOW,
+            ))
+        await session.commit()
+        return lot
+
+
+async def _sales(corp_uuid):
+    async with SessionLocal() as session:
+        return await sales_repo.list_for_corp(session, corporation_id=corp_uuid)
+
+
+async def test_outgoing_finished_contract_records_a_fifo_sale():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    lot = await _entitle_and_stock(corp_uuid, qty=100, cost="3.60")
+    esi._contracts = [_outgoing(40, price=Decimal("500.00"))]
+    esi._items = {40: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+
+    rows = await _sales(corp_uuid)
+    assert [(r.lot_id, r.qty, r.unit_proceeds, r.channel, r.external_ref)
+            for r in rows] == [
+        (lot.id, 100, Decimal("5.00"), "contract", 40),
+    ]
+    async with SessionLocal() as session:
+        remaining = await lots_repo.open_lots(session, corporation_id=corp_uuid)
+    assert remaining == []  # the lot was consumed by the sale
+
+    # The watcher fires repeatedly; the contract records once.
+    await _run(esi)
+    assert len(await _sales(corp_uuid)) == 1
+
+
+async def test_outgoing_contract_allocates_price_across_items_by_value():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _entitle_and_stock(
+        corp_uuid, qty=100, cost="3.60", type_id=34,
+        prices={34: "4.00", 35: "8.00"},
+    )
+    async with SessionLocal() as session:
+        await lots_repo.create_lot(
+            session, corporation_id=corp_uuid, item_type_id=35, qty=50,
+            unit_purchase_cost=Decimal("7.20"), acquired_at=ISSUED,
+            source="buyback", location_id=LOCATION,
+        )
+        await session.commit()
+    # Trit value 100×4=400 vs Pye 50×8=400 → the 500 ISK price splits 250/250.
+    esi._contracts = [_outgoing(41, price=Decimal("500.00"))]
+    esi._items = {41: [
+        ContractItem(type_id=34, quantity=100),
+        ContractItem(type_id=35, quantity=50),
+    ]}
+
+    await _run(esi)
+
+    rows = await _sales(corp_uuid)
+    proceeds = {
+        r.lot_id: (r.qty, r.unit_proceeds) for r in rows
+    }
+    totals = {qty * unit for qty, unit in proceeds.values()}
+    assert totals == {Decimal("250.00")}
+    assert sum(qty * unit for qty, unit in proceeds.values()) == Decimal("500.00")
+
+
+async def test_outgoing_contract_needs_the_entitlement():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    # Stock but NO entitlement: the watcher still runs, records no sale.
+    async with SessionLocal() as session:
+        await lots_repo.create_lot(
+            session, corporation_id=corp_uuid, item_type_id=34, qty=100,
+            unit_purchase_cost=Decimal("3.60"), acquired_at=ISSUED,
+            source="buyback", location_id=LOCATION,
+        )
+        await session.commit()
+    esi._contracts = [_outgoing(42, price=Decimal("500.00"))]
+    esi._items = {42: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+
+    assert await _sales(corp_uuid) == []
+
+
+async def test_zero_price_outgoing_contract_is_not_a_sale():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _entitle_and_stock(corp_uuid)
+    # A giveaway / internal move: items left, no ISK — the hangar check's problem,
+    # not a revenue event.
+    esi._contracts = [_outgoing(43, price=Decimal(0))]
+    esi._items = {43: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+
+    assert await _sales(corp_uuid) == []
+
+
+async def test_incoming_buyback_contract_still_creates_lots_never_sales():
+    esi = ContractsEsi()
+    corp_uuid = await _connect(esi)
+    await _entitle_and_stock(corp_uuid, qty=1)  # entitled; tiny unrelated lot
+    await _make_appraisal("apprINBOUNDa")
+    # The member issued it TO the corp — issuer_corporation_id is NOT the corp.
+    esi._contracts = [
+        _contract(44, title="apprINBOUNDa", status="finished",
+                  completed=NOW - timedelta(minutes=5),
+                  issuer_corporation_id=98000999),
+    ]
+    esi._items = {44: [ContractItem(type_id=34, quantity=100)]}
+
+    await _run(esi)
+
+    assert await _status("apprINBOUNDa") == "completed"
+    rows = await _sales(corp_uuid)
+    assert rows == []  # buying is never selling
+    async with SessionLocal() as session:
+        lots = await lots_repo.open_lots(session, corporation_id=corp_uuid)
+    assert any(lot.appraisal_id is not None for lot in lots)  # the purchase landed
 
 
 # --- list / detail ordering ---

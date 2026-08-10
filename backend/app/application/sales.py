@@ -10,6 +10,7 @@ opt-in switch for the whole sell side (ADR-0045).
 import logging
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application import corp_esi_token as corp_esi_token_app
 from app.application import entitlements as entitlements_app
 from app.application import reconciliation as reconciliation_app
+from app.application import transformations as transformations_app
 from app.application.corporations import get_registered_corporation
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import expenses as expenses_repo
@@ -24,8 +26,9 @@ from app.data.repositories import lots as lots_repo
 from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sales as sales_repo
-from app.domain.lots import LotConsumption, OpenLot, plan_fifo
-from app.plugins.esi import CorpWalletTransaction, EsiClient
+from app.domain.lots import LotConsumption, OpenLot, SaleChannel, plan_fifo
+from app.domain.transformations import OutputLine, allocate_source_cost
+from app.plugins.esi import CorpMarketOrder, CorporationContract, EsiClient
 from app.plugins.sso import EveSsoClient
 from app.plugins.token_cipher import TokenCipher
 
@@ -34,6 +37,22 @@ log = logging.getLogger(__name__)
 # Journal ref types the ingestion books (ADR-0045).
 _TAX_REF = "transaction_tax"
 _BROKER_REFS = frozenset({"brokers_fee", "market_provider_tax"})
+
+
+def _order_row(order: CorpMarketOrder) -> dict:
+    """One live order as the snapshot repo stores it (location as a string, per
+    the ADR-0029 id convention)."""
+    return {
+        "order_id": order.order_id,
+        "type_id": order.type_id,
+        "is_buy_order": order.is_buy_order,
+        "price": order.price,
+        "volume_remain": order.volume_remain,
+        "volume_total": order.volume_total,
+        "location_id": str(order.location_id),
+        "wallet_division": order.wallet_division,
+        "issued": order.issued,
+    }
 
 
 class SalesIngestResult(BaseModel):
@@ -74,20 +93,7 @@ async def ingest_market_sales(
     await orders_repo.replace_for_corp(
         session,
         corporation_id=corp.id,
-        orders=[
-            {
-                "order_id": o.order_id,
-                "type_id": o.type_id,
-                "is_buy_order": o.is_buy_order,
-                "price": o.price,
-                "volume_remain": o.volume_remain,
-                "volume_total": o.volume_total,
-                "location_id": str(o.location_id),
-                "wallet_division": o.wallet_division,
-                "issued": o.issued,
-            }
-            for o in orders
-        ],
+        orders=[_order_row(o) for o in orders],
     )
     flagged = await _flag_off_division_orders(
         session, corporation_id=corp.id, division=division, now=now
@@ -105,7 +111,18 @@ async def ingest_market_sales(
     for tx in sorted(transactions, key=lambda t: (t.date, t.transaction_id)):
         if tx.is_buy or tx.transaction_id in seen:
             continue
-        unmatched = await _record_fill(session, corp.id, tx, now=now)
+        unmatched = await consume_and_record_sale(
+            session,
+            corp.id,
+            type_id=tx.type_id,
+            qty=tx.quantity,
+            unit_proceeds=tx.unit_price,
+            location_id=str(tx.location_id),
+            channel="market",
+            external_ref=tx.transaction_id,
+            sold_at=tx.date,
+            now=now,
+        )
         sales_recorded += 1
         if unmatched:
             flagged += 1
@@ -153,53 +170,58 @@ async def ingest_market_sales(
     )
 
 
-async def _record_fill(
+async def consume_and_record_sale(
     session: AsyncSession,
     corporation_id: uuid.UUID,
-    tx: CorpWalletTransaction,
     *,
+    type_id: int,
+    qty: int,
+    unit_proceeds: Decimal,
+    location_id: str,
+    channel: SaleChannel,
+    external_ref: int,
+    sold_at: datetime,
     now: datetime,
 ) -> bool:
-    """Turn one sell fill into FIFO-consuming sale rows (one per lot touched,
-    ADR-0043). Stock the books didn't have — the no-lot sale (ADR-0045) — books a
-    deemed-cost lot for the shortfall (`cost_is_estimated=TRUE`, so the estimate
-    propagates into realized profit), consumes it, and flags the event in the
-    reconciliation log. Returns True when that fallback fired."""
-    location_id = str(tx.location_id)
+    """Turn one detected disposal (a market fill or an outgoing contract's line)
+    into FIFO-consuming sale rows — one per lot touched (ADR-0043). Stock the books
+    didn't have — the no-lot sale (ADR-0045) — books a deemed-cost lot for the
+    shortfall (`cost_is_estimated=TRUE`, so the estimate propagates into realized
+    profit), consumes it, and flags the event in the reconciliation log. Returns
+    True when that fallback fired. Does not commit; callers own the UoW."""
     lots = await lots_repo.open_lots(
         session,
         corporation_id=corporation_id,
-        item_type_id=tx.type_id,
+        item_type_id=type_id,
         location_id=location_id,
     )
-    plan = plan_fifo(
-        [
+    open_lots: list[OpenLot] = []
+    for lot in lots:
+        open_lots.append(
             OpenLot(
                 lot_id=lot.id,
                 qty_remaining=lot.qty_remaining,
                 acquired_at=lot.acquired_at,
             )
-            for lot in lots
-        ],
-        tx.quantity,
-    )
+        )
+    plan = plan_fifo(open_lots, qty)
     consumptions = list(plan.consumptions)
     unmatched = plan.shortfall > 0
     if unmatched:
         # The same deemed-cost policy the hangar reconciliation uses (ADR-0044/0045).
         deemed = await reconciliation_app.deemed_unit_costs(
-            session, corporation_id, [tx.type_id]
+            session, corporation_id, [type_id]
         )
         # No market evidence either → the sale's own proceeds are the only cost
         # signal left; deem at proceeds (zero estimated profit, never invented gain).
-        unit_cost = deemed.get(tx.type_id, tx.unit_price)
+        unit_cost = deemed.get(type_id, unit_proceeds)
         shortfall_lot = await lots_repo.create_lot(
             session,
             corporation_id=corporation_id,
-            item_type_id=tx.type_id,
+            item_type_id=type_id,
             qty=plan.shortfall,
             unit_purchase_cost=unit_cost,
-            acquired_at=tx.date,
+            acquired_at=sold_at,
             source="opening_balance",
             cost_is_estimated=True,
             location_id=location_id,
@@ -212,7 +234,7 @@ async def _record_fill(
             session,
             corporation_id=corporation_id,
             location_id=location_id,
-            type_id=tx.type_id,
+            type_id=type_id,
             kind="unmatched_sale",
             qty=plan.shortfall,
             occurred_at=now,
@@ -229,11 +251,11 @@ async def _record_fill(
             corporation_id=corporation_id,
             lot_id=consumption.lot_id,
             qty=consumption.qty,
-            unit_proceeds=tx.unit_price,
-            channel="market",
+            unit_proceeds=unit_proceeds,
+            channel=channel,
             source="esi",
-            sold_at=tx.date,
-            external_ref=tx.transaction_id,
+            sold_at=sold_at,
+            external_ref=external_ref,
         )
     return unmatched
 
@@ -305,3 +327,93 @@ async def set_wallet_division(
     )
     await session.commit()
     return record.wallet_division if record else None
+
+
+def _is_outgoing_sale(
+    contract: CorporationContract, corporation_eve_id: int
+) -> bool:
+    """Whether a contract is an OUTGOING sale (ADR-0045, #157): the corp issued it
+    on its own behalf, it finished, and the buyer paid. Zero-price finished
+    contracts (giveaways / internal moves) deliberately don't qualify."""
+    return (
+        contract.issuer_corporation_id == corporation_eve_id
+        and contract.for_corporation
+        and contract.status in ("finished", "finished_issuer", "finished_contractor")
+        and contract.price > 0
+    )
+
+
+async def record_outgoing_contract_sales(
+    session: AsyncSession,
+    esi: EsiClient,
+    *,
+    corporation_uuid: uuid.UUID,
+    corporation_eve_id: int,
+    contracts: list[CorporationContract],
+    access_token: str,
+    now: datetime,
+) -> int:
+    """Record finished OUTGOING corp contracts as sales (ADR-0045, #157): contracts
+    the corp itself issued on its own behalf (`issuer_corporation_id` == the corp +
+    `for_corporation`), finished, with a price — the buyer paid `price` for the
+    included items. Incoming buyback contracts (member-issued) never match the
+    filter and are untouched.
+
+    The contract's single price spans its items, so proceeds are allocated across
+    the types pro-rata by market value at the corp's default hub (the ADR-0047
+    allocator — exact to the cent), then each type FIFO-consumes lots at the
+    contract's start location, with the shared no-lot fallback. Zero-price finished
+    contracts (giveaways / internal moves) are deliberately NOT sales — the hangar
+    check surfaces the departed stock for a human instead. `contract_id` is the
+    idempotency key. Gated by the entitlement (skips, not raises — this rides the
+    watcher, which serves unentitled corps too). Does not commit; the watcher owns
+    the UoW."""
+    if not await entitlements_app.corp_has_entitlement(
+        session, corporation_id=corporation_uuid, feature="accounting", now=now
+    ):
+        return 0
+    outgoing = [c for c in contracts if _is_outgoing_sale(c, corporation_eve_id)]
+    if not outgoing:
+        return 0
+    seen = await sales_repo.external_refs_for_channel(
+        session, corporation_id=corporation_uuid, channel="contract"
+    )
+    recorded = 0
+    for contract in outgoing:
+        if contract.contract_id in seen:
+            continue
+        items = await esi.get_corporation_contract_items(
+            corporation_eve_id, contract.contract_id, access_token
+        )
+        disposed: dict[int, int] = {}
+        for item in items:
+            if item.is_included:
+                disposed[item.type_id] = disposed.get(item.type_id, 0) + item.quantity
+        if not disposed:
+            continue  # an ISK-only contract disposes nothing
+        values = await transformations_app.split_off_values(
+            session, corporation_uuid, sorted(disposed)
+        )
+        lines: list[OutputLine] = []
+        for tid, qty in sorted(disposed.items()):
+            lines.append(
+                OutputLine(type_id=tid, quantity=qty, unit_value=values.get(tid))
+            )
+        allocated = allocate_source_cost(contract.price, lines)
+        sold_at = contract.date_completed or now
+        location_id = str(contract.start_location_id or "")
+        for out in allocated:
+            await consume_and_record_sale(
+                session,
+                corporation_uuid,
+                type_id=out.type_id,
+                qty=out.quantity,
+                unit_proceeds=out.unit_cost,  # the allocator's per-unit share
+                location_id=location_id,
+                channel="contract",
+                external_ref=contract.contract_id,
+                sold_at=sold_at,
+                now=now,
+            )
+        recorded += 1
+    return recorded

@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import corp_esi_token as corp_esi_token_app
 from app.application import lots as lots_app
+from app.application import sales as sales_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     CorpEsiTokenExpired,
@@ -125,13 +126,27 @@ async def refresh_contracts(
     lots_created = await lots_app.materialize_buyback_lots(
         session, corporation_id=corp.id, links=list(best.values()), now=now
     )
+    # And a finished OUTGOING corp contract is a sale (ADR-0045, #157): the corp
+    # issued it, the buyer paid, the items left. Entitlement-gated inside (the
+    # watcher serves unentitled corps too); idempotent on contract_id.
+    contract_sales = await sales_app.record_outgoing_contract_sales(
+        session,
+        esi,
+        corporation_uuid=corp.id,
+        corporation_eve_id=corporation_id,
+        contracts=contracts,
+        access_token=access_token,
+        now=now,
+    )
     await session.commit()
-    if best:
+    if best or contract_sales:
         log.info(
-            "contract sync for corp %s: %d appraisal(s) linked, %d lot(s) created",
+            "contract sync for corp %s: %d appraisal(s) linked, %d lot(s) created, "
+            "%d contract sale(s)",
             corporation_id,
             len(best),
             lots_created,
+            contract_sales,
         )
 
 
