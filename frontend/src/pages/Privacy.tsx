@@ -94,8 +94,10 @@ export default function Privacy() {
               to read a structure&apos;s market orders, search and resolve structures,
               read the corporation&apos;s member list, read the corporation&apos;s
               contracts, read the corporation&apos;s assets, read the
-              corporation&apos;s wallets, and read the corporation&apos;s market
-              orders.
+              corporation&apos;s wallets, read the corporation&apos;s market
+              orders, and read the corporation&apos;s wallet and hangar division
+              names (only to label them in the app — the names are shown, never
+              stored).
             </li>
             <li>
               The <strong>refresh token is encrypted at rest</strong> (Fernet) before it

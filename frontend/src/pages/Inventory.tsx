@@ -6,6 +6,7 @@ import {
   addHangar,
   clearReceivable,
   createReceivable,
+  getDivisionNames,
   getInventory,
   getReprocessPreview,
   getWalletDivision,
@@ -165,6 +166,20 @@ function StockView({ inv }: { inv: InventoryOut }) {
       />
     </>
   )
+}
+
+/** The corp's real division names (ADR-0048), as `division → name` lookups. Both
+ * pickers share the one query; when the corp token can't provide names (no grant,
+ * missing scope, not a Director) the maps stay empty and generic labels apply. */
+function useDivisionNames() {
+  const divisions = useQuery({
+    queryKey: ["divisionNames"],
+    queryFn: getDivisionNames,
+  })
+  return {
+    wallet: new Map(divisions.data?.wallet.map((d) => [d.division, d.name])),
+    hangar: new Map(divisions.data?.hangar.map((d) => [d.division, d.name])),
+  }
 }
 
 const EXPENSE_KINDS = [
@@ -454,6 +469,7 @@ function ReceivablesSection() {
  * sell side off. */
 function WalletSection() {
   const queryClient = useQueryClient()
+  const names = useDivisionNames()
   const division = useQuery({
     queryKey: ["walletDivision"],
     queryFn: getWalletDivision,
@@ -485,7 +501,7 @@ function WalletSection() {
           <option value="">Not set — sales aren&apos;t recorded</option>
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
             <option key={d} value={d}>
-              Wallet division {d}
+              {names.wallet.get(d) ?? `Wallet division ${d}`}
             </option>
           ))}
         </select>
@@ -751,6 +767,7 @@ function eventText(e: ReconciliationEventOut): string {
  * members deliver. The check itself (books vs hangar) rides a background sync. */
 function HangarsSection() {
   const queryClient = useQueryClient()
+  const names = useDivisionNames()
   const hangars = useQuery({ queryKey: ["hangars"], queryFn: listHangars })
   const locations = useQuery({ queryKey: ["locations"], queryFn: listLocations })
   const [locationId, setLocationId] = useState("")
@@ -779,7 +796,8 @@ function HangarsSection() {
         <ul className="hangar-list">
           {hangars.data.map((h) => (
             <li key={`${h.location_id}-${h.division}`}>
-              {h.location_name} — hangar {h.division}{" "}
+              {h.location_name} —{" "}
+              {names.hangar.get(h.division) ?? `hangar ${h.division}`}{" "}
               <button
                 type="button"
                 className="linkbtn"
@@ -819,7 +837,7 @@ function HangarsSection() {
           >
             {[1, 2, 3, 4, 5, 6, 7].map((d) => (
               <option key={d} value={d}>
-                Hangar {d}
+                {names.hangar.get(d) ?? `Hangar ${d}`}
               </option>
             ))}
           </select>

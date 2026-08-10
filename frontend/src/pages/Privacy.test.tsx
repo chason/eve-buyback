@@ -37,6 +37,10 @@ describe("Privacy", () => {
     expect(screen.getAllByText(/encrypted at rest/i)).toHaveLength(2)
     // Current ADR-0036: one token per corp, not a transient step-up.
     expect(screen.getByText(/one token per corporation/i)).toBeInTheDocument()
+    // Division names (ADR-0048): read to label the Stock page pickers, never stored.
+    expect(
+      screen.getByText(/wallet and hangar division names/i),
+    ).toBeInTheDocument()
     // The roster snapshot caches only names + ids.
     expect(screen.getByText(/character names and ids only/i)).toBeInTheDocument()
     // Contract tracking (ADR-0037): corp item-exchange contracts only, and only the

@@ -273,6 +273,54 @@ describe("Config", () => {
     expect(option.disabled).toBe(true)
   })
 
+  it("hints to reconnect when the grant predates the divisions scope (ADR-0048)", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
+      authorized: true,
+      character_name: "Capsuleer",
+      expired: false,
+      // Everything but the divisions scope — only that hint should show.
+      scopes:
+        "esi-contracts.read_corporation_contracts.v1 " +
+        "esi-assets.read_corporation_assets.v1 " +
+        "esi-wallet.read_corporation_wallets.v1 " +
+        "esi-markets.read_corporation_orders.v1",
+    })
+
+    renderConfig()
+
+    expect(
+      await screen.findByText(/Reconnect to enable division names/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/Reconnect to enable contract tracking/),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows no reconnect hints when the grant carries every scope", async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
+    vi.mocked(pricingApi.getConfig).mockResolvedValue(config)
+    vi.mocked(structuresApi.getStructureStatus).mockResolvedValue({
+      configured: true,
+      authorized: true,
+      character_name: "Capsuleer",
+      expired: false,
+      scopes:
+        "esi-contracts.read_corporation_contracts.v1 " +
+        "esi-assets.read_corporation_assets.v1 " +
+        "esi-wallet.read_corporation_wallets.v1 " +
+        "esi-markets.read_corporation_orders.v1 " +
+        "esi-corporations.read_divisions.v1",
+    })
+
+    renderConfig()
+
+    expect(await screen.findByText(/Connected as/)).toBeInTheDocument()
+    expect(screen.queryByText(/Reconnect to enable/)).not.toBeInTheDocument()
+  })
+
   it("warns when re-auth switched to a different character", async () => {
     vi.mocked(authApi.getMe).mockResolvedValue(user("manager"))
     vi.mocked(pricingApi.getConfig).mockResolvedValue(config)

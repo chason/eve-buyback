@@ -144,6 +144,17 @@ class CorpMarketOrder(BaseModel):
     state: str | None = None  # set on history entries (e.g. cancelled/expired)
 
 
+class CorporationDivisions(BaseModel):
+    """The corp's custom division names from `/corporations/{id}/divisions/`
+    (ADR-0048): division number → name, for wallets and hangars separately. Only
+    divisions the corp has actually named appear — ESI omits `name` for the rest
+    (including the unrenamable master wallet), and the UI falls back to generic
+    labels. Empty when the token can't read them."""
+
+    wallet: dict[int, str] = {}
+    hangar: dict[int, str] = {}
+
+
 class CorporationAsset(BaseModel):
     """One corp asset row from `/corporations/{id}/assets/` (ADR-0044). Only the fields
     the hangar reconciliation needs: `location_flag` is the hangar division
@@ -375,6 +386,25 @@ class EsiClient:
             page += 1
         return assets
 
+    async def get_corporation_divisions(
+        self, corporation_id: int, access_token: str
+    ) -> CorporationDivisions:
+        """The corp's wallet/hangar division names (ADR-0048). Needs the divisions
+        scope + the Director role in game; 401/403 degrades to empty maps — the
+        labels are cosmetic, so the UI falls back rather than erroring."""
+        resp = await self._client.get(
+            f"{ESI_BASE}/corporations/{corporation_id}/divisions/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if scope_missing(resp):
+            return CorporationDivisions()
+        resp.raise_for_status()
+        data = resp.json()
+        return CorporationDivisions(
+            wallet=_named_divisions(data.get("wallet", [])),
+            hangar=_named_divisions(data.get("hangar", [])),
+        )
+
     async def get_corporation_contract_items(
         self, corporation_id: int, contract_id: int, access_token: str
     ) -> list[ContractItem]:
@@ -413,6 +443,12 @@ class EsiClient:
         if scope_missing(resp):
             raise OpenWindowForbidden()
         resp.raise_for_status()
+
+
+def _named_divisions(entries: list[dict]) -> dict[int, str]:
+    """`division` → `name` for the entries that carry a name (ESI omits it for
+    divisions left at their in-game default)."""
+    return {e["division"]: e["name"] for e in entries if e.get("name")}
 
 
 def get_esi_client(request: Request) -> EsiClient:

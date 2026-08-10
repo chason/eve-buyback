@@ -8,6 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from app.application import divisions as divisions_app
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
 from app.application import manual_entries as manual_app
@@ -23,6 +24,8 @@ from app.plugins.esi import EsiClient, get_esi_client
 from app.plugins.sso import EveSsoClient, get_sso_client
 from app.plugins.token_cipher import TokenCipher, get_token_cipher
 from app.schemas.accounting import (
+    DivisionNameOut,
+    DivisionNamesOut,
     HangarCheckResult,
     HangarCreateRequest,
     HangarOut,
@@ -117,6 +120,30 @@ async def remove_hangar(
         location_id=location_id,
         division=division,
     )
+
+
+@router.get("/divisions", response_model=DivisionNamesOut)
+async def get_division_names(
+    user: ManagerUser,
+    session: SessionDep,
+    sso: SsoDep,
+    esi: EsiDep,
+    cipher: CipherDep,
+) -> DivisionNamesOut:
+    """The corp's real division names for the wallet/hangar pickers (ADR-0048).
+    Best-effort: empty lists when the corp token can't read them — the frontend
+    falls back to generic labels."""
+    names = await divisions_app.get_division_names(
+        session, sso, esi, corporation_eve_id=user.corporation_id, cipher=cipher
+    )
+    return DivisionNamesOut(
+        wallet=_division_names_out(names.wallet),
+        hangar=_division_names_out(names.hangar),
+    )
+
+
+def _division_names_out(names: dict[int, str]) -> list[DivisionNameOut]:
+    return [DivisionNameOut(division=d, name=n) for d, n in sorted(names.items())]
 
 
 @router.get("/wallet-division", response_model=WalletDivisionOut)

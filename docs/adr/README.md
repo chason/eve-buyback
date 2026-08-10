@@ -57,5 +57,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0045](0045-esi-sales-ingestion-and-manual-entry.md) | ESI outgoing-sales ingestion + manual-entry escape hatch | Proposed |
 | [0046](0046-playwright-e2e-smoke.md) | E2E smoke tests: Playwright against the single deployable (minted sessions, `buyback_e2e` DB) | Proposed |
 | [0047](0047-lot-transformations-reprocessing.md) | Lot transformations: reprocessing flows cost into child lots (joint-cost allocation) | Proposed |
+| [0048](0048-corp-division-names.md) | Real corp division names on the Stock page (divisions scope on the corp token) | Accepted |
 
 See the project [architecture overview](../architecture.md) for how these fit together.

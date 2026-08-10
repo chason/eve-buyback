@@ -197,6 +197,10 @@ class Settings(BaseSettings):
     # Accountant (or Junior Accountant) role in game; earlier grants must reconnect.
     eve_corp_wallet_scopes: str = "esi-wallet.read_corporation_wallets.v1"
     eve_corp_orders_scopes: str = "esi-markets.read_corporation_orders.v1"
+    # Corp-divisions scope, folded into the Corp ESI access grant (ADR-0048) so the
+    # Stock page can label wallet/hangar pickers with the corp's real division names.
+    # Needs the Director role in game; earlier grants must reconnect to gain it.
+    eve_corp_divisions_scopes: str = "esi-corporations.read_divisions.v1"
     # Scopes for the OPERATOR wallet grant (ADR-0042): reading the operator's own
     # character wallet journal to reconcile incoming ISK access payments. This token
     # belongs to the instance operator, never to a tenant corp.
@@ -205,14 +209,16 @@ class Settings(BaseSettings):
     @property
     def eve_corp_token_scopes(self) -> str:
         """The full scope set for the one persisted Corp ESI access token (ADR-0036,
-        0037, 0044, 0045): structure-market access + corp-membership + corp-contracts
-        + corp-assets + corp-wallet + corp-orders, requested in a single grant.
-        Deduped, order-preserving (the sets share `publicData`)."""
+        0037, 0044, 0045, 0048): structure-market access + corp-membership +
+        corp-contracts + corp-assets + corp-wallet + corp-orders + corp-divisions,
+        requested in a single grant. Deduped, order-preserving (the sets share
+        `publicData`)."""
         seen: dict[str, None] = {}
         combined = (
             f"{self.eve_structure_scopes} {self.eve_roster_scopes} "
             f"{self.eve_contracts_scopes} {self.eve_assets_scopes} "
-            f"{self.eve_corp_wallet_scopes} {self.eve_corp_orders_scopes}"
+            f"{self.eve_corp_wallet_scopes} {self.eve_corp_orders_scopes} "
+            f"{self.eve_corp_divisions_scopes}"
         )
         for scope in combined.split():
             seen.setdefault(scope, None)

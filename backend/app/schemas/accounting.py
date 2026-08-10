@@ -54,6 +54,21 @@ class HangarCreateRequest(BaseModel):
     division: int = Field(ge=1, le=7)
 
 
+class DivisionNameOut(BaseModel):
+    division: int
+    name: str
+
+
+class DivisionNamesOut(BaseModel):
+    """The corp's named wallet/hangar divisions (ADR-0048), for the Stock page's
+    pickers. Only named divisions appear — the frontend falls back to generic
+    labels for the rest, and both lists are empty when the corp token can't read
+    them (no grant, a pre-ADR-0048 grant, or a non-Director character)."""
+
+    wallet: list[DivisionNameOut]
+    hangar: list[DivisionNameOut]
+
+
 class WalletDivisionOut(BaseModel):
     """The corp wallet division buyback sales pay into (ADR-0045). None = sell-side
     ingestion off."""

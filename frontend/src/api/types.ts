@@ -48,6 +48,8 @@ export type InventoryLotOut = Schemas["InventoryLotOut"]
 // Buyback-hangar config for the hangar check (ADR-0044, #154).
 export type HangarOut = Schemas["HangarOut"]
 export type HangarCreateRequest = Schemas["HangarCreateRequest"]
+// Real corp division names for the wallet/hangar pickers (ADR-0048).
+export type DivisionNamesOut = Schemas["DivisionNamesOut"]
 // Hangar reconciliation (ADR-0044, #155): the "Needs a look" log + manual check.
 export type ReconciliationEventOut = Schemas["ReconciliationEventOut"]
 export type HangarCheckResult = Schemas["HangarCheckResult"]
