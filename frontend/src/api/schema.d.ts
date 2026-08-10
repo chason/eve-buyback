@@ -445,6 +445,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/manual/expense": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Manual Expense */
+        post: operations["record_manual_expense_api_v1_corporations_me_accounting_manual_expense_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/manual/lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Manual Lot */
+        post: operations["record_manual_lot_api_v1_corporations_me_accounting_manual_lot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/manual/sale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Manual Sale */
+        post: operations["record_manual_sale_api_v1_corporations_me_accounting_manual_sale_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Receivables */
+        get: operations["list_receivables_api_v1_corporations_me_accounting_receivables_get"];
+        put?: never;
+        /** Create Receivable */
+        post: operations["create_receivable_api_v1_corporations_me_accounting_receivables_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/receivables/{receivable_id}/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear Receivable */
+        post: operations["clear_receivable_api_v1_corporations_me_accounting_receivables__receivable_id__clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/reconciliation": {
         parameters: {
             query?: never;
@@ -1183,6 +1269,8 @@ export interface components {
             id: string;
             /** Qty */
             qty: number;
+            /** Source */
+            source: string;
             /** Stale */
             stale: boolean;
             /** Total Cost */
@@ -1276,6 +1364,69 @@ export interface components {
             /** Granted By Character Id */
             granted_by_character_id: number;
         };
+        /**
+         * ManualExpenseRequest
+         * @description A cost ESI didn't book. A NEGATIVE amount is a correction — a reversing
+         *     entry whose note says what it offsets (never an edit or delete).
+         */
+        ManualExpenseRequest: {
+            /** Amount */
+            amount: number | string;
+            /** Incurred At */
+            incurred_at?: string | null;
+            /** Kind */
+            kind: string;
+            /** Note */
+            note: string;
+        };
+        /**
+         * ManualLotRequest
+         * @description Off-app stock with a known (or best-guess) cost. `cost_is_estimated` is the
+         *     manager's honesty switch: False = the price is known, True = a guess.
+         */
+        ManualLotRequest: {
+            /** Acquired At */
+            acquired_at?: string | null;
+            /**
+             * Cost Is Estimated
+             * @default false
+             */
+            cost_is_estimated: boolean;
+            /** Location Id */
+            location_id: string;
+            /** Note */
+            note: string;
+            /** Qty */
+            qty: number;
+            /** Type Id */
+            type_id: number;
+            /** Unit Cost */
+            unit_cost: number | string;
+        };
+        /**
+         * ManualSaleRequest
+         * @description An off-game sale a manager records by hand (ADR-0045, #158). The note is
+         *     required — provenance without a why is half a record.
+         */
+        ManualSaleRequest: {
+            /** Location Id */
+            location_id: string;
+            /** Note */
+            note: string;
+            /** Qty */
+            qty: number;
+            /** Sold At */
+            sold_at?: string | null;
+            /** Type Id */
+            type_id: number;
+            /** Unit Proceeds */
+            unit_proceeds: number | string;
+        };
+        /** ManualSaleResult */
+        ManualSaleResult: {
+            /** Stock Was Missing */
+            stock_was_missing: boolean;
+        };
         /** MarketGroupOut */
         MarketGroupOut: {
             /** Market Group Id */
@@ -1342,6 +1493,39 @@ export interface components {
             received_at: string;
             /** Sender Name */
             sender_name?: string | null;
+        };
+        /** ReceivableClearRequest */
+        ReceivableClearRequest: {
+            /** Note */
+            note?: string | null;
+        };
+        /** ReceivableCreateRequest */
+        ReceivableCreateRequest: {
+            /** Amount */
+            amount: number | string;
+            /** Note */
+            note: string;
+        };
+        /** ReceivableOut */
+        ReceivableOut: {
+            /** Amount */
+            amount: string;
+            /** Cleared At */
+            cleared_at?: string | null;
+            /** Cleared Note */
+            cleared_note?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Incurred At
+             * Format: date-time
+             */
+            incurred_at: string;
+            /** Note */
+            note: string;
         };
         /**
          * ReconciliationEventOut
@@ -2457,6 +2641,193 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReprocessPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_manual_expense_api_v1_corporations_me_accounting_manual_expense_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualExpenseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_manual_lot_api_v1_corporations_me_accounting_manual_lot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualLotRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_manual_sale_api_v1_corporations_me_accounting_manual_sale_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualSaleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualSaleResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_receivables_api_v1_corporations_me_accounting_receivables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableOut"][];
+                };
+            };
+        };
+    };
+    create_receivable_api_v1_corporations_me_accounting_receivables_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceivableCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_receivable_api_v1_corporations_me_accounting_receivables__receivable_id__clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receivable_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceivableClearRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableOut"];
                 };
             };
             /** @description Validation Error */

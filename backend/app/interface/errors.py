@@ -39,6 +39,7 @@ from app.application.errors import (
     PaymentTooSmall,
     PricingRuleNotFound,
     PricingRuleTargetInvalid,
+    ReceivableNotFound,
     ReprocessQtyUnavailable,
     RosterAccessDenied,
     RosterRefreshTooSoon,
@@ -88,6 +89,7 @@ _STATUS: dict[type[ApplicationError], int] = {
     PaymentTooSmall: 422,
     LotNotFound: 404,
     ReprocessQtyUnavailable: 422,
+    ReceivableNotFound: 404,
 }
 
 

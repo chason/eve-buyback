@@ -4,11 +4,17 @@ import { Link } from "react-router-dom"
 
 import {
   addHangar,
+  clearReceivable,
+  createReceivable,
   getInventory,
   getReprocessPreview,
   getWalletDivision,
   listHangars,
+  listReceivables,
   listReconciliationEvents,
+  recordManualExpense,
+  recordManualLot,
+  recordManualSale,
   recordReprocess,
   removeHangar,
   runHangarCheck,
@@ -20,6 +26,7 @@ import type {
   ReconciliationEventOut,
 } from "../api/accounting"
 import { listLocations } from "../api/locations"
+import { searchTypes } from "../api/sde"
 import AccountingAccessPanel from "../components/AccountingAccessPanel"
 import { StatusChip } from "../components/StatusChip"
 import { formatIsk, formatIskCompact } from "../lib/format"
@@ -50,10 +57,22 @@ export default function Inventory() {
   return <StockView inv={result.data.inventory} />
 }
 
+/** What the "Record by hand" form opens pre-filled with (#158) — e.g. resolving a
+ * hangar-check shortfall as the off-app sale it probably was. */
+type ManualPrefill = {
+  type_id: number
+  type_name: string | null
+  qty: number
+  location_id: string
+}
+
 function StockView({ inv }: { inv: InventoryOut }) {
   // The reprocess record dialog (#177), opened from a buy row or a hangar-check
   // suggestion; one at a time, keyed by the source lot.
   const [reprocessLotId, setReprocessLotId] = useState<string | null>(null)
+  // The manual-entry form's prefill (#158); bumping the key remounts the form.
+  const [manualPrefill, setManualPrefill] = useState<ManualPrefill | null>(null)
+  const [manualKey, setManualKey] = useState(0)
   // Valuation cards only make sense once something is priced (#153).
   const anythingPriced = inv.items.length > inv.unpriced_types
   // A suggestion targets a TYPE; the oldest buy of it is the FIFO-correct source.
@@ -125,6 +144,8 @@ function StockView({ inv }: { inv: InventoryOut }) {
         />
       )}
 
+      <ManualEntrySection key={manualKey} prefill={manualPrefill} />
+      <ReceivablesSection />
       <HangarsSection />
       <WalletSection />
       <ReconciliationSection
@@ -132,8 +153,299 @@ function StockView({ inv }: { inv: InventoryOut }) {
           const lotId = oldestLotOf(typeId)
           if (lotId) setReprocessLotId(lotId)
         }}
+        onRecordSale={(e) => {
+          setManualPrefill({
+            type_id: e.type_id,
+            type_name: e.type_name ?? null,
+            qty: e.qty,
+            location_id: e.location_id,
+          })
+          setManualKey((k) => k + 1)
+        }}
       />
     </>
+  )
+}
+
+const EXPENSE_KINDS = [
+  ["hauling", "Hauling"],
+  ["broker_fee", "Broker fee"],
+  ["relist_fee", "Relist fee"],
+  ["other", "Something else"],
+] as const
+
+/** The manual-entry escape hatch (ADR-0045, #158): off-game sales, stock bought
+ * outside the app, expenses, and ISK owed to the buyback — everything ESI can't
+ * see, entered by hand into the same books with a required note. */
+function ManualEntrySection({ prefill }: { prefill: ManualPrefill | null }) {
+  const queryClient = useQueryClient()
+  const locations = useQuery({ queryKey: ["locations"], queryFn: listLocations })
+  const [kind, setKind] = useState<"sale" | "lot" | "expense" | "receivable">(
+    "sale",
+  )
+  const [typeQuery, setTypeQuery] = useState("")
+  const [picked, setPicked] = useState<{ id: number; name: string } | null>(
+    prefill ? { id: prefill.type_id, name: prefill.type_name ?? "" } : null,
+  )
+  const [qty, setQty] = useState(prefill?.qty ?? 0)
+  const [isk, setIsk] = useState("")  // unit proceeds / unit cost / amount
+  const [locationId, setLocationId] = useState(prefill?.location_id ?? "")
+  const [estimated, setEstimated] = useState(false)
+  const [expenseKind, setExpenseKind] = useState<string>("hauling")
+  const [note, setNote] = useState("")
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const search = useQuery({
+    queryKey: ["typeSearch", typeQuery],
+    queryFn: () => searchTypes(typeQuery),
+    enabled: typeQuery.length >= 2,
+  })
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (kind === "sale") {
+        return recordManualSale({
+          type_id: picked!.id, qty, unit_proceeds: isk,
+          location_id: locationId, note,
+        })
+      }
+      if (kind === "lot") {
+        await recordManualLot({
+          type_id: picked!.id, qty, unit_cost: isk, location_id: locationId,
+          note, cost_is_estimated: estimated,
+        })
+        return null
+      }
+      if (kind === "expense") {
+        await recordManualExpense({ kind: expenseKind, amount: isk, note })
+        return null
+      }
+      await createReceivable(isk, note)
+      return null
+    },
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["inventory"] })
+      void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+      void queryClient.invalidateQueries({ queryKey: ["receivables"] })
+      setNote("")
+      setIsk("")
+      submit.reset()
+      if (result && result.stock_was_missing) {
+        setFeedback(
+          "Recorded — heads up: the books didn't have that stock, so it was " +
+            "added at estimated value and flagged in Hangar checks.",
+        )
+      } else {
+        setFeedback("Recorded.")
+      }
+    },
+  })
+
+  const needsItem = kind === "sale" || kind === "lot"
+  const ready =
+    note.trim().length >= 3 &&
+    isk !== "" &&
+    (!needsItem || (picked && qty > 0 && locationId))
+
+  return (
+    <section className="panel">
+      <h2>Record by hand</h2>
+      <p>
+        <small className="field-hint">
+          For anything the app can&apos;t see on its own: deals made outside the
+          game&apos;s market, stock bought off-app, costs, or ISK someone still
+          owes the buyback. A short note is required — future-you will thank you.
+        </small>
+      </p>
+      <div className="access-actions">
+        <select
+          aria-label="What to record"
+          value={kind}
+          onChange={(e) => {
+            setKind(e.target.value as typeof kind)
+            setFeedback(null)
+          }}
+        >
+          <option value="sale">A sale outside the market</option>
+          <option value="lot">Stock we bought off-app</option>
+          <option value="expense">An expense</option>
+          <option value="receivable">ISK owed to us</option>
+        </select>
+      </div>
+      {needsItem && (
+        <div className="access-actions">
+          {picked ? (
+            <span>
+              {picked.name || `Type ${picked.id}`}{" "}
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => setPicked(null)}
+              >
+                Change item
+              </button>
+            </span>
+          ) : (
+            <label>
+              Item
+              <input
+                type="search"
+                placeholder="Search items…"
+                value={typeQuery}
+                onChange={(e) => setTypeQuery(e.target.value)}
+              />
+              {(search.data ?? []).length > 0 && (
+                <ul className="search-results">
+                  {(search.data ?? []).slice(0, 8).map((t) => (
+                    <li key={t.type_id}>
+                      <button
+                        type="button"
+                        className="linkbtn"
+                        onClick={() => {
+                          setPicked({ id: t.type_id, name: t.name })
+                          setTypeQuery("")
+                        }}
+                      >
+                        {t.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </label>
+          )}
+          <label>
+            How many
+            <input
+              type="number"
+              min={1}
+              value={qty || ""}
+              onChange={(e) => setQty(Number(e.target.value))}
+            />
+          </label>
+          <select
+            aria-label="Where"
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+          >
+            <option value="">Where…</option>
+            {(locations.data ?? []).map((l) => (
+              <option key={l.location_id} value={l.location_id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="access-actions">
+        {kind === "expense" && (
+          <select
+            aria-label="Expense kind"
+            value={expenseKind}
+            onChange={(e) => setExpenseKind(e.target.value)}
+          >
+            {EXPENSE_KINDS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        )}
+        <label>
+          {kind === "sale"
+            ? "ISK per unit"
+            : kind === "lot"
+              ? "What we paid per unit"
+              : "ISK"}
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={isk}
+            onChange={(e) => setIsk(e.target.value)}
+          />
+        </label>
+        {kind === "lot" && (
+          <label>
+            <input
+              type="checkbox"
+              checked={estimated}
+              onChange={(e) => setEstimated(e.target.checked)}
+            />
+            The price is a guess
+          </label>
+        )}
+      </div>
+      <div className="access-actions">
+        <label className="manual-note">
+          Note
+          <input
+            type="text"
+            placeholder="What happened? (required)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!ready || submit.isPending}
+          onClick={() => submit.mutate()}
+        >
+          {submit.isPending ? "Adding…" : "Add to the books"}
+        </button>
+      </div>
+      {feedback && (
+        <p>
+          <small className="field-hint" role="status">
+            {feedback}
+          </small>
+        </p>
+      )}
+      {submit.isError && (
+        <p>
+          <small className="error">{(submit.error as Error).message}</small>
+        </p>
+      )}
+    </section>
+  )
+}
+
+/** ISK owed to the buyback (ADR-0045, #158): wrong-wallet payments held as an
+ * honest asset until the ISK actually moves. Rendered only when any exist. */
+function ReceivablesSection() {
+  const queryClient = useQueryClient()
+  const receivables = useQuery({
+    queryKey: ["receivables"],
+    queryFn: listReceivables,
+  })
+  const clear = useMutation({
+    mutationFn: (id: string) => clearReceivable(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["receivables"] }),
+  })
+  const open = (receivables.data ?? []).filter((r) => r.cleared_at === null)
+  if (open.length === 0) return null
+
+  return (
+    <section className="panel">
+      <h2>ISK owed to us</h2>
+      <ul className="recon-list">
+        {open.map((r) => (
+          <li key={r.id}>
+            <small>
+              <strong className="isk">{formatIsk(r.amount)}</strong> — {r.note}{" "}
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => clear.mutate(r.id)}
+              >
+                Mark paid
+              </button>
+            </small>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -308,8 +620,10 @@ function ReprocessPanel({
  * reprocess suggestion (#177) carries a "Record it" button into the form. */
 function ReconciliationSection({
   onRecordReprocess,
+  onRecordSale,
 }: {
   onRecordReprocess: (typeId: number) => void
+  onRecordSale: (event: ReconciliationEventOut) => void
 }) {
   const queryClient = useQueryClient()
   const events = useQuery({
@@ -367,6 +681,18 @@ function ReconciliationSection({
                       onClick={() => onRecordReprocess(e.type_id)}
                     >
                       Record it
+                    </button>
+                  </>
+                )}
+                {e.kind === "shortfall" && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => onRecordSale(e)}
+                    >
+                      Record the sale
                     </button>
                   </>
                 )}
@@ -604,6 +930,18 @@ function ItemRows({
                 {new Date(lot.acquired_at).toLocaleDateString(undefined, {
                   timeZone: "UTC",
                 })}
+                {lot.source === "manual" && (
+                  <>
+                    {" "}
+                    <StatusChip variant="muted">Entered by hand</StatusChip>
+                  </>
+                )}
+                {lot.source === "reprocess" && (
+                  <>
+                    {" "}
+                    <StatusChip variant="muted">From reprocessing</StatusChip>
+                  </>
+                )}
               </small>
             </td>
             <td className="num">

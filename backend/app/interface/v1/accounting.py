@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
+from app.application import manual_entries as manual_app
 from app.application import reconciliation as reconciliation_app
 from app.application import sales as sales_app
 from app.application import transformations as transformations_app
@@ -24,6 +25,13 @@ from app.schemas.accounting import (
     HangarCreateRequest,
     HangarOut,
     InventoryOut,
+    ManualExpenseRequest,
+    ManualLotRequest,
+    ManualSaleRequest,
+    ManualSaleResult,
+    ReceivableClearRequest,
+    ReceivableCreateRequest,
+    ReceivableOut,
     ReconciliationEventOut,
     ReprocessOutputOut,
     ReprocessPreviewOut,
@@ -179,6 +187,100 @@ async def record_reprocess(
             for c in children
         ]
     )
+
+
+@router.post("/manual/sale", response_model=ManualSaleResult)
+async def record_manual_sale(
+    payload: ManualSaleRequest, user: ManagerUser, session: SessionDep
+) -> ManualSaleResult:
+    missing = await manual_app.record_manual_sale(
+        session,
+        corporation_eve_id=user.corporation_id,
+        type_id=payload.type_id,
+        qty=payload.qty,
+        unit_proceeds=payload.unit_proceeds,
+        location_id=payload.location_id,
+        note=payload.note,
+        entered_by_character_id=user.character_id,
+        sold_at=payload.sold_at,
+    )
+    return ManualSaleResult(stock_was_missing=missing)
+
+
+@router.post("/manual/lot", status_code=status.HTTP_201_CREATED)
+async def record_manual_lot(
+    payload: ManualLotRequest, user: ManagerUser, session: SessionDep
+) -> None:
+    await manual_app.record_manual_lot(
+        session,
+        corporation_eve_id=user.corporation_id,
+        type_id=payload.type_id,
+        qty=payload.qty,
+        unit_cost=payload.unit_cost,
+        location_id=payload.location_id,
+        note=payload.note,
+        entered_by_character_id=user.character_id,
+        cost_is_estimated=payload.cost_is_estimated,
+        acquired_at=payload.acquired_at,
+    )
+
+
+@router.post("/manual/expense", status_code=status.HTTP_201_CREATED)
+async def record_manual_expense(
+    payload: ManualExpenseRequest, user: ManagerUser, session: SessionDep
+) -> None:
+    await manual_app.record_manual_expense(
+        session,
+        corporation_eve_id=user.corporation_id,
+        kind=payload.kind,
+        amount=payload.amount,
+        note=payload.note,
+        entered_by_character_id=user.character_id,
+        incurred_at=payload.incurred_at,
+    )
+
+
+@router.get("/receivables", response_model=list[ReceivableOut])
+async def list_receivables(
+    user: ManagerUser, session: SessionDep
+) -> list[ReceivableOut]:
+    records = await manual_app.list_receivables(
+        session, corporation_eve_id=user.corporation_id
+    )
+    return [ReceivableOut.model_validate(r.model_dump()) for r in records]
+
+
+@router.post(
+    "/receivables", response_model=ReceivableOut, status_code=status.HTTP_201_CREATED
+)
+async def create_receivable(
+    payload: ReceivableCreateRequest, user: ManagerUser, session: SessionDep
+) -> ReceivableOut:
+    record = await manual_app.create_receivable(
+        session,
+        corporation_eve_id=user.corporation_id,
+        amount=payload.amount,
+        note=payload.note,
+        entered_by_character_id=user.character_id,
+    )
+    return ReceivableOut.model_validate(record.model_dump())
+
+
+@router.post("/receivables/{receivable_id}/clear", response_model=ReceivableOut)
+async def clear_receivable(
+    receivable_id: uuid.UUID,
+    payload: ReceivableClearRequest,
+    user: ManagerUser,
+    session: SessionDep,
+) -> ReceivableOut:
+    record = await manual_app.clear_receivable(
+        session,
+        corporation_eve_id=user.corporation_id,
+        receivable_id=receivable_id,
+        cleared_by_character_id=user.character_id,
+        cleared_note=payload.note,
+    )
+    return ReceivableOut.model_validate(record.model_dump())
 
 
 @router.post("/hangar-check", response_model=HangarCheckResult)

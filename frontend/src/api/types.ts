@@ -54,6 +54,11 @@ export type HangarCheckResult = Schemas["HangarCheckResult"]
 // Reprocess transformations (ADR-0047, #177).
 export type ReprocessPreviewOut = Schemas["ReprocessPreviewOut"]
 export type ReprocessResultOut = Schemas["ReprocessResultOut"]
+// Manual entries + receivables (ADR-0045, #158).
+export type ManualSaleRequest = Schemas["ManualSaleRequest"]
+export type ManualLotRequest = Schemas["ManualLotRequest"]
+export type ManualExpenseRequest = Schemas["ManualExpenseRequest"]
+export type ReceivableOut = Schemas["ReceivableOut"]
 
 // Used by the M6b rule editor / config view.
 export type ConfigOut = Schemas["ConfigOut"]
