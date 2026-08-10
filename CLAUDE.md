@@ -12,7 +12,9 @@ directories are created as features land. Update this section as things become r
 
 **The plan lives in [`docs/architecture.md`](docs/architecture.md); decisions and
 their rationale are in [`docs/adr/`](docs/adr/). Read those before making
-architectural changes.**
+architectural changes. The coding rules distilled from both are in
+[`docs/conventions.md`](docs/conventions.md) — the quick reference for how code
+here is written.**
 
 ## What this is
 
@@ -60,7 +62,7 @@ buyback/
 ├── e2e/                  # Playwright smoke suite vs the single deployable (ADR-0046)
 │   ├── support/          # env resolution, global setup, e2e_setup.py (e2e DB + minted sessions)
 │   └── tests/            # browser journeys (small smoke pack — unit suites stay primary)
-├── docs/                 # architecture.md + adr/
+├── docs/                 # architecture.md + conventions.md + adr/
 ├── Dockerfile            # single-deployable image: builds SPA, serves it + /api/v1 (ADR-0012)
 ├── docker-compose.yml    # self-host stack: Postgres + app
 ├── docker-compose.coolify.yml  # Coolify deploy: app only, managed Postgres, Traefik (ADR-0027)
