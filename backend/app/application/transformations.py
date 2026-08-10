@@ -24,11 +24,7 @@ from app.data.repositories import prices as prices_repo
 from app.data.repositories import sde as sde_repo
 from app.data.repositories import transformations as transformations_repo
 from app.domain.lots import landed_unit_cost
-from app.domain.transformations import (
-    OutputLine,
-    allocate_source_cost,
-    base_yield_outputs,
-)
+from app.domain.transformations import allocate_amount, base_yield_outputs
 
 
 @dataclass(frozen=True)
@@ -111,15 +107,7 @@ async def record_reprocess(
         lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
     )
     values = await split_off_values(session, corp.id, sorted(outputs))
-    allocated = allocate_source_cost(
-        consumed_cost,
-        [
-            OutputLine(
-                type_id=tid, quantity=out_qty, unit_value=values.get(tid)
-            )
-            for tid, out_qty in sorted(outputs.items())
-        ],
-    )
+    allocated = allocate_amount(consumed_cost, outputs, values)
 
     await lots_repo.consume(session, lot_id=lot.id, qty=qty)
     await transformations_repo.create_transformation(

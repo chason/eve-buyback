@@ -91,6 +91,26 @@ def allocate_source_cost(
     ]
 
 
+def allocate_amount(
+    amount: Decimal,
+    quantities: dict[int, int],
+    unit_values: dict[int, Decimal],
+) -> list[AllocatedOutput]:
+    """Split one amount across typed quantities pro-rata by market value — the
+    shape shared by a reprocess flowing its source COST into materials (ADR-0047)
+    and an outgoing contract's single PRICE spanning its items (ADR-0045). Types
+    absent from `unit_values` carry zero weight; see `allocate_source_cost` for
+    the exactness and fallback rules."""
+    lines: list[OutputLine] = []
+    for type_id, qty in sorted(quantities.items()):
+        lines.append(
+            OutputLine(
+                type_id=type_id, quantity=qty, unit_value=unit_values.get(type_id)
+            )
+        )
+    return allocate_source_cost(amount, lines)
+
+
 def base_yield_outputs(
     qty: int, portion_size: int, materials: list[tuple[int, int]]
 ) -> dict[int, int]:
