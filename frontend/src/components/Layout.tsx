@@ -79,6 +79,11 @@ export default function Layout() {
                   </NavLink>
                 </li>
                 <li>
+                  <NavLink to="/profit" className={navClass}>
+                    Profit
+                  </NavLink>
+                </li>
+                <li>
                   <NavLink to="/config" className={navClass}>
                     Config
                   </NavLink>

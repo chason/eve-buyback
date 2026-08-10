@@ -21,6 +21,8 @@ async def create_sale(
     lot_id: uuid.UUID,
     qty: int,
     unit_proceeds: Decimal,
+    unit_cost: Decimal,
+    cost_is_estimated: bool,
     channel: SaleChannel,
     source: EntrySource,
     sold_at: datetime,
@@ -34,6 +36,8 @@ async def create_sale(
         lot_id=lot_id,
         qty=qty,
         unit_proceeds=unit_proceeds,
+        unit_cost=unit_cost,
+        cost_is_estimated=cost_is_estimated,
         sales_tax=sales_tax,
         channel=channel,
         source=source,
@@ -97,6 +101,24 @@ async def set_sales_tax_for_ref(
         row.sales_tax = sales_tax if i == 0 else Decimal(0)
     await session.flush()
     return True
+
+
+async def list_between(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> list[SaleRecord]:
+    """Sales sold in [since, until) — the profit view's period read (#159). Either
+    bound may be None (open-ended)."""
+    stmt = select(Sale).where(Sale.corporation_id == corporation_id)
+    if since is not None:
+        stmt = stmt.where(Sale.sold_at >= since)
+    if until is not None:
+        stmt = stmt.where(Sale.sold_at < until)
+    rows = (await session.execute(stmt.order_by(Sale.sold_at))).scalars().all()
+    return [SaleRecord.model_validate(row) for row in rows]
 
 
 async def list_for_corp(

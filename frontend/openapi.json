@@ -492,6 +492,49 @@
         "title": "BillingSettingsUpdate",
         "type": "object"
       },
+      "ChannelProfitOut": {
+        "description": "One sales channel's slice of the period: market | contract | direct.",
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "cost_of_goods": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cost Of Goods",
+            "type": "string"
+          },
+          "margin": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Margin",
+            "type": "string"
+          },
+          "revenue": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue",
+            "type": "string"
+          },
+          "sale_count": {
+            "title": "Sale Count",
+            "type": "integer"
+          },
+          "sales_tax": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Sales Tax",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "revenue",
+          "sales_tax",
+          "cost_of_goods",
+          "margin",
+          "sale_count"
+        ],
+        "title": "ChannelProfitOut",
+        "type": "object"
+      },
       "ConfigOut": {
         "properties": {
           "aggregate_field": {
@@ -1534,6 +1577,112 @@
           "matched"
         ],
         "title": "PaymentOut",
+        "type": "object"
+      },
+      "ProfitOut": {
+        "description": "The \"How we're doing\" period fold (#159). `margin` = revenue \u2212 tax \u2212 cost\nof goods; `profit` subtracts the period's expenses on top. `measured_margin` +\n`estimated_margin` == `margin` \u2014 deemed-cost results stay visibly apart.",
+        "properties": {
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelProfitOut"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "cost_of_goods": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cost Of Goods",
+            "type": "string"
+          },
+          "estimated_margin": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Estimated Margin",
+            "type": "string"
+          },
+          "fees": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fees",
+            "type": "string"
+          },
+          "margin": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Margin",
+            "type": "string"
+          },
+          "measured_margin": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Measured Margin",
+            "type": "string"
+          },
+          "other_expenses": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Other Expenses",
+            "type": "string"
+          },
+          "profit": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Profit",
+            "type": "string"
+          },
+          "revenue": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue",
+            "type": "string"
+          },
+          "sale_count": {
+            "title": "Sale Count",
+            "type": "integer"
+          },
+          "sales_tax": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Sales Tax",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "write_downs": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Write Downs",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revenue",
+          "sales_tax",
+          "cost_of_goods",
+          "margin",
+          "measured_margin",
+          "estimated_margin",
+          "fees",
+          "write_downs",
+          "other_expenses",
+          "profit",
+          "sale_count",
+          "channels"
+        ],
+        "title": "ProfitOut",
         "type": "object"
       },
       "ReceivableClearRequest": {
@@ -3617,6 +3766,74 @@
           }
         },
         "summary": "Record Manual Sale",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/profit": {
+      "get": {
+        "description": "The \"How we're doing\" view (#159): sales sold in [since, until) and the\nexpenses incurred in it, folded. Both bounds optional (open-ended).",
+        "operationId": "get_profit_api_v1_corporations_me_accounting_profit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profit",
         "tags": [
           "accounting"
         ]

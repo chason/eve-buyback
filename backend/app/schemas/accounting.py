@@ -185,6 +185,38 @@ class ReprocessResultOut(BaseModel):
     children: list[ReprocessOutputOut]
 
 
+class ChannelProfitOut(BaseModel):
+    """One sales channel's slice of the period: market | contract | direct."""
+
+    channel: str
+    revenue: Decimal
+    sales_tax: Decimal
+    cost_of_goods: Decimal
+    margin: Decimal
+    sale_count: int
+
+
+class ProfitOut(BaseModel):
+    """The "How we're doing" period fold (#159). `margin` = revenue − tax − cost
+    of goods; `profit` subtracts the period's expenses on top. `measured_margin` +
+    `estimated_margin` == `margin` — deemed-cost results stay visibly apart."""
+
+    since: datetime | None = None
+    until: datetime | None = None
+    revenue: Decimal
+    sales_tax: Decimal
+    cost_of_goods: Decimal
+    margin: Decimal
+    measured_margin: Decimal
+    estimated_margin: Decimal
+    fees: Decimal
+    write_downs: Decimal
+    other_expenses: Decimal
+    profit: Decimal
+    sale_count: int
+    channels: list[ChannelProfitOut]
+
+
 class InventoryOut(BaseModel):
     total_cost: Decimal
     verified_cost: Decimal

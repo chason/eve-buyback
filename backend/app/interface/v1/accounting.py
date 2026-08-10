@@ -3,6 +3,7 @@ entitlement gate (ADR-0042) is enforced in the application layer and surfaces he
 as 402 via the error mapping."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -10,6 +11,7 @@ from fastapi import APIRouter, Depends, status
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
 from app.application import manual_entries as manual_app
+from app.application import profit as profit_app
 from app.application import reconciliation as reconciliation_app
 from app.application import sales as sales_app
 from app.application import transformations as transformations_app
@@ -29,6 +31,7 @@ from app.schemas.accounting import (
     ManualLotRequest,
     ManualSaleRequest,
     ManualSaleResult,
+    ProfitOut,
     ReceivableClearRequest,
     ReceivableCreateRequest,
     ReceivableOut,
@@ -59,6 +62,24 @@ async def get_inventory(user: ManagerUser, session: SessionDep) -> InventoryOut:
         sales_tax_rate=settings.accounting_sales_tax_rate,
     )
     return InventoryOut.model_validate(view.model_dump())
+
+
+@router.get("/profit", response_model=ProfitOut)
+async def get_profit(
+    user: ManagerUser,
+    session: SessionDep,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> ProfitOut:
+    """The "How we're doing" view (#159): sales sold in [since, until) and the
+    expenses incurred in it, folded. Both bounds optional (open-ended)."""
+    view = await profit_app.get_profit(
+        session,
+        corporation_eve_id=user.corporation_id,
+        since=since,
+        until=until,
+    )
+    return ProfitOut.model_validate(view.model_dump())
 
 
 @router.get("/hangars", response_model=list[HangarOut])

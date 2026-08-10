@@ -61,6 +61,24 @@ async def external_refs(
     return set(rows)
 
 
+async def list_between(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> list[ExpenseRecord]:
+    """Expenses incurred in [since, until) — the profit view's period read (#159).
+    Either bound may be None (open-ended)."""
+    stmt = select(LotExpense).where(LotExpense.corporation_id == corporation_id)
+    if since is not None:
+        stmt = stmt.where(LotExpense.incurred_at >= since)
+    if until is not None:
+        stmt = stmt.where(LotExpense.incurred_at < until)
+    rows = (await session.execute(stmt.order_by(LotExpense.incurred_at))).scalars().all()
+    return [ExpenseRecord.model_validate(row) for row in rows]
+
+
 async def list_for_corp(
     session: AsyncSession, *, corporation_id: uuid.UUID
 ) -> list[ExpenseRecord]:

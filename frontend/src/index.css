@@ -806,6 +806,28 @@ label:has(> .search-results) > input {
   cursor: help;
 }
 
+/* The profit page's period picker (#159): an inline "Show <select>" control, not a
+   full-width Pico form field. */
+.profit-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: var(--pico-block-spacing-vertical);
+}
+
+.profit-period select {
+  width: auto;
+  margin-bottom: 0;
+}
+
+/* The breakdown's bottom line: separated from the running lines above it. */
+.profit-total th,
+.profit-total td {
+  border-top: 2px solid var(--pico-muted-border-color);
+  border-bottom: none;
+  font-size: 1.1rem;
+}
+
 /* The hangar-check log (#155): compact entries; flagged ones read danger-red so
    "needs a look" is scannable. */
 .recon-list {

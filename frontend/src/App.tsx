@@ -13,6 +13,7 @@ import Inventory from "./pages/Inventory"
 import Locations from "./pages/Locations"
 import Managers from "./pages/Managers"
 import Privacy from "./pages/Privacy"
+import Profit from "./pages/Profit"
 import Rules from "./pages/Rules"
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/a/:publicId" element={<Appraisal />} />
           <Route path="/appraisals" element={<History />} />
           <Route path="/stock" element={<Inventory />} />
+          <Route path="/profit" element={<Profit />} />
           <Route path="/config" element={<Config />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/locations" element={<Locations />} />
