@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
+from typing import TypedDict
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,16 +14,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.data.models import CorpMarketOrder
 
 
+class OrderRow(TypedDict):
+    """One live order as this repository stores it (#188) — the input contract for
+    `replace_for_corp`, owned here so callers build a checkable shape instead of
+    folklore dicts. `location_id` is a string (ADR-0029 id convention)."""
+
+    order_id: int
+    type_id: int
+    is_buy_order: bool
+    price: Decimal
+    volume_remain: int
+    volume_total: int
+    location_id: str
+    wallet_division: int
+    issued: datetime
+
+
 async def replace_for_corp(
     session: AsyncSession,
     *,
     corporation_id: uuid.UUID,
-    orders: Sequence[dict],
+    orders: Sequence[OrderRow],
 ) -> None:
     """Make the snapshot match the live orders: delete-and-insert (the set is small
-    and vanished orders must vanish). Each dict: order_id, type_id, is_buy_order,
-    price (Decimal), volume_remain, volume_total, location_id (str),
-    wallet_division, issued (datetime)."""
+    and vanished orders must vanish)."""
     await session.execute(
         delete(CorpMarketOrder).where(
             CorpMarketOrder.corporation_id == corporation_id

@@ -23,6 +23,7 @@ from app.application.errors import (
 from app.config import get_settings
 from app.data.records import MarketPriceRecord
 from app.data.repositories import prices as prices_repo
+from app.data.repositories.prices import PriceRow
 from app.domain.aggregates import BuySellAggregate
 from app.domain.market import HubDescriptor, is_fresh, resolve_market_source
 from app.plugins.cache import Cache, get_model, safe_key, set_model
@@ -45,7 +46,7 @@ def _l1_key(hub_id: str, type_id: int) -> str:
 
 def _row_from_aggregate(
     type_id: int, agg: BuySellAggregate, fetched_at: datetime
-) -> dict:
+) -> PriceRow:
     """Build a `market_prices` row from any buy/sell aggregate — Fuzzwork's
     `FuzzworkAggregate` or ESI's `OrderBookAggregate`, both typed as `BuySellAggregate`
     so the shared 7-field side shape is a contract, not a coincidence (#19)."""

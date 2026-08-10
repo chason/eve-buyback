@@ -6,6 +6,8 @@ the application layer (which owns the clock and the `commit()`).
 
 from collections.abc import Sequence
 from datetime import datetime
+from decimal import Decimal
+from typing import TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -13,6 +15,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import MarketPrice
 from app.data.records import MarketPriceRecord
+
+
+class PriceRow(TypedDict):
+    """One cached-price row as this repository stores it (#188) — the input
+    contract for `upsert_prices` (`hub_id` is supplied separately by the caller)."""
+
+    type_id: int
+    buy_weighted_average: Decimal
+    buy_max: Decimal
+    buy_min: Decimal
+    buy_median: Decimal
+    buy_percentile: Decimal
+    buy_volume: Decimal
+    buy_order_count: int
+    sell_weighted_average: Decimal
+    sell_max: Decimal
+    sell_min: Decimal
+    sell_median: Decimal
+    sell_percentile: Decimal
+    sell_volume: Decimal
+    sell_order_count: int
+    fetched_at: datetime
 
 _AGGREGATE_COLUMNS = (
     "buy_weighted_average",
@@ -76,10 +100,9 @@ async def latest_fetched_at(
 
 
 async def upsert_prices(
-    session: AsyncSession, *, hub_id: str, rows: Sequence[dict]
+    session: AsyncSession, *, hub_id: str, rows: Sequence[PriceRow]
 ) -> None:
-    """Insert-or-update cached prices keyed by `(hub_id, type_id)`. Each row dict
-    carries `type_id`, the buy/sell aggregate fields, and `fetched_at`."""
+    """Insert-or-update cached prices keyed by `(hub_id, type_id)`."""
     if not rows:
         return
     values = [{**row, "hub_id": hub_id} for row in rows]
