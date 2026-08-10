@@ -36,6 +36,9 @@ class InventoryItemOut(BaseModel):
     # None when the type has no cached market price.
     worth: Decimal | None = None
     unrealized: Decimal | None = None
+    # Whether the type has seeded reprocessing yields — gates the reprocess
+    # record action (#177): a type without any cannot be reprocessed.
+    reprocessable: bool
     lots: list[InventoryLotOut]
 
 

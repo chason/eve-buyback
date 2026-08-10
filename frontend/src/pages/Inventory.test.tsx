@@ -35,6 +35,7 @@ const INVENTORY: InventoryOut = {
       any_estimated: true,
       worth: "4600000000.00",
       unrealized: "400000000.00",
+      reprocessable: true,
       lots: [
         {
           id: "lot-old",
@@ -411,6 +412,36 @@ describe("Inventory", () => {
       { type_id: 34, quantity: 360 },
       { type_id: 35, quantity: 9 },
     ])
+  })
+
+  it("hides Turned into minerals for a type without yield data", async () => {
+    const u = userEvent.setup()
+    const item = INVENTORY.items[0]
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        items: [
+          { ...item, reprocessable: false },
+          // A single-lot item without yields hides the row action too.
+          {
+            ...item,
+            type_id: 44992,
+            type_name: "PLEX",
+            reprocessable: false,
+            lots: [item.lots[0]],
+          },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    // Expanding the buys shows the lot rows, but never the record action.
+    await u.click(await screen.findByRole("button", { name: "2 buys" }))
+    expect(
+      screen.queryByRole("button", { name: "Turned into minerals" }),
+    ).not.toBeInTheDocument()
   })
 
   it("offers Record it on a reprocess suggestion (#177)", async () => {
