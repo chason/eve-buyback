@@ -4,6 +4,7 @@ The application owns commit."""
 import uuid
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import NotRequired, TypedDict
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,27 @@ from app.data.records import (
 )
 
 
+class AppraisalLineRow(TypedDict):
+    """One appraisal line as this repository stores it (#188) — the input contract
+    for `create_appraisal`. The NotRequired keys default in the ORM model: the
+    reprocess breakdown snapshot (ADR-0026) and the hub-override snapshot
+    (ADR-0031), both null for plain lines."""
+
+    type_id: int | None
+    type_name: str
+    quantity: int
+    status: str
+    basis: str | None
+    percentage: Decimal | None
+    unit_value: Decimal | None
+    unit_price: Decimal | None
+    line_total: Decimal
+    reason: str | None
+    reprocess: NotRequired[dict | None]
+    market_hub_id: NotRequired[str | None]
+    market_hub_name: NotRequired[str | None]
+
+
 async def create_appraisal(
     session: AsyncSession,
     *,
@@ -36,7 +58,7 @@ async def create_appraisal(
     accepted_total: Decimal,
     rejected_count: int,
     request_json: dict,
-    lines: Sequence[dict],
+    lines: Sequence[AppraisalLineRow],
 ) -> AppraisalRecord:
     appraisal = Appraisal(
         public_id=public_id,

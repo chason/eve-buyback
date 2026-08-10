@@ -6,6 +6,8 @@ an ORM entity). The unit of work — `commit()` — is owned by the application 
 
 from collections.abc import Sequence
 from datetime import datetime
+from decimal import Decimal
+from typing import NotRequired, TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -27,6 +29,43 @@ from app.data.records import (
 
 # SQLite caps a statement at 999 bound parameters; keep batches well under that.
 _BATCH = 500
+
+
+# Input contracts for the bulk upserts (#188), owned here so seed and test callers
+# build checkable shapes. NotRequired keys have nullable columns / server defaults.
+# NOTE: pg_insert renders ONE statement per batch, so every row **within one call**
+# must carry the same key set — NotRequired means "omittable by all rows of a call",
+# not per-row.
+
+
+class SdeTypeRow(TypedDict):
+    type_id: int
+    name: str
+    group_id: int
+    volume: float | Decimal
+    published: bool
+    category_id: NotRequired[int | None]
+    market_group_id: NotRequired[int | None]
+    portion_size: NotRequired[int]
+
+
+class SdeStationRow(TypedDict):
+    station_id: int
+    name: str
+    system_name: str
+    region_id: int
+
+
+class SdeTypeMaterialRow(TypedDict):
+    type_id: int
+    material_type_id: int
+    quantity: int
+
+
+class SdeMarketGroupRow(TypedDict):
+    market_group_id: int
+    parent_id: int | None
+    name: str
 
 
 async def get_type(session: AsyncSession, type_id: int) -> SdeTypeRecord | None:
@@ -123,7 +162,7 @@ async def search_stations(
 
 
 async def bulk_upsert_stations(
-    session: AsyncSession, rows: Sequence[dict]
+    session: AsyncSession, rows: Sequence[SdeStationRow]
 ) -> int:
     """Insert-or-update SdeStation rows keyed by `station_id`. Returns the row count."""
     for start in range(0, len(rows), _BATCH):
@@ -142,7 +181,7 @@ async def bulk_upsert_stations(
 
 
 async def bulk_upsert_types(
-    session: AsyncSession, rows: Sequence[dict]
+    session: AsyncSession, rows: Sequence[SdeTypeRow]
 ) -> int:
     """Insert-or-update SdeType rows keyed by `type_id`. Returns the row count."""
     for start in range(0, len(rows), _BATCH):
@@ -165,7 +204,7 @@ async def bulk_upsert_types(
 
 
 async def bulk_upsert_type_materials(
-    session: AsyncSession, rows: Sequence[dict]
+    session: AsyncSession, rows: Sequence[SdeTypeMaterialRow]
 ) -> int:
     """Insert-or-update reprocessing yields, keyed by `(type_id, material_type_id)`."""
     for start in range(0, len(rows), _BATCH):
@@ -198,7 +237,7 @@ async def get_type_materials(
 
 
 async def bulk_upsert_market_groups(
-    session: AsyncSession, rows: Sequence[dict]
+    session: AsyncSession, rows: Sequence[SdeMarketGroupRow]
 ) -> int:
     """Insert-or-update SdeMarketGroup rows keyed by `market_group_id`."""
     for start in range(0, len(rows), _BATCH):

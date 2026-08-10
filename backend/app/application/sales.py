@@ -26,6 +26,7 @@ from app.data.repositories import lots as lots_repo
 from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sales as sales_repo
+from app.data.repositories.market_orders import OrderRow
 from app.domain.lots import LotConsumption, OpenLot, SaleChannel, plan_fifo
 from app.domain.transformations import allocate_amount
 from app.plugins.esi import (
@@ -44,9 +45,8 @@ _TAX_REF = "transaction_tax"
 _BROKER_REFS = frozenset({"brokers_fee", "market_provider_tax"})
 
 
-def _order_row(order: CorpMarketOrder) -> dict:
-    """One live order as the snapshot repo stores it (location as a string, per
-    the ADR-0029 id convention)."""
+def _order_row(order: CorpMarketOrder) -> OrderRow:
+    """Bridge the ESI order model into the snapshot repo's input contract (#188)."""
     return {
         "order_id": order.order_id,
         "type_id": order.type_id,
