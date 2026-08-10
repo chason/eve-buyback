@@ -58,5 +58,6 @@ old ones rather than being edited away; mark the old one `Superseded by NNNN`.
 | [0046](0046-playwright-e2e-smoke.md) | E2E smoke tests: Playwright against the single deployable (minted sessions, `buyback_e2e` DB) | Proposed |
 | [0047](0047-lot-transformations-reprocessing.md) | Lot transformations: reprocessing flows cost into child lots (joint-cost allocation) | Proposed |
 | [0048](0048-corp-division-names.md) | Real corp division names on the Stock page (divisions scope on the corp token) | Accepted |
+| [0049](0049-hangar-move-detection.md) | Move detection: pairing hangar shortfalls with excess across stations (suggest-only, cost basis carried on confirm) | Proposed |
 
 See the project [architecture overview](../architecture.md) for how these fit together.
