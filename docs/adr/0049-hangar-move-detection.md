@@ -53,8 +53,11 @@ lot and relocating the original lots with their cost basis, acquisition dates, a
   because relocation is not acquisition); (3) resolution of the shortfall flag, with the whole
   conversion recorded in the log. Idempotent per suggestion; a suggestion invalidated by a later
   sync (the "excess" evaporated) is withdrawn, and one whose deemed lot has since been partially
-  consumed by a sale converts only the unconsumed remainder (the consumed units keep their deemed
-  COGS — sale rows are frozen facts, ADR-0043 #159).
+  consumed — **sold or transformed** (ADR-0047) — converts only the unconsumed remainder
+  (`qty_remaining`): sold units keep their frozen deemed COGS (sale rows are frozen facts,
+  ADR-0043 #159), and transformed units' deemed cost has already flowed into their child lots and
+  stays there, still flagged estimated — re-costing children retroactively would cascade into
+  frozen sale facts wherever a child has since sold.
 - **Optional freight cost on confirm.** The confirmation form accepts an optional hauling cost,
   booked as a **selling expense attributed to the lots moved** (ADR-0043/0045: corp freight is a
   selling cost, never landed cost — relocation must not change a lot's carrying value).
@@ -82,6 +85,14 @@ lot and relocating the original lots with their cost basis, acquisition dates, a
   into a *different* type (reprocessing in transit) is out of scope (that's ADR-0047's domain), and
   simultaneous loss-at-A + off-app-buyback-at-B of the same type can masquerade as a move — which
   is exactly why a human confirms.
+- **Move *then* reprocess before a sync is a known blind spot.** The shortfall at A is the source
+  type but the excess at B is its materials, so this heuristic can't pair them, and ADR-0047's
+  hangar-assisted reprocess suggestion matches shortfall against yield-consistent excess **within
+  a hangar** — the composed case needs that yield matching to look cross-location (an ADR-0047
+  extension, not attempted here). Until then it degrades to the safe defaults (shortfall flag +
+  deemed-cost material lots), with manual reprocess entry as the recovery. Likewise a move
+  followed by a **sale** before any sync leaves no excess to pair — the shortfall at A and the
+  no-lot sale exception at B (ADR-0045) both surface, but correlating them is out of scope.
 
 ## Alternatives considered
 
