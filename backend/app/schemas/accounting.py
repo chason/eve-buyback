@@ -167,14 +167,17 @@ class HangarCheckResult(BaseModel):
 
 
 class MoveSuggestionOut(BaseModel):
-    """One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
-    the same item missing at one marked hangar and appearing at another. `id`
-    keys the card's actions (confirm #201, dismiss #202). `qty` is what
-    confirming would actually convert now (#204) — units already sold or
-    reprocessed since the pairing are excluded, so the card never overstates.
-    Suggestions sharing a `group_id` are candidate origins for the same found
-    stock (#203) — the UI folds them into one card and the manager picks which
-    origin to confirm; confirming one resolves the claim for all of them."""
+    """One pending "looks like a move" card (ADR-0049, #200/#206): a hangar
+    check saw the same item missing at one marked hangar and appearing
+    somewhere else — counted in a hangar there, and/or listed for sale there
+    (`qty_listed` of `qty`; a sell-side destination needn't be a marked
+    hangar). `id` keys the card's actions (confirm #201, dismiss #202). `qty`
+    is what confirming would actually convert now (#204) — units already sold
+    or reprocessed since the pairing are excluded, so the card never
+    overstates. Suggestions sharing a `group_id` are candidate origins for the
+    same found stock (#203) — the UI folds them into one card and the manager
+    picks which origin to confirm; confirming one resolves the claim for all
+    of them."""
 
     id: uuid.UUID
     type_id: int
@@ -184,6 +187,7 @@ class MoveSuggestionOut(BaseModel):
     destination_location_id: str
     destination_name: str | None = None
     qty: int
+    qty_listed: int
     noticed_at: datetime
     group_id: uuid.UUID | None = None
 
