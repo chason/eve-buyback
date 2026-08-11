@@ -60,7 +60,10 @@ of suggesting it: source lots consume FIFO, the *observed* material excess becom
 lots, and cost and `acquired_at` flow through per source lot — the minerals inherit the ore
 contracts' age and cost, exactly as a hand-recorded reprocess would. (When the outputs are too
 few to split across several source lots, everything folds into one group carrying the oldest
-lot's age and an any-estimated honesty flag — cost is conserved exactly either way.) The link is logged as its
+lot's age and an any-estimated honesty flag — cost is conserved exactly either way.) Only
+**whole refine batches** convert: the `qty % portion_size` remainder arithmetically cannot have
+fed the reprocess, so it stays behind as a flagged shortfall — that much really is missing —
+rather than being silently absorbed into the minerals' basis. The link is logged as its
 own reconciliation kind, never silent. What ADR-0047 guarded against — guessing yields — doesn't
 apply: the outputs recorded are what was counted, not an assumed rate; the only inference is the
 link itself, bounded by the ≤100 %-yield consistency check. When the pattern can't be applied

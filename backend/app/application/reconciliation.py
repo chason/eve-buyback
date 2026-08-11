@@ -240,7 +240,7 @@ async def reconcile_hangars(
             corporation_id=corp.id,
             location_id=hint.location_id,
             source_type_id=hint.type_id,
-            qty=hint.qty,
+            qty=hint.qty_recordable,
             outputs=outputs,
             now=now,
         )
@@ -251,10 +251,36 @@ async def reconcile_hangars(
                 location_id=hint.location_id,
                 type_id=hint.type_id,
                 kind="reprocess_recorded",
-                qty=hint.qty,
+                qty=hint.qty_recordable,
                 occurred_at=now,
                 flagged=False,
             )
+            # The partial-batch remainder cannot have fed the reprocess — that
+            # much really is missing, and it stays a flagged shortfall instead
+            # of being silently absorbed into the minerals' basis (ADR-0050).
+            remainder = hint.qty - hint.qty_recordable
+            remainder_delta = Delta(
+                location_id=hint.location_id,
+                type_id=hint.type_id,
+                kind="shortfall",
+                qty=remainder,
+            )
+            if remainder > 0 and not _already_logged(
+                latest, remainder_delta, lot_id_present=None
+            ):
+                await recon_repo.add_event(
+                    session,
+                    corporation_id=corp.id,
+                    location_id=hint.location_id,
+                    type_id=hint.type_id,
+                    kind="shortfall",
+                    qty=remainder,
+                    occurred_at=now,
+                    flagged=True,
+                    note="Left over after the recorded reprocess — less than a "
+                    "whole refine batch, so it can't be part of it",
+                )
+                flagged += 1
             continue
         hint_delta = Delta(
             location_id=hint.location_id,

@@ -134,6 +134,14 @@ def test_hint_matches_yield_consistent_pattern_only():
     )
     assert len(hints) == 1
     assert hints[0].type_id == VELD and hints[0].material_type_ids == {TRIT}
+    assert hints[0].qty_recordable == 600  # 6 whole batches — all of it
+
+    # A partial batch: 250 short = 2 whole batches + 50 that arithmetically
+    # cannot have been reprocessed — only the whole batches are recordable.
+    (partial,) = match_reprocess_hints(
+        [(JITA, VELD, 250)], [(JITA, TRIT, 750)], materials, portions
+    )
+    assert (partial.qty, partial.qty_recordable) == (250, 200)
 
     # More Trit than 6 batches could EVER yield → not explained by this reprocess.
     assert (

@@ -135,11 +135,17 @@ class ReprocessHint:
     reprocessable type is short while its OWN materials are in excess at the same
     location. Recorded automatically when it can be applied cleanly (ADR-0050 —
     the outputs recorded are the OBSERVED excess, not an assumed yield, so the
-    only inference is the link itself); surfaced as a suggestion when it can't."""
+    only inference is the link itself); surfaced as a suggestion when it can't.
+
+    Only `qty_recordable` — whole refine batches — feeds the record: the
+    `qty % portion_size` remainder arithmetically CANNOT have been reprocessed,
+    so it stays a shortfall for a human rather than being silently absorbed
+    into the minerals' cost basis."""
 
     location_id: str
     type_id: int  # the reprocessable source type that is short
     qty: int  # how many units are missing
+    qty_recordable: int  # whole batches only — what an automatic record consumes
     material_type_ids: frozenset[int]  # the excess types the pattern explains
 
 
@@ -215,6 +221,7 @@ def match_reprocess_hints(
                     location_id=location_id,
                     type_id=type_id,
                     qty=qty,
+                    qty_recordable=batches * portion_size_by_type.get(type_id, 1),
                     material_type_ids=frozenset(matched),
                 )
             )

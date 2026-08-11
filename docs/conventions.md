@@ -261,7 +261,7 @@ interface  →  application  →  domain
   *FIFO*, *COGS*, *NRV*, or *reconciliation* — "Profit", "What the buyback has
   now", "What we paid for it". (ADR-0043–0045)
 
-## Accounting ledger rules *(proposed — ADR-0042…0047)*
+## Accounting ledger rules *(proposed — ADR-0042…0050)*
 
 - The lot ledger is the source of truth; ESI data (assets, wallet) reconciles
   against it, never replaces it. (ADR-0044)
@@ -284,7 +284,12 @@ interface  →  application  →  domain
   the `(location, type)` delta. Re-polling never double-records. (ADR-0043–0045)
 - **Corrections are reversing entries** pointing at what they reverse — never
   edits or deletes of booked entries. Shortfalls/anomalies are flagged for a
-  human ("Needs a look"), never auto-resolved. (ADR-0044, ADR-0045)
+  human ("Needs a look") and stay unresolved until one acts — with ONE carved-out
+  exception: a shortfall of a reprocessable type whose own materials appeared at
+  the same location within the yield bound is **recorded as the reprocess it
+  evidently was** (whole batches only; the remainder stays flagged), because the
+  outputs are counted, not guessed, and waiting would sever the cost lineage.
+  (ADR-0044, ADR-0045; the exception: ADR-0050 §4)
 
 ## Testing
 
