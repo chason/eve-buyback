@@ -58,6 +58,40 @@ async def pending_exists(
     return row is not None
 
 
+async def get_for_corp(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+) -> MoveSuggestionRecord | None:
+    """One suggestion, corp-scoped — None for another corp's suggestion as much
+    as for a missing one, so cross-tenant probing is indistinguishable from
+    absence (the `lots.get_for_corp` posture)."""
+    row = (
+        await session.execute(
+            select(MoveSuggestion).where(
+                MoveSuggestion.id == suggestion_id,
+                MoveSuggestion.corporation_id == corporation_id,
+            )
+        )
+    ).scalar_one_or_none()
+    return MoveSuggestionRecord.model_validate(row) if row else None
+
+
+async def set_status(
+    session: AsyncSession, *, suggestion_id: uuid.UUID, status: str
+) -> None:
+    """Advance a suggestion's lifecycle (pending → confirmed/dismissed). The
+    application decides the transition rules; this only writes it."""
+    row = (
+        await session.execute(
+            select(MoveSuggestion).where(MoveSuggestion.id == suggestion_id)
+        )
+    ).scalar_one()
+    row.status = status
+    await session.flush()
+
+
 async def list_pending(
     session: AsyncSession, *, corporation_id: uuid.UUID
 ) -> list[MoveSuggestionRecord]:

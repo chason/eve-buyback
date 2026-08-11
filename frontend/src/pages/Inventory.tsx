@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import {
   addHangar,
   clearReceivable,
+  confirmMoveSuggestion,
   createReceivable,
   getDivisionNames,
   getInventory,
@@ -660,6 +661,16 @@ function ReconciliationSection({
       void queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
   })
+  // Confirming a move (#201): the card leaves the pending list, the stock list
+  // and the check log both change — refetch all three.
+  const confirmMove = useMutation({
+    mutationFn: (id: string) => confirmMoveSuggestion(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["moveSuggestions"] })
+      void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+      void queryClient.invalidateQueries({ queryKey: ["inventory"] })
+    },
+  })
 
   return (
     <section className="panel">
@@ -691,14 +702,29 @@ function ReconciliationSection({
       </p>
       {suggestions.data && suggestions.data.length > 0 && (
         <ul className="recon-list">
-          {suggestions.data.map((s, i) => (
-            <li key={i}>
+          {suggestions.data.map((s) => (
+            <li key={s.id}>
               <small>
-                {new Date(s.noticed_at).toLocaleString()} — {suggestionText(s)}
+                {new Date(s.noticed_at).toLocaleString()} — {suggestionText(s)}{" "}
+                <button
+                  type="button"
+                  className="linkbtn"
+                  disabled={confirmMove.isPending}
+                  onClick={() => confirmMove.mutate(s.id)}
+                >
+                  Yes, this was a move
+                </button>
               </small>
             </li>
           ))}
         </ul>
+      )}
+      {confirmMove.isError && (
+        <p>
+          <small className="error">
+            {(confirmMove.error as Error).message}
+          </small>
+        </p>
       )}
       {events.data && events.data.length > 0 && (
         <ul className="recon-list">
@@ -756,8 +782,9 @@ function checkSummary(r: { lots_added: number; flagged: number }): string {
   return `Done — ${parts.join(", ")}.`
 }
 
-/** A "looks like a move" suggestion (ADR-0049, #200), read-only for now: the
- * same item went missing in one marked hangar and turned up in another. */
+/** A "looks like a move" suggestion (ADR-0049, #200): the same item went
+ * missing in one marked hangar and turned up in another. Confirming it (#201)
+ * carries what we paid — and how long we've held it — to the new hangar. */
 function suggestionText(s: MoveSuggestionOut): string {
   const item = s.type_name ?? `Type ${s.type_id}`
   const from = s.origin_name ?? s.origin_location_id
@@ -777,6 +804,10 @@ function eventText(e: ReconciliationEventOut): string {
   }
   if (e.kind === "unexpected_division") {
     return `A sell order for ${qty} ${item} at ${where} pays into a different corp wallet than the buyback's.`
+  }
+  if (e.kind === "move_confirmed") {
+    // The note carries where it went and who confirmed, in plain words.
+    return `Moved ${qty} ${item} out of ${where}${e.note ? ` — ${e.note}` : ""}.`
   }
   if (e.kind === "shortfall") {
     return `${qty} ${item} missing at ${where} — sold or moved outside the app?`

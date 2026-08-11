@@ -28,6 +28,8 @@ from app.application.errors import (
     ManagerAlreadyExists,
     ManagerNotFound,
     MarketHubInvalid,
+    MoveSuggestionNotFound,
+    MoveSuggestionNotPending,
     NoMatchedContract,
     NotAuthorized,
     NotAuthorizedToAuthorizeStructure,
@@ -90,6 +92,8 @@ _STATUS: dict[type[ApplicationError], int] = {
     LotNotFound: 404,
     ReprocessQtyUnavailable: 422,
     ReceivableNotFound: 404,
+    MoveSuggestionNotFound: 404,
+    MoveSuggestionNotPending: 409,
 }
 
 

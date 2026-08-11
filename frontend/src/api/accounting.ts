@@ -106,9 +106,20 @@ export async function removeHangar(
 export const listReconciliationEvents = () =>
   apiGet<ReconciliationEventOut[]>("/corporations/me/accounting/reconciliation")
 
-/** Pending "looks like a move" suggestions (ADR-0049, #200) — read-only. */
+/** Pending "looks like a move" suggestions (ADR-0049, #200). */
 export const listMoveSuggestions = () =>
   apiGet<MoveSuggestionOut[]>("/corporations/me/accounting/move-suggestions")
+
+/** "Yes, this was a move" (ADR-0049, #201): the estimated-value stock at the
+ * destination is replaced by the origin's real stock — what we paid, and how
+ * long we've held it, move with it. */
+export async function confirmMoveSuggestion(id: string): Promise<void> {
+  const res = await apiSend(
+    "POST",
+    `/corporations/me/accounting/move-suggestions/${id}/confirm`,
+  )
+  if (!res.ok) await throwApiError(res, "Confirming the move failed")
+}
 
 /** Run a hangar check right now instead of waiting for the hourly sync. */
 export async function runHangarCheck(): Promise<HangarCheckResult> {

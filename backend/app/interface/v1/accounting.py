@@ -12,6 +12,7 @@ from app.application import divisions as divisions_app
 from app.application import hangar as hangar_app
 from app.application import lots as lots_app
 from app.application import manual_entries as manual_app
+from app.application import moves as moves_app
 from app.application import profit as profit_app
 from app.application import reconciliation as reconciliation_app
 from app.application import sales as sales_app
@@ -198,17 +199,37 @@ async def list_reconciliation_events(
 async def list_move_suggestions(
     user: ManagerUser, session: SessionDep
 ) -> list[MoveSuggestionOut]:
-    """The pending "looks like a move" cards (ADR-0049, #200) — read-only."""
+    """The pending "looks like a move" cards (ADR-0049, #200)."""
     views = await reconciliation_app.list_move_suggestions(
         session, corporation_eve_id=user.corporation_id
     )
     return [_move_suggestion_out(v) for v in views]
 
 
+@router.post(
+    "/move-suggestions/{suggestion_id}/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def confirm_move_suggestion(
+    suggestion_id: uuid.UUID, user: ManagerUser, session: SessionDep
+) -> None:
+    """"Yes, this was a move" (ADR-0049, #201): reverses the estimated-value
+    stock at the destination and moves the origin's oldest matching stock there,
+    cost basis and aging intact — atomically, logged with who confirmed."""
+    await moves_app.confirm_move(
+        session,
+        corporation_eve_id=user.corporation_id,
+        suggestion_id=suggestion_id,
+        confirmed_by_character_id=user.character_id,
+        confirmed_by_name=user.character_name,
+    )
+
+
 def _move_suggestion_out(
     v: reconciliation_app.MoveSuggestionView,
 ) -> MoveSuggestionOut:
     return MoveSuggestionOut(
+        id=v.record.id,
         type_id=v.record.type_id,
         type_name=v.type_name,
         origin_location_id=v.record.origin_location_id,
