@@ -8,8 +8,9 @@ from typing import Literal
 
 # What a sync observed for one (location, type): more in the hangar than the books
 # expect (off-app buyback / opening stock), less (an unrecorded sale or move), a
-# shortfall-plus-materials pattern that looks like an unrecorded reprocess (ADR-0047,
-# a suggestion, never auto-applied), a market sale of stock the books didn't have
+# shortfall-plus-materials pattern that looks like an unrecorded reprocess (ADR-0047;
+# recorded automatically when it applies cleanly, ADR-0050 — `reprocess_recorded` —
+# with the suggestion kind kept as the fallback), a market sale of stock the books didn't have
 # (ADR-0045 — booked at deemed COGS, flagged), or market activity paying into a
 # wallet division other than the configured buyback one (ADR-0045's guard).
 # `move_confirmed` is a human-written kind (ADR-0049, #201): a manager confirmed
@@ -27,6 +28,7 @@ ReconciliationKind = Literal[
     "excess",
     "shortfall",
     "reprocess_hint",
+    "reprocess_recorded",
     "unmatched_sale",
     "unexpected_division",
     "move_confirmed",

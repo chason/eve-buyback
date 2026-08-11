@@ -58,7 +58,9 @@ short while its own materials are in excess at the same location, in quantities 
 units could actually have produced (the ADR-0047 matcher), it **records the reprocess** instead
 of suggesting it: source lots consume FIFO, the *observed* material excess becomes the child
 lots, and cost and `acquired_at` flow through per source lot — the minerals inherit the ore
-contracts' age and cost, exactly as a hand-recorded reprocess would. The link is logged as its
+contracts' age and cost, exactly as a hand-recorded reprocess would. (When the outputs are too
+few to split across several source lots, everything folds into one group carrying the oldest
+lot's age and an any-estimated honesty flag — cost is conserved exactly either way.) The link is logged as its
 own reconciliation kind, never silent. What ADR-0047 guarded against — guessing yields — doesn't
 apply: the outputs recorded are what was counted, not an assumed rate; the only inference is the
 link itself, bounded by the ≤100 %-yield consistency check. When the pattern can't be applied

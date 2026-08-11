@@ -24,7 +24,11 @@ from app.data.repositories import prices as prices_repo
 from app.data.repositories import sde as sde_repo
 from app.data.repositories import transformations as transformations_repo
 from app.domain.lots import landed_unit_cost
-from app.domain.transformations import allocate_amount, base_yield_outputs
+from app.domain.transformations import (
+    allocate_amount,
+    apportion_outputs,
+    base_yield_outputs,
+)
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,122 @@ async def record_reprocess(
     ]
     await session.commit()
     return children
+
+
+async def record_observed_reprocess(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    location_id: str,
+    source_type_id: int,
+    qty: int,
+    outputs: dict[int, int],
+    now: datetime,
+) -> bool:
+    """The automatic reprocess record (ADR-0050): a hangar sync saw `qty` units of
+    a reprocessable type missing while `outputs` — its own materials, within the
+    yield bound — appeared at the same location, so record the transformation the
+    corp evidently performed. Consumes the slot's open lots FIFO, writes one audit
+    row per consumed lot, and apportions the OBSERVED outputs across the consumed
+    portions pro-rata so each source lot's own cost and age flow into its own
+    children (`record_reprocess` semantics, lot by lot). In the degenerate case
+    where a portion would get no output at all, everything folds into one group —
+    cost is conserved exactly either way, with the oldest lot's age and an
+    any-estimated flag standing for the blend.
+
+    Returns False without touching anything when the slot's open lots can't cover
+    `qty` (the caller falls back to the suggest-only hint). Does NOT commit — the
+    reconciliation pass owns the unit of work."""
+    if qty <= 0 or not outputs:
+        return False
+    lots = await lots_repo.open_lots(
+        session,
+        corporation_id=corporation_id,
+        item_type_id=source_type_id,
+        location_id=location_id,
+    )
+    if sum(lot.qty_remaining for lot in lots) < qty:
+        return False
+
+    consumed: list[tuple[LotRecord, int]] = []
+    remaining = qty
+    for lot in lots:  # FIFO: oldest acquired first
+        if remaining <= 0:
+            break
+        take = min(remaining, lot.qty_remaining)
+        consumed.append((lot, take))
+        remaining -= take
+
+    values = await split_off_values(session, corporation_id, sorted(outputs))
+    shares = apportion_outputs([take for _, take in consumed], outputs)
+    for lot, take in consumed:
+        await lots_repo.consume(session, lot_id=lot.id, qty=take)
+        await transformations_repo.create_transformation(
+            session,
+            corporation_id=corporation_id,
+            source_lot_id=lot.id,
+            qty_consumed=take,
+            occurred_at=now,
+            recorded_by_character_id=None,
+        )
+    if shares is not None:
+        for (lot, take), share in zip(consumed, shares, strict=True):
+            await _create_children(session, corporation_id, lot, take, share, values)
+    else:
+        oldest, _ = consumed[0]
+        costs = [_consumed_cost(lot, take) for lot, take in consumed]
+        total_cost = sum(costs, Decimal(0))
+        estimated = any(lot.cost_is_estimated for lot, _ in consumed)
+        blend = oldest.model_copy(update={"cost_is_estimated": estimated})
+        await _create_children_at_cost(
+            session, corporation_id, blend, total_cost, outputs, values
+        )
+    return True
+
+
+def _consumed_cost(lot: LotRecord, take: int) -> Decimal:
+    return take * landed_unit_cost(
+        lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
+    )
+
+
+async def _create_children(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    lot: LotRecord,
+    take: int,
+    share: dict[int, int],
+    values: dict[int, Decimal],
+) -> None:
+    await _create_children_at_cost(
+        session, corporation_id, lot, _consumed_cost(lot, take), share, values
+    )
+
+
+async def _create_children_at_cost(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    lot: LotRecord,
+    consumed_cost: Decimal,
+    outputs: dict[int, int],
+    values: dict[int, Decimal],
+) -> None:
+    """One child lot per output type, carrying `lot`'s age, location, and honesty
+    flag, with `consumed_cost` allocated across the outputs by market value —
+    exactly the manual record's mechanics (ADR-0047)."""
+    for out in allocate_amount(consumed_cost, outputs, values):
+        await lots_repo.create_lot(
+            session,
+            corporation_id=corporation_id,
+            item_type_id=out.type_id,
+            qty=out.quantity,
+            unit_purchase_cost=out.unit_cost,
+            acquired_at=lot.acquired_at,  # inherited: same capital, same age
+            source="reprocess",
+            source_lot_id=lot.id,
+            cost_is_estimated=lot.cost_is_estimated,
+            location_id=lot.location_id,
+        )
 
 
 async def split_off_values(

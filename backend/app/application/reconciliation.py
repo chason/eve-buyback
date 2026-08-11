@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import entitlements as entitlements_app
 from app.application import hangar as hangar_app
+from app.application import transformations as transformations_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import (
     HangarReadUnavailable,
@@ -202,10 +203,13 @@ async def reconcile_hangars(
         return HangarCheckResult(lots_added=0, flagged=0)
 
     # A reprocessable-type shortfall + yield-consistent materials excess looks like
-    # an unrecorded reprocess (ADR-0047): suggest it instead of flagging a loss and
-    # booking re-estimated materials — that would sever the cost lineage the manual
-    # record action exists to preserve. Matched slots skip the normal paths for
-    # this pass; the suggestion repeats until recorded (or the pattern changes).
+    # an unrecorded reprocess (ADR-0047). Record it automatically (ADR-0050): the
+    # outputs recorded are the OBSERVED excess — not an assumed yield — so the only
+    # inference is the link itself, and the minerals inherit the ore lots' cost and
+    # age instead of reappearing as re-estimated discoveries with severed lineage.
+    # When it can't be applied cleanly (open lots don't cover the shortfall), the
+    # suggest-only hint remains the fallback. Matched slots skip the normal paths
+    # for this pass either way.
     hints = await _reprocess_hints(session, deltas)
     hinted_sources = {(h.location_id, h.type_id) for h in hints}
     hinted_materials = {
@@ -224,7 +228,34 @@ async def reconcile_hangars(
     # default treatment books them.
     excess_lots: dict[tuple[str, int], uuid.UUID] = {}
     shortfall_events: dict[tuple[str, int], uuid.UUID] = {}
+    excess_by_slot = {
+        (d.location_id, d.type_id): d.qty for d in deltas if d.kind == "excess"
+    }
     for hint in hints:
+        outputs = {}
+        for tid in sorted(hint.material_type_ids):
+            outputs[tid] = excess_by_slot[(hint.location_id, tid)]
+        recorded = await transformations_app.record_observed_reprocess(
+            session,
+            corporation_id=corp.id,
+            location_id=hint.location_id,
+            source_type_id=hint.type_id,
+            qty=hint.qty,
+            outputs=outputs,
+            now=now,
+        )
+        if recorded:
+            await recon_repo.add_event(
+                session,
+                corporation_id=corp.id,
+                location_id=hint.location_id,
+                type_id=hint.type_id,
+                kind="reprocess_recorded",
+                qty=hint.qty,
+                occurred_at=now,
+                flagged=False,
+            )
+            continue
         hint_delta = Delta(
             location_id=hint.location_id,
             type_id=hint.type_id,
