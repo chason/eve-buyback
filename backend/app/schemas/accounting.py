@@ -169,7 +169,7 @@ class HangarCheckResult(BaseModel):
 class MoveSuggestionOut(BaseModel):
     """One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
     the same item missing at one marked hangar and appearing at another. `id`
-    keys the confirm action (#201)."""
+    keys the card's actions (confirm #201, dismiss #202)."""
 
     id: uuid.UUID
     type_id: int

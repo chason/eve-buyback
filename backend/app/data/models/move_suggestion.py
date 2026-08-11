@@ -15,7 +15,8 @@ class MoveSuggestion(Base):
     on the reconciliation artifacts it references — the shortfall flag event and
     the deemed-cost excess lot are booked regardless (the suggest-only
     invariant); this row only remembers the pattern so a human can act on it
-    later. SET NULL survives the excess lot; this slice only writes `pending`."""
+    later. SET NULL survives the excess lot; the status lifecycle is documented
+    on `MoveSuggestionStatus` (domain/moves.py)."""
 
     __tablename__ = "move_suggestions"
 

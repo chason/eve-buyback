@@ -10,9 +10,13 @@ on those artifacts, never a replacement. A shortfall + excess pattern is merely
 from dataclasses import dataclass
 from typing import Literal
 
-# Lifecycle of a persisted suggestion. This slice (#200) only ever writes
-# `pending`; confirm/dismiss actions land in stacked follow-ups (#203+).
-MoveSuggestionStatus = Literal["pending", "confirmed", "dismissed"]
+# Lifecycle of a persisted suggestion. `dismissed` is a human's "not a move"
+# (#202) — it stands as a decision and suppresses re-suggesting the same
+# pattern; `withdrawn` is bookkeeping (#202) — a later sync invalidated the
+# pair (the excess evaporated, or the shortfall flag resolved some other way),
+# no human decided anything, and a re-materialized pair may suggest again.
+# `confirmed` is #201's converting action.
+MoveSuggestionStatus = Literal["pending", "confirmed", "dismissed", "withdrawn"]
 
 
 @dataclass(frozen=True)

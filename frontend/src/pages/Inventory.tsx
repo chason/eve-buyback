@@ -7,6 +7,7 @@ import {
   clearReceivable,
   confirmMoveSuggestion,
   createReceivable,
+  dismissMoveSuggestion,
   getDivisionNames,
   getInventory,
   getReprocessPreview,
@@ -671,6 +672,15 @@ function ReconciliationSection({
       void queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
   })
+  // "Not a move" (#202): the card leaves the list; what's booked stays booked,
+  // and the decision lands in the log below.
+  const dismiss = useMutation({
+    mutationFn: (id: string) => dismissMoveSuggestion(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["moveSuggestions"] })
+      void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+    },
+  })
 
   return (
     <section className="panel">
@@ -709,10 +719,18 @@ function ReconciliationSection({
                 <button
                   type="button"
                   className="linkbtn"
-                  disabled={confirmMove.isPending}
+                  disabled={confirmMove.isPending || dismiss.isPending}
                   onClick={() => confirmMove.mutate(s.id)}
                 >
                   Yes, this was a move
+                </button>{" "}
+                <button
+                  type="button"
+                  className="linkbtn"
+                  disabled={confirmMove.isPending || dismiss.isPending}
+                  onClick={() => dismiss.mutate(s.id)}
+                >
+                  Not a move
                 </button>
               </small>
             </li>
@@ -724,6 +742,11 @@ function ReconciliationSection({
           <small className="error">
             {(confirmMove.error as Error).message}
           </small>
+        </p>
+      )}
+      {dismiss.isError && (
+        <p>
+          <small className="error">{(dismiss.error as Error).message}</small>
         </p>
       )}
       {events.data && events.data.length > 0 && (
@@ -808,6 +831,12 @@ function eventText(e: ReconciliationEventOut): string {
   if (e.kind === "move_confirmed") {
     // The note carries where it went and who confirmed, in plain words.
     return `Moved ${qty} ${item} out of ${where}${e.note ? ` — ${e.note}` : ""}.`
+  }
+  if (e.kind === "move_dismissed") {
+    return `Decided ${qty} ${item} didn't move from ${where} — everything stays as recorded.`
+  }
+  if (e.kind === "move_withdrawn") {
+    return `The move hint for ${qty} ${item} from ${where} no longer adds up — it was taken back.`
   }
   if (e.kind === "shortfall") {
     return `${qty} ${item} missing at ${where} — sold or moved outside the app?`

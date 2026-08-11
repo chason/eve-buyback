@@ -12,9 +12,13 @@ from typing import Literal
 # a suggestion, never auto-applied), a market sale of stock the books didn't have
 # (ADR-0045 — booked at deemed COGS, flagged), or market activity paying into a
 # wallet division other than the configured buyback one (ADR-0045's guard).
-# `move_confirmed` is the one human-written kind (ADR-0049, #201): a manager
-# confirmed a "looks like a move" pairing, converting the shortfall's default
-# treatment — it supersedes the standing shortfall flag at the origin slot.
+# `move_confirmed` is a human-written kind (ADR-0049, #201): a manager confirmed
+# a "looks like a move" pairing, converting the shortfall's default treatment —
+# it supersedes the standing shortfall flag at the origin slot.
+# `move_dismissed`/`move_withdrawn` (ADR-0049, #202) are annotations, not slot
+# state: a human said a suggested move wasn't one, or a later sync invalidated
+# the pair — the sync's latest-per-slot dedupe skips over them (but NOT over
+# `move_confirmed`, which is real slot state).
 ReconciliationKind = Literal[
     "excess",
     "shortfall",
@@ -22,6 +26,8 @@ ReconciliationKind = Literal[
     "unmatched_sale",
     "unexpected_division",
     "move_confirmed",
+    "move_dismissed",
+    "move_withdrawn",
 ]
 
 

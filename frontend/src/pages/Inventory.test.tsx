@@ -461,8 +461,8 @@ describe("Inventory", () => {
 
     renderInventory()
 
-    // Plain English only — no "pairing", "reconciliation", or "lot"; the one
-    // action is the confirm (#201 — dismiss is its own slice).
+    // Plain English only — no "pairing", "reconciliation", or "lot"; the
+    // actions are the confirm (#201) and the dismiss (#202).
     const card = await screen.findByText(
       /Looks like 40 Tritanium moved from Amarr VIII to Jita IV - Moon 4 — was this a move\?/,
     )
@@ -470,6 +470,9 @@ describe("Inventory", () => {
       within(card.closest("li")!).getByRole("button", {
         name: "Yes, this was a move",
       }),
+    ).toBeInTheDocument()
+    expect(
+      within(card.closest("li")!).getByRole("button", { name: "Not a move" }),
     ).toBeInTheDocument()
   })
 
@@ -501,6 +504,75 @@ describe("Inventory", () => {
     await waitFor(() =>
       expect(screen.queryByText(/was this a move\?/)).not.toBeInTheDocument(),
     )
+  })
+
+  it("dismisses a move suggestion with Not a move (#202)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([
+      {
+        id: "sug-1", type_id: 34, type_name: "Tritanium",
+        origin_location_id: "60008494", origin_name: "Amarr VIII",
+        destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+        qty: 40, noticed_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+    vi.mocked(accountingApi.dismissMoveSuggestion).mockImplementation(
+      async () => {
+        // The card leaves the list on the refetch the dismissal triggers.
+        vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([])
+      },
+    )
+
+    renderInventory()
+
+    const card = await screen.findByText(/was this a move\?/)
+    await u.click(
+      within(card.closest("li")!).getByRole("button", { name: "Not a move" }),
+    )
+    expect(accountingApi.dismissMoveSuggestion).toHaveBeenCalledWith("sug-1")
+    await waitFor(() =>
+      expect(screen.queryByText(/was this a move\?/)).not.toBeInTheDocument(),
+    )
+  })
+
+  it("tells the dismissed and withdrawn stories in the log (#202)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "move_dismissed", type_id: 34, type_name: "Tritanium",
+        location_id: "60008494", location_name: "Amarr VIII",
+        qty: 40, unit_cost: null, booked: false, flagged: false,
+        note: "Not a move — dismissed by Boss",
+        occurred_at: "2026-08-11T11:00:00Z",
+      },
+      {
+        kind: "move_withdrawn", type_id: 35, type_name: "Pyerite",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 12, unit_cost: null, booked: false, flagged: false,
+        note: "The found stock is no longer there",
+        occurred_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(
+        /Decided 40 Tritanium didn't move from Amarr VIII — everything stays as recorded\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /The move hint for 12 Pyerite from Jita IV - Moon 4 no longer adds up — it was taken back\./,
+      ),
+    ).toBeInTheDocument()
   })
 
   it("offers Record it on a reprocess suggestion (#177)", async () => {
