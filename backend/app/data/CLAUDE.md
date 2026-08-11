@@ -26,3 +26,9 @@ Conventions for this layer (the only place that talks to the database).
 - **Adding a model:** define it in `models/<entity>.py` (import `Base` from
   `data.db`), register it in `models/__init__.py` so Alembic and `Base.metadata` see
   it, then autogenerate a migration (`uv run alembic revision --autogenerate`).
+- **Every model change needs a migration that really matches it.** The suite's
+  `tests/test_migrations.py` builds a database via `alembic upgrade head` and fails if
+  it differs from `Base.metadata`. Beware `check_enum` (ADR-0021) changes: autogenerate
+  can't diff CHECK constraints, so growing a Literal needs a hand-written
+  drop/recreate of the CHECK (see migration `a91c4f2b7d13`) — and widens the VARCHAR
+  if the new value is the longest.
