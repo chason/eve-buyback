@@ -53,6 +53,8 @@ export type DivisionNamesOut = Schemas["DivisionNamesOut"]
 // Hangar reconciliation (ADR-0044, #155): the "Needs a look" log + manual check.
 export type ReconciliationEventOut = Schemas["ReconciliationEventOut"]
 export type HangarCheckResult = Schemas["HangarCheckResult"]
+// "Looks like a move" suggestions (ADR-0049, #200) — read-only cards.
+export type MoveSuggestionOut = Schemas["MoveSuggestionOut"]
 // Reprocess transformations (ADR-0047, #177).
 export type ReprocessPreviewOut = Schemas["ReprocessPreviewOut"]
 export type ReprocessResultOut = Schemas["ReprocessResultOut"]

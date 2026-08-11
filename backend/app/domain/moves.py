@@ -1,0 +1,67 @@
+"""Pure rules for hangar move detection (ADR-0049, #200). No I/O: the
+reconciliation use case computes the per-(location, type) deltas and feeds the
+same-sync shortfall/excess pattern here; this proposes "looks like a move" pairs.
+
+Suggest-only by design: the caller books the ADR-0044 defaults regardless (the
+shortfall flag and the deemed-cost excess lot) — a pair is only ever a decoration
+on those artifacts, never a replacement. A shortfall + excess pattern is merely
+*consistent with* a move; a human confirms (in a later slice)."""
+
+from dataclasses import dataclass
+from typing import Literal
+
+# Lifecycle of a persisted suggestion. This slice (#200) only ever writes
+# `pending`; confirm/dismiss actions land in stacked follow-ups (#203+).
+MoveSuggestionStatus = Literal["pending", "confirmed", "dismissed"]
+
+
+@dataclass(frozen=True)
+class MovePair:
+    """One proposed move: the same type short at `origin` and over at
+    `destination` in the same sync. `qty` is the overlap — min(shortfall,
+    excess); any residual on either side keeps the default treatment."""
+
+    type_id: int
+    origin_location_id: str  # where the shortfall is
+    destination_location_id: str  # where the excess is
+    qty: int
+
+
+def match_move_pairs(
+    shortfalls: list[tuple[str, int, int]],
+    excesses: list[tuple[str, int, int]],
+) -> list[MovePair]:
+    """Pair same-type shortfalls against excesses across hangars (both sides are
+    `(location, type, qty)`), quantity capped at the smaller side. Same type
+    only, ever — quantity coincidence across *different* types is numerology
+    (ADR-0049).
+
+    Kept deliberately simple for this slice (#200): a type pairs only when it
+    has exactly ONE shortfall location and ONE excess location — the single
+    unambiguous pair. Multi-candidate patterns (say, short at two stations and
+    over at one) produce nothing here; listing candidates for the manager to
+    pick is #203, as is pairing against a still-open flag from a prior sync.
+    Deterministic order (by type) so logs and tests read stably."""
+    shorts_by_type: dict[int, list[tuple[str, int]]] = {}
+    for location_id, type_id, qty in shortfalls:
+        shorts_by_type.setdefault(type_id, []).append((location_id, qty))
+    excess_by_type: dict[int, list[tuple[str, int]]] = {}
+    for location_id, type_id, qty in excesses:
+        excess_by_type.setdefault(type_id, []).append((location_id, qty))
+
+    pairs: list[MovePair] = []
+    for type_id in sorted(shorts_by_type.keys() & excess_by_type.keys()):
+        shorts = shorts_by_type[type_id]
+        overs = excess_by_type[type_id]
+        if len(shorts) != 1 or len(overs) != 1:
+            continue  # ambiguous — the manager-picks flow is #203
+        (origin, short_qty), (destination, excess_qty) = shorts[0], overs[0]
+        pairs.append(
+            MovePair(
+                type_id=type_id,
+                origin_location_id=origin,
+                destination_location_id=destination,
+                qty=min(short_qty, excess_qty),
+            )
+        )
+    return pairs

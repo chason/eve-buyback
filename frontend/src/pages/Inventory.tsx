@@ -11,6 +11,7 @@ import {
   getReprocessPreview,
   getWalletDivision,
   listHangars,
+  listMoveSuggestions,
   listReceivables,
   listReconciliationEvents,
   recordManualExpense,
@@ -24,6 +25,7 @@ import {
 import type {
   InventoryItemOut,
   InventoryOut,
+  MoveSuggestionOut,
   ReconciliationEventOut,
 } from "../api/accounting"
 import { listLocations } from "../api/locations"
@@ -646,10 +648,15 @@ function ReconciliationSection({
     queryKey: ["reconciliation"],
     queryFn: listReconciliationEvents,
   })
+  const suggestions = useQuery({
+    queryKey: ["moveSuggestions"],
+    queryFn: listMoveSuggestions,
+  })
   const check = useMutation({
     mutationFn: runHangarCheck,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+      void queryClient.invalidateQueries({ queryKey: ["moveSuggestions"] })
       void queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
   })
@@ -682,6 +689,17 @@ function ReconciliationSection({
           <small className="error">{(check.error as Error).message}</small>
         )}
       </p>
+      {suggestions.data && suggestions.data.length > 0 && (
+        <ul className="recon-list">
+          {suggestions.data.map((s, i) => (
+            <li key={i}>
+              <small>
+                {new Date(s.noticed_at).toLocaleString()} — {suggestionText(s)}
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
       {events.data && events.data.length > 0 && (
         <ul className="recon-list">
           {events.data.map((e, i) => (
@@ -736,6 +754,15 @@ function checkSummary(r: { lots_added: number; flagged: number }): string {
   }
   if (r.flagged > 0) parts.push(`${r.flagged} flagged for a look`)
   return `Done — ${parts.join(", ")}.`
+}
+
+/** A "looks like a move" suggestion (ADR-0049, #200), read-only for now: the
+ * same item went missing in one marked hangar and turned up in another. */
+function suggestionText(s: MoveSuggestionOut): string {
+  const item = s.type_name ?? `Type ${s.type_id}`
+  const from = s.origin_name ?? s.origin_location_id
+  const to = s.destination_name ?? s.destination_location_id
+  return `Looks like ${s.qty.toLocaleString()} ${item} moved from ${from} to ${to} — was this a move?`
 }
 
 function eventText(e: ReconciliationEventOut): string {

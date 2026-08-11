@@ -518,6 +518,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/move-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Move Suggestions
+         * @description The pending "looks like a move" cards (ADR-0049, #200) — read-only.
+         */
+        get: operations["list_move_suggestions_api_v1_corporations_me_accounting_move_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/profit": {
         parameters: {
             query?: never;
@@ -1518,6 +1538,33 @@ export interface components {
             name: string;
             /** Parent Id */
             parent_id: number | null;
+        };
+        /**
+         * MoveSuggestionOut
+         * @description One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
+         *     the same item missing at one marked hangar and appearing at another. Read-only
+         *     in this slice — confirm/dismiss actions land in follow-ups.
+         */
+        MoveSuggestionOut: {
+            /** Destination Location Id */
+            destination_location_id: string;
+            /** Destination Name */
+            destination_name?: string | null;
+            /**
+             * Noticed At
+             * Format: date-time
+             */
+            noticed_at: string;
+            /** Origin Location Id */
+            origin_location_id: string;
+            /** Origin Name */
+            origin_name?: string | null;
+            /** Qty */
+            qty: number;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
         };
         /**
          * OperatorWalletStatus
@@ -2888,6 +2935,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_move_suggestions_api_v1_corporations_me_accounting_move_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveSuggestionOut"][];
                 };
             };
         };

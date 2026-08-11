@@ -25,16 +25,18 @@ from app.application import entitlements as entitlements_app
 from app.application import hangar as hangar_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import HangarReadUnavailable
-from app.data.records import ReconciliationEventRecord
+from app.data.records import MoveSuggestionRecord, ReconciliationEventRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
 from app.data.repositories import market_orders as orders_repo
+from app.data.repositories import move_suggestions as moves_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
 from app.domain import pricing as pricing_domain
+from app.domain.moves import MovePair, match_move_pairs
 from app.domain.reconciliation import Delta, reconcile
 from app.domain.transformations import match_reprocess_hints
 from app.plugins.esi import CorporationAssetsForbidden, EsiClient
@@ -62,6 +64,17 @@ class ReconciliationEventView:
     record: ReconciliationEventRecord
     type_name: str | None
     location_name: str | None
+
+
+@dataclass(frozen=True)
+class MoveSuggestionView:
+    """A pending "looks like a move" pairing enriched for display (ADR-0049):
+    names resolved so the UI stays plain."""
+
+    record: MoveSuggestionRecord
+    type_name: str | None
+    origin_name: str | None
+    destination_name: str | None
 
 
 async def reconcile_hangars(
@@ -126,6 +139,11 @@ async def reconcile_hangars(
 
     lots_added = 0
     flagged = 0
+    # The reconciliation artifacts this pass stands behind, by slot — a move
+    # pair (ADR-0049) decorates exactly these, so their ids are collected as the
+    # default treatment books them.
+    excess_lots: dict[tuple[str, int], uuid.UUID] = {}
+    shortfall_events: dict[tuple[str, int], uuid.UUID] = {}
     for hint in hints:
         hint_delta = Delta(
             location_id=hint.location_id,
@@ -195,13 +213,18 @@ async def reconcile_hangars(
                 lot_id=lot.id,
                 flagged=is_large,
             )
+            excess_lots[slot] = lot.id
             lots_added += 1
             if is_large:
                 flagged += 1
         else:
             if _already_logged(latest, delta, lot_id_present=None):
-                continue  # the same shortfall was already flagged — no daily spam
-            await recon_repo.add_event(
+                # The same shortfall was already flagged — no daily spam. The
+                # standing flag still anchors a move pair below (the freighter
+                # may only now have arrived at the other hangar).
+                shortfall_events[slot] = latest[slot].id
+                continue
+            event = await recon_repo.add_event(
                 session,
                 corporation_id=corp.id,
                 location_id=delta.location_id,
@@ -211,7 +234,39 @@ async def reconcile_hangars(
                 occurred_at=now,
                 flagged=True,
             )
+            shortfall_events[slot] = event.id
             flagged += 1
+
+    # A same-type shortfall at one hangar + excess at another looks like a haul
+    # nobody recorded (ADR-0049, #200). Suggest-only — the heart of this slice:
+    # the defaults above are already booked (the shortfall flag stands, the
+    # deemed-cost lot exists), and the suggestion merely decorates them so a
+    # human can act later. Excess that couldn't be priced has no lot to decorate
+    # yet — the pair proposes on the pass that books it. A still-pending pair is
+    # never duplicated by a later sync.
+    for pair in _move_pairs(deltas, hinted_sources, hinted_materials):
+        event_id = shortfall_events.get((pair.origin_location_id, pair.type_id))
+        lot_id = excess_lots.get((pair.destination_location_id, pair.type_id))
+        if event_id is None or lot_id is None:
+            continue
+        already = await moves_repo.pending_exists(
+            session,
+            corporation_id=corp.id,
+            shortfall_event_id=event_id,
+            excess_lot_id=lot_id,
+        )
+        if already:
+            continue
+        await moves_repo.add(
+            session,
+            corporation_id=corp.id,
+            type_id=pair.type_id,
+            origin_location_id=pair.origin_location_id,
+            destination_location_id=pair.destination_location_id,
+            qty=pair.qty,
+            shortfall_event_id=event_id,
+            excess_lot_id=lot_id,
+        )
 
     await session.commit()
     if lots_added or flagged:
@@ -246,6 +301,27 @@ async def _reprocess_hints(session: AsyncSession, deltas: list[Delta]):
         materials,
         {tid: t.portion_size for tid, t in types.items()},
     )
+
+
+def _move_pairs(
+    deltas: list[Delta],
+    hinted_sources: set[tuple[str, int]],
+    hinted_materials: set[tuple[str, int]],
+) -> list[MovePair]:
+    """Feed the default-treated deltas to the pure pairer (ADR-0049). Slots the
+    reprocess suggestion claimed are excluded: they skipped the default
+    treatment, so there is no flag or lot for a move pair to decorate."""
+    shortfalls: list[tuple[str, int, int]] = []
+    excesses: list[tuple[str, int, int]] = []
+    for delta in deltas:
+        slot = (delta.location_id, delta.type_id)
+        if delta.kind == "shortfall" and slot not in hinted_sources:
+            shortfalls.append((delta.location_id, delta.type_id, delta.qty))
+        elif delta.kind == "excess" and slot not in hinted_materials:
+            excesses.append((delta.location_id, delta.type_id, delta.qty))
+    if not shortfalls or not excesses:
+        return []
+    return match_move_pairs(shortfalls, excesses)
 
 
 def _already_logged(
@@ -387,6 +463,37 @@ async def list_events(
         )
         for r in records
     ]
+
+
+async def list_move_suggestions(
+    session: AsyncSession, *, corporation_eve_id: int
+) -> list[MoveSuggestionView]:
+    """The pending "looks like a move" pairings for the "Needs a look" area
+    (ADR-0049, #200), names resolved — read-only in this slice. Gated: the
+    accounting entitlement is required (ADR-0042)."""
+    corp = await get_registered_corporation(session, corporation_eve_id)
+    await entitlements_app.require_entitlement(
+        session, corporation_id=corp.id, feature="accounting"
+    )
+    records = await moves_repo.list_pending(session, corporation_id=corp.id)
+    types = await sde_repo.get_types(session, sorted({r.type_id for r in records}))
+    hangar_names = {
+        h.location_id: h.location_name
+        for h in await hangars_repo.list_for_corp(session, corp.id)
+    }
+    return [_suggestion_view(r, types, hangar_names) for r in records]
+
+
+def _suggestion_view(
+    record: MoveSuggestionRecord, types: dict, hangar_names: dict[str, str]
+) -> MoveSuggestionView:
+    type_name = types[record.type_id].name if record.type_id in types else None
+    return MoveSuggestionView(
+        record=record,
+        type_name=type_name,
+        origin_name=hangar_names.get(record.origin_location_id),
+        destination_name=hangar_names.get(record.destination_location_id),
+    )
 
 
 async def run_manual_check(
