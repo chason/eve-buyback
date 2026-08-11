@@ -123,6 +123,7 @@ class SdeMetadataRecord(BaseModel):
     type_count: int
     market_group_count: int
     imported_at: datetime
+    seed_version: int | None = None
 
 
 class SdeStationRecord(BaseModel):

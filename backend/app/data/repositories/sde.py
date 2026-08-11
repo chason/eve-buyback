@@ -290,6 +290,7 @@ async def set_metadata(
     type_count: int,
     market_group_count: int,
     imported_at: datetime,
+    seed_version: int,
 ) -> SdeMetadataRecord:
     stmt = pg_insert(SdeMetadata).values(
         id=1,
@@ -297,6 +298,7 @@ async def set_metadata(
         type_count=type_count,
         market_group_count=market_group_count,
         imported_at=imported_at,
+        seed_version=seed_version,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=[SdeMetadata.id],
@@ -305,6 +307,7 @@ async def set_metadata(
             "type_count": stmt.excluded.type_count,
             "market_group_count": stmt.excluded.market_group_count,
             "imported_at": stmt.excluded.imported_at,
+            "seed_version": stmt.excluded.seed_version,
         },
     )
     await session.execute(stmt)
@@ -313,4 +316,5 @@ async def set_metadata(
         type_count=type_count,
         market_group_count=market_group_count,
         imported_at=imported_at,
+        seed_version=seed_version,
     )

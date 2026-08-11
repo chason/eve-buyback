@@ -1,5 +1,8 @@
-from app.application.sde import seed_if_needed, seed_reference_data
+from sqlalchemy import update
+
+from app.application.sde import SEED_VERSION, seed_if_needed, seed_reference_data
 from app.data.db import SessionLocal
+from app.data.models import SdeMetadata
 from app.data.repositories import sde as sde_repo
 from app.plugins.sde_source import (
     SdeMarketGroupRow,
@@ -89,6 +92,7 @@ async def test_seed_keeps_only_published_market_types():
     assert meta.type_count == 2
     assert meta.market_group_count == 2
     assert meta.source == "test"
+    assert meta.seed_version == SEED_VERSION
 
     async with SessionLocal() as session:
         assert (await sde_repo.get_type(session, 34)) is not None
@@ -149,6 +153,28 @@ async def test_seed_if_needed_seeds_then_skips():
         second = await seed_if_needed(session, source, source_label="test")
     assert second is None
     assert source.fetches == fetched_before  # no re-download when up to date
+
+
+async def test_seed_if_needed_reseeds_when_the_stamp_is_outdated():
+    """A deploy that widens the seed's coverage bumps SEED_VERSION; the boot-time
+    `--if-needed` must then re-seed even though no table is empty. A NULL stamp is
+    what pre-versioning deployments have — it reads as older than any version."""
+    source = FakeSdeSource(TYPES, GROUPS)
+    async with SessionLocal() as session:
+        await seed_reference_data(session, source, source_label="test")
+    async with SessionLocal() as session:
+        await session.execute(update(SdeMetadata).values(seed_version=None))
+        await session.commit()
+
+    fetched_before = source.fetches
+    async with SessionLocal() as session:
+        reseed = await seed_if_needed(session, source, source_label="test")
+    assert reseed is not None  # outdated stamp → full re-seed
+    assert source.fetches > fetched_before
+
+    # The re-seed stamped the current version, so the next boot is a no-op again.
+    async with SessionLocal() as session:
+        assert (await seed_if_needed(session, source, source_label="test")) is None
 
 
 async def test_seed_is_idempotent():

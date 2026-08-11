@@ -17,3 +17,7 @@ class SdeMetadata(Base):
     type_count: Mapped[int]
     market_group_count: Mapped[int]
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # What the seed covered (application SEED_VERSION at import time). Lets the
+    # boot-time auto-seed re-run when the seed's coverage changes, not just when
+    # a table is empty. NULL = stamped before versioning existed (outdated).
+    seed_version: Mapped[int | None]

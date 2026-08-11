@@ -1,12 +1,13 @@
 """Deploy-time SDE seed (ADR-0009). Run with:
 
     uv run python -m app.sde.seed              # always (re)seed
-    uv run python -m app.sde.seed --if-needed  # seed only when the SDE is incomplete
+    uv run python -m app.sde.seed --if-needed  # seed only when incomplete/outdated
 
-Downloads Fuzzwork's SDE dumps (types, market groups, ore reprocessing yields, NPC
+Downloads Fuzzwork's SDE dumps (types, market groups, reprocessing yields, NPC
 stations) and upserts the curated subset into the app database. Idempotent — safe to
 re-run after each EVE expansion. The container entrypoint runs `--if-needed` on boot
-so a fresh deploy self-seeds without re-downloading on every restart. Standalone: no
+so a fresh deploy self-seeds — and a deploy that widens the seed's coverage (a bumped
+`SEED_VERSION`) re-seeds — without re-downloading on every restart. Standalone: no
 FastAPI app required.
 """
 
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--if-needed",
         action="store_true",
-        help="seed only when the SDE is missing/incomplete (cheap no-op otherwise)",
+        help="seed only when the SDE is missing/incomplete/outdated (cheap no-op otherwise)",
     )
     args = parser.parse_args()
     asyncio.run(main(if_needed=args.if_needed))
