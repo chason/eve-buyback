@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application import entitlements as entitlements_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import MoveSuggestionNotFound, MoveSuggestionNotPending
+from app.data.records import MoveSuggestionRecord
 from app.data.repositories import expenses as expenses_repo
 from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
@@ -71,6 +72,11 @@ async def confirm_move(
       attributes through its note, which always names the move — allocating
       one ISK figure across lots would imply a precision it doesn't have.
       Omitted, zero, or a confirm that converted nothing books nothing.
+    - Candidate origins (#203) are sibling pending suggestions sharing this
+      one's deemed lot; the manager picks by confirming ONE of them — this
+      function never chooses. A confirm that fully claims the lot withdraws
+      the siblings (see `_withdraw_claimed_siblings`); a partial claim leaves
+      them pending at their shrunken convertible quantity.
 
     The log entry is written at the ORIGIN slot: append-only, it supersedes the
     shortfall as that slot's latest event, which is what "resolving the flag"
@@ -174,6 +180,15 @@ async def confirm_move(
             confirmed_by_name=confirmed_by_name,
         ),
     )
+    if moved > 0 and deemed is not None:
+        await _withdraw_claimed_siblings(
+            session,
+            corp.id,
+            deemed_lot_id=deemed.id,
+            remaining=deemed.qty_remaining - moved,
+            chosen=suggestion,
+            now=now,
+        )
     await session.commit()
     return ConfirmMoveResult(qty_moved=moved)
 
@@ -203,6 +218,55 @@ async def _confirmed_note(
     )
     who = confirmed_by_name or f"character {confirmed_by_character_id}"
     return f"confirmed as a move to {destination} by {who}"
+
+
+async def _withdraw_claimed_siblings(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    *,
+    deemed_lot_id: uuid.UUID,
+    remaining: int,
+    chosen: MoveSuggestionRecord,
+    now: datetime,
+) -> None:
+    """Candidate origins share one found-stock lot (#203): several pending
+    suggestions can point at the same deemed lot, and confirming one claims its
+    units. When the claim leaves nothing — the lot is fully reversed — the
+    sibling candidates are withdrawn: bookkeeping, not a decision (#202's
+    stance — no origin was ruled out, the stock is simply spoken for), logged
+    in plain words at each sibling's origin slot. A partial claim leaves the
+    siblings pending: the remainder is still real found stock, and a haul can
+    arrive from two places — the cards just shrink to what is left (#204)."""
+    if remaining > 0:
+        return
+    pending = await moves_repo.list_pending(session, corporation_id=corporation_id)
+    siblings = [s for s in pending if _is_sibling(s, deemed_lot_id, chosen.id)]
+    if not siblings:
+        return
+    hangar_names = await _hangar_names(session, corporation_id)
+    origin = hangar_names.get(
+        chosen.origin_location_id, chosen.origin_location_id
+    )
+    for sibling in siblings:
+        await moves_repo.set_status(
+            session, suggestion_id=sibling.id, status="withdrawn"
+        )
+        await recon_repo.add_event(
+            session,
+            corporation_id=corporation_id,
+            location_id=sibling.origin_location_id,
+            type_id=sibling.type_id,
+            kind="move_withdrawn",
+            qty=sibling.qty,
+            occurred_at=now,
+            note=f"The found stock was confirmed as a move from {origin}",
+        )
+
+
+def _is_sibling(
+    s: MoveSuggestionRecord, deemed_lot_id: uuid.UUID, chosen_id: uuid.UUID
+) -> bool:
+    return s.excess_lot_id == deemed_lot_id and s.id != chosen_id
 
 
 async def _haul_note(

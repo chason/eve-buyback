@@ -1521,7 +1521,7 @@
         "type": "object"
       },
       "MoveSuggestionOut": {
-        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202). `qty` is what\nconfirming would actually convert now (#204) \u2014 units already sold or\nreprocessed since the pairing are excluded, so the card never\noverstates.",
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202). `qty` is what\nconfirming would actually convert now (#204) \u2014 units already sold or\nreprocessed since the pairing are excluded, so the card never overstates.\nSuggestions sharing a `group_id` are candidate origins for the same found\nstock (#203) \u2014 the UI folds them into one card and the manager picks which\norigin to confirm; confirming one resolves the claim for all of them.",
         "properties": {
           "destination_location_id": {
             "title": "Destination Location Id",
@@ -1537,6 +1537,18 @@
               }
             ],
             "title": "Destination Name"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
           },
           "id": {
             "format": "uuid",

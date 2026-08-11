@@ -77,21 +77,45 @@ def test_never_pairs_across_types_even_on_a_quantity_match():
     assert match_move_pairs([(JITA, TRIT, 600)], [(AMARR, PYE, 600)]) == []
 
 
-def test_ambiguous_candidates_pair_nothing_but_unambiguous_types_still_do():
-    # Tritanium short at TWO stations with one excess is ambiguous (#203 lists
-    # candidates); Pyerite's single pair still proposes.
+def test_two_candidate_origins_for_one_excess_both_propose():
+    # Tritanium short at TWO stations with one excess (#203): one candidate
+    # pair per origin, each capped by its own shortfall, sharing the excess.
+    # Pyerite's single unambiguous pair proposes as before (#200).
     pairs = match_move_pairs(
         shortfalls=[(JITA, TRIT, 100), ("60011866", TRIT, 50), (JITA, PYE, 20)],
         excesses=[(AMARR, TRIT, 150), (AMARR, PYE, 80)],
     )
     assert pairs == [
         MovePair(
+            type_id=TRIT,
+            origin_location_id=JITA,
+            destination_location_id=AMARR,
+            qty=100,
+        ),
+        MovePair(
+            type_id=TRIT,
+            origin_location_id="60011866",
+            destination_location_id=AMARR,
+            qty=50,
+        ),
+        MovePair(
             type_id=PYE,
             origin_location_id=JITA,
             destination_location_id=AMARR,
             qty=20,
-        )
+        ),
     ]
+
+
+def test_an_ambiguous_destination_still_proposes_nothing():
+    # One shortfall, TWO excess locations: with the destination itself in doubt
+    # there is no single found-stock lot for candidates to share (#203 scopes
+    # the manager-picks flow to candidate ORIGINS) — the defaults stand.
+    pairs = match_move_pairs(
+        shortfalls=[(JITA, TRIT, 100)],
+        excesses=[(AMARR, TRIT, 60), ("60011866", TRIT, 40)],
+    )
+    assert pairs == []
 
 
 def test_no_pairs_without_both_sides():

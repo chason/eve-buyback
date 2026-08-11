@@ -681,14 +681,52 @@ function ReconciliationSection({
     },
   })
   // "Not a move" (#202): the card leaves the list; what's booked stays booked,
-  // and the decision lands in the log below.
+  // and the decision lands in the log below. A candidate card (#203) is
+  // several suggestions — "not a move" answers every origin's question, so
+  // each candidate is dismissed.
   const dismiss = useMutation({
-    mutationFn: (id: string) => dismissMoveSuggestion(id),
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) await dismissMoveSuggestion(id)
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["moveSuggestions"] })
       void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
     },
   })
+
+  // The #205 haul-cost prompt, shared by the plain confirm and the #203
+  // candidate pick — by the time it opens, WHICH suggestion converts is fixed.
+  const costPrompt = (id: string) => (
+    <div className="access-actions">
+      <label>
+        What did the haul cost? (optional)
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          placeholder="ISK — leave empty if nothing"
+          value={haulCost}
+          onChange={(e) => setHaulCost(e.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        className="secondary"
+        disabled={confirmMove.isPending}
+        onClick={() => confirmMove.mutate({ id, cost: haulCost || undefined })}
+      >
+        {confirmMove.isPending ? "Confirming…" : "Confirm the move"}
+      </button>{" "}
+      <button
+        type="button"
+        className="linkbtn"
+        disabled={confirmMove.isPending}
+        onClick={() => setConfirmingId(null)}
+      >
+        Cancel
+      </button>
+    </div>
+  )
 
   return (
     <section className="panel">
@@ -720,68 +758,57 @@ function ReconciliationSection({
       </p>
       {suggestions.data && suggestions.data.length > 0 && (
         <ul className="recon-list">
-          {suggestions.data.map((s) => (
-            <li key={s.id}>
+          {groupSuggestions(suggestions.data).map((group) => {
+            const chosen = group.find((c) => c.id === confirmingId)
+            return (
+            <li key={group[0].id}>
               <small>
-                {new Date(s.noticed_at).toLocaleString()} — {suggestionText(s)}{" "}
+                {new Date(group[0].noticed_at).toLocaleString()} —{" "}
+                {group.length === 1
+                  ? suggestionText(group[0])
+                  : ambiguousText(group)}{" "}
+                {group.length === 1 ? (
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    disabled={confirmMove.isPending || dismiss.isPending}
+                    onClick={() => {
+                      setConfirmingId(group[0].id)
+                      setHaulCost("")
+                    }}
+                  >
+                    Yes, this was a move
+                  </button>
+                ) : (
+                  group.map((c) => (
+                    <span key={c.id}>
+                      <button
+                        type="button"
+                        className="linkbtn"
+                        disabled={confirmMove.isPending || dismiss.isPending}
+                        onClick={() => {
+                          setConfirmingId(c.id)
+                          setHaulCost("")
+                        }}
+                      >
+                        From {c.origin_name ?? c.origin_location_id}
+                      </button>{" "}
+                    </span>
+                  ))
+                )}{" "}
                 <button
                   type="button"
                   className="linkbtn"
                   disabled={confirmMove.isPending || dismiss.isPending}
-                  onClick={() => {
-                    setConfirmingId(s.id)
-                    setHaulCost("")
-                  }}
-                >
-                  Yes, this was a move
-                </button>{" "}
-                <button
-                  type="button"
-                  className="linkbtn"
-                  disabled={confirmMove.isPending || dismiss.isPending}
-                  onClick={() => dismiss.mutate(s.id)}
+                  onClick={() => dismiss.mutate(group.map((c) => c.id))}
                 >
                   Not a move
                 </button>
               </small>
-              {confirmingId === s.id && (
-                <div className="access-actions">
-                  <label>
-                    What did the haul cost? (optional)
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="ISK — leave empty if nothing"
-                      value={haulCost}
-                      onChange={(e) => setHaulCost(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={confirmMove.isPending}
-                    onClick={() =>
-                      confirmMove.mutate({
-                        id: s.id,
-                        cost: haulCost || undefined,
-                      })
-                    }
-                  >
-                    {confirmMove.isPending ? "Confirming…" : "Confirm the move"}
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="linkbtn"
-                    disabled={confirmMove.isPending}
-                    onClick={() => setConfirmingId(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+              {chosen && costPrompt(chosen.id)}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
       {confirmMove.isError && (
@@ -850,6 +877,40 @@ function checkSummary(r: { lots_added: number; flagged: number }): string {
   }
   if (r.flagged > 0) parts.push(`${r.flagged} flagged for a look`)
   return `Done — ${parts.join(", ")}.`
+}
+
+/** Candidate-origin folding (#203): suggestions sharing a `group_id` are the
+ * same found stock with more than one plausible origin — one card, and the
+ * manager picks which origin to confirm. Ungrouped suggestions stay singleton
+ * cards. Order of the list is preserved. */
+function groupSuggestions(list: MoveSuggestionOut[]): MoveSuggestionOut[][] {
+  const byGroup = new Map<string, MoveSuggestionOut[]>()
+  const groups: MoveSuggestionOut[][] = []
+  for (const s of list) {
+    const existing = s.group_id ? byGroup.get(s.group_id) : undefined
+    if (existing) {
+      existing.push(s)
+      continue
+    }
+    const fresh = [s]
+    if (s.group_id) byGroup.set(s.group_id, fresh)
+    groups.push(fresh)
+  }
+  return groups
+}
+
+/** The ambiguous card's question (#203): the same item is missing at more than
+ * one hangar and turned up at one — plain English, the manager picks. */
+function ambiguousText(group: MoveSuggestionOut[]): string {
+  const item = group[0].type_name ?? `Type ${group[0].type_id}`
+  const to = group[0].destination_name ?? group[0].destination_location_id
+  const origins = group.map(candidateOrigin).join(" or from ")
+  return `Looks like some ${item} moved to ${to} — from ${origins}: which was it?`
+}
+
+function candidateOrigin(s: MoveSuggestionOut): string {
+  const name = s.origin_name ?? s.origin_location_id
+  return `${name} (${s.qty.toLocaleString()} missing)`
 }
 
 /** A "looks like a move" suggestion (ADR-0049, #200): the same item went

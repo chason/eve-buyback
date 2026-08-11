@@ -40,12 +40,15 @@ def match_move_pairs(
     only, ever — quantity coincidence across *different* types is numerology
     (ADR-0049).
 
-    Kept deliberately simple for this slice (#200): a type pairs only when it
-    has exactly ONE shortfall location and ONE excess location — the single
-    unambiguous pair. Multi-candidate patterns (say, short at two stations and
-    over at one) produce nothing here; listing candidates for the manager to
-    pick is #203, as is pairing against a still-open flag from a prior sync.
-    Deterministic order (by type) so logs and tests read stably."""
+    A type with ONE excess location pairs against every shortfall location it
+    has (#203): a single shortfall is the unambiguous pair (#200); several are
+    candidate origins — one pair per origin, each capped by its own shortfall,
+    all pointing at the same excess. The caller persists them as siblings and a
+    manager picks which one to confirm; nothing is auto-chosen. A type over at
+    SEVERAL locations still proposes nothing: with the destination itself in
+    doubt there is no single found-stock lot for the candidates to share, so
+    the defaults stand until a human sorts it out. Deterministic order (by
+    type, then origin) so logs and tests read stably."""
     shorts_by_type: dict[int, list[tuple[str, int]]] = {}
     for location_id, type_id, qty in shortfalls:
         shorts_by_type.setdefault(type_id, []).append((location_id, qty))
@@ -55,17 +58,17 @@ def match_move_pairs(
 
     pairs: list[MovePair] = []
     for type_id in sorted(shorts_by_type.keys() & excess_by_type.keys()):
-        shorts = shorts_by_type[type_id]
         overs = excess_by_type[type_id]
-        if len(shorts) != 1 or len(overs) != 1:
-            continue  # ambiguous — the manager-picks flow is #203
-        (origin, short_qty), (destination, excess_qty) = shorts[0], overs[0]
-        pairs.append(
-            MovePair(
-                type_id=type_id,
-                origin_location_id=origin,
-                destination_location_id=destination,
-                qty=min(short_qty, excess_qty),
+        if len(overs) != 1:
+            continue  # ambiguous destination — nothing to anchor a pair on
+        (destination, excess_qty) = overs[0]
+        for origin, short_qty in sorted(shorts_by_type[type_id]):
+            pairs.append(
+                MovePair(
+                    type_id=type_id,
+                    origin_location_id=origin,
+                    destination_location_id=destination,
+                    qty=min(short_qty, excess_qty),
+                )
             )
-        )
     return pairs

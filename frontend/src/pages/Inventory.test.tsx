@@ -609,6 +609,101 @@ describe("Inventory", () => {
     )
   })
 
+  const CANDIDATES = [
+    {
+      id: "cand-jita", type_id: 34, type_name: "Tritanium",
+      origin_location_id: "60003760", origin_name: "Jita IV - Moon 4",
+      destination_location_id: "60008494", destination_name: "Amarr VIII",
+      qty: 100, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
+    },
+    {
+      id: "cand-dodixie", type_id: 34, type_name: "Tritanium",
+      origin_location_id: "60011866", origin_name: "Dodixie IX",
+      destination_location_id: "60008494", destination_name: "Amarr VIII",
+      qty: 50, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
+    },
+  ]
+
+  it("folds candidate origins into one card that asks which it was (#203)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue(CANDIDATES)
+
+    renderInventory()
+
+    // One card, both origins named with what each is missing, and the pick
+    // spelled out — no auto-choice, no jargon.
+    const card = await screen.findByText(
+      /Looks like some Tritanium moved to Amarr VIII — from Jita IV - Moon 4 \(100 missing\) or from Dodixie IX \(50 missing\): which was it\?/,
+    )
+    const item = card.closest("li")!
+    expect(
+      within(item).getByRole("button", { name: "From Jita IV - Moon 4" }),
+    ).toBeInTheDocument()
+    expect(
+      within(item).getByRole("button", { name: "From Dodixie IX" }),
+    ).toBeInTheDocument()
+    expect(
+      within(item).getByRole("button", { name: "Not a move" }),
+    ).toBeInTheDocument()
+    // No unqualified confirm button — picking an origin IS the confirm path.
+    expect(
+      within(item).queryByRole("button", { name: "Yes, this was a move" }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("confirms the picked candidate — and only that one (#203)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions)
+      .mockResolvedValueOnce(CANDIDATES)
+      .mockResolvedValue([])
+    vi.mocked(accountingApi.confirmMoveSuggestion).mockResolvedValue(undefined)
+
+    renderInventory()
+
+    // Picking an origin opens the same haul-cost prompt as a plain confirm
+    // (#205); confirming fires for the chosen candidate's id only.
+    await u.click(
+      await screen.findByRole("button", { name: "From Dodixie IX" }),
+    )
+    await u.click(screen.getByRole("button", { name: "Confirm the move" }))
+    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledTimes(1)
+    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledWith(
+      "cand-dodixie",
+      undefined,
+    )
+  })
+
+  it("Not a move on a candidate card dismisses every candidate (#203)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue(CANDIDATES)
+    vi.mocked(accountingApi.dismissMoveSuggestion).mockResolvedValue(undefined)
+
+    renderInventory()
+
+    const card = await screen.findByText(/which was it\?/)
+    await u.click(
+      within(card.closest("li")!).getByRole("button", { name: "Not a move" }),
+    )
+    await waitFor(() =>
+      expect(accountingApi.dismissMoveSuggestion).toHaveBeenCalledTimes(2),
+    )
+    expect(accountingApi.dismissMoveSuggestion).toHaveBeenCalledWith("cand-jita")
+    expect(accountingApi.dismissMoveSuggestion).toHaveBeenCalledWith(
+      "cand-dodixie",
+    )
+  })
+
   it("tells the dismissed and withdrawn stories in the log (#202)", async () => {
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
       access: true,

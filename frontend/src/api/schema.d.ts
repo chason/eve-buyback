@@ -1601,14 +1601,18 @@ export interface components {
          *     the same item missing at one marked hangar and appearing at another. `id`
          *     keys the card's actions (confirm #201, dismiss #202). `qty` is what
          *     confirming would actually convert now (#204) — units already sold or
-         *     reprocessed since the pairing are excluded, so the card never
-         *     overstates.
+         *     reprocessed since the pairing are excluded, so the card never overstates.
+         *     Suggestions sharing a `group_id` are candidate origins for the same found
+         *     stock (#203) — the UI folds them into one card and the manager picks which
+         *     origin to confirm; confirming one resolves the claim for all of them.
          */
         MoveSuggestionOut: {
             /** Destination Location Id */
             destination_location_id: string;
             /** Destination Name */
             destination_name?: string | null;
+            /** Group Id */
+            group_id?: string | null;
             /**
              * Id
              * Format: uuid
