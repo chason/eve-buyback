@@ -31,10 +31,9 @@ from app.data.repositories import move_suggestions as moves_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
 from app.main import app
-from app.plugins.esi import CharacterInfo, CorporationAsset, CorporationInfo
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, HangarAssetsEsi, login, make_client
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -65,38 +64,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class MultiHangarEsi:
-    """ESI fake: token-connect validation + an assets read spanning multiple
-    stations. `hangar` is `(location_id, type_id) → qty` in CorpSAG2."""
-
-    def __init__(self):
-        self.hangar: dict[tuple[str, int], int] = {}
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        assets = []
-        for (loc, tid), qty in self.hangar.items():
-            assets.append(
-                CorporationAsset(
-                    item_id=next(self._item_id), type_id=tid, quantity=qty,
-                    location_id=int(loc), location_flag="CorpSAG2",
-                )
-            )
-        return assets
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -105,7 +72,7 @@ def _user() -> AuthenticatedUser:
     )
 
 
-async def _seed(esi: MultiHangarEsi) -> None:
+async def _seed(esi: HangarAssetsEsi) -> None:
     """Registered, entitled corp with THREE marked hangars (Jita, Amarr,
     Dodixie), a cached Tritanium price, and a connected corp ESI token."""
     async with SessionLocal() as session:
@@ -166,7 +133,7 @@ async def _book_lot(qty: int, location_id: str) -> None:
         await session.commit()
 
 
-async def _run(esi: MultiHangarEsi):
+async def _run(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -208,13 +175,13 @@ def _by_origin(suggestions, origin: str):
 
 
 async def test_mid_haul_shortfall_pairs_with_a_later_syncs_excess():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(1000, JITA)
 
     # Sync N: the freighter is in space — 600 gone from Jita, nothing has
     # arrived anywhere. The shortfall flags; no pair is possible yet.
-    esi.hangar = {(JITA, TRIT): 400}
+    esi.stock = {(JITA, TRIT): 400}
     await _run(esi)
     _, events, pending = await _state()
     assert pending == []
@@ -224,7 +191,7 @@ async def test_mid_haul_shortfall_pairs_with_a_later_syncs_excess():
     # Sync N+1: the freighter docked — 350 surfaced at Amarr. The pair
     # proposes against the STANDING flag from sync N: no new shortfall event,
     # the old one anchors.
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
     await _run(esi)
     _, events, pending = await _state()
     assert sum(1 for e in events if e.kind == "shortfall") == 1
@@ -238,14 +205,14 @@ async def test_mid_haul_shortfall_pairs_with_a_later_syncs_excess():
 
 
 async def _suggest_candidates(
-    esi: MultiHangarEsi, *, jita_short: int, dodixie_short: int, excess: int
+    esi: HangarAssetsEsi, *, jita_short: int, dodixie_short: int, excess: int
 ):
     """One sync where Tritanium is short at Jita AND Dodixie and over at
     Amarr; returns the two pending candidate suggestions."""
     await _seed(esi)
     await _book_lot(1000, JITA)
     await _book_lot(500, DODIXIE)
-    esi.hangar = {
+    esi.stock = {
         (JITA, TRIT): 1000 - jita_short,
         (DODIXIE, TRIT): 500 - dodixie_short,
         (AMARR, TRIT): excess,
@@ -257,7 +224,7 @@ async def _suggest_candidates(
 
 
 async def test_two_candidate_origins_share_the_lot_each_with_its_own_anchor():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     from_jita, from_dodixie = await _suggest_candidates(
         esi, jita_short=100, dodixie_short=50, excess=150
     )
@@ -278,7 +245,7 @@ async def test_two_candidate_origins_share_the_lot_each_with_its_own_anchor():
 
 
 async def test_candidate_cards_expose_a_shared_group_id():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _suggest_candidates(esi, jita_short=100, dodixie_short=50, excess=150)
 
     app.dependency_overrides.clear()
@@ -301,7 +268,7 @@ async def test_candidate_cards_expose_a_shared_group_id():
 
 
 async def test_confirming_one_candidate_converts_it_and_withdraws_the_claimed_sibling():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     from_jita, from_dodixie = await _suggest_candidates(
         esi, jita_short=350, dodixie_short=350, excess=350
     )
@@ -340,7 +307,7 @@ async def test_confirming_one_candidate_converts_it_and_withdraws_the_claimed_si
 
 
 async def test_a_partial_claim_leaves_the_sibling_pending_at_what_remains():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     from_jita, from_dodixie = await _suggest_candidates(
         esi, jita_short=100, dodixie_short=350, excess=350
     )
@@ -361,7 +328,7 @@ async def test_a_partial_claim_leaves_the_sibling_pending_at_what_remains():
 
 
 async def test_dismissing_one_candidate_leaves_the_other_actionable():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     from_jita, from_dodixie = await _suggest_candidates(
         esi, jita_short=100, dodixie_short=50, excess=150
     )
