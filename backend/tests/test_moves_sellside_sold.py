@@ -36,10 +36,9 @@ from app.domain.moves import (
     sold_cost_estimate,
     unretired_sold,
 )
-from app.plugins.esi import CharacterInfo, CorporationAsset, CorporationInfo
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID
+from tests.helpers import CHAR_ID, CORP_ID, HangarAssetsEsi
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -125,38 +124,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class MultiHangarEsi:
-    """ESI fake: token-connect validation + an assets read spanning multiple
-    stations. `hangar` is `(location_id, type_id) → qty` in CorpSAG2."""
-
-    def __init__(self):
-        self.hangar: dict[tuple[str, int], int] = {}
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        assets = []
-        for (loc, tid), qty in self.hangar.items():
-            assets.append(
-                CorporationAsset(
-                    item_id=next(self._item_id), type_id=tid, quantity=qty,
-                    location_id=int(loc), location_flag="CorpSAG2",
-                )
-            )
-        return assets
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -165,7 +132,7 @@ def _user() -> AuthenticatedUser:
     )
 
 
-async def _seed(esi: MultiHangarEsi, *, prices: dict[int, str] | None = None):
+async def _seed(esi: HangarAssetsEsi, *, prices: dict[int, str] | None = None):
     """Registered + entitled corp with marked hangars at Jita AND Amarr, Jita
     config, SDE types + stations, cached prices, and a corp ESI token. Dodixie
     is deliberately NOT a hangar — the sell side isn't scoped by the list."""
@@ -275,7 +242,7 @@ async def _list_orders(rows: list[tuple[str, int, int]]) -> None:
         await session.commit()
 
 
-async def _run(esi: MultiHangarEsi):
+async def _run(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -314,13 +281,13 @@ async def _confirm(suggestion_id):
 
 
 async def test_estimated_cost_sales_at_any_station_pair():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
     # 60 gone from the Jita hangar; the division's fills at Dodixie booked the
     # no-lot fallback (deemed 90% × 4.00 = 3.60, flagged) — sold evidence.
     assert await _sell(TRIT, 60, DODIXIE, ref=101) is True
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
 
     await _run(esi)
 
@@ -338,13 +305,13 @@ async def test_estimated_cost_sales_at_any_station_pair():
 
 
 async def test_triple_signal_pair_sums_without_double_counting():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
     # At Amarr: 50 already sold via the fallback, 40 counted in the hangar
     # beyond the books, 60 more in sell-order escrow. 150 missing at Jita.
     assert await _sell(TRIT, 50, AMARR, ref=102) is True
-    esi.hangar = {(JITA, TRIT): 850, (AMARR, TRIT): 40}
+    esi.stock = {(JITA, TRIT): 850, (AMARR, TRIT): 40}
     await _list_orders([(AMARR, TRIT, 60)])
 
     await _run(esi)
@@ -360,11 +327,11 @@ async def test_triple_signal_pair_sums_without_double_counting():
 
 
 async def test_confirm_retires_fifo_and_books_a_positive_true_up():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     lot = await _book_lot(TRIT, 1000, JITA, unit_cost="5.00")
     await _sell(TRIT, 60, DODIXIE, ref=103)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _run(esi)
     _, _, (suggestion,) = await _state()
 
@@ -409,12 +376,12 @@ async def test_confirm_retires_fifo_and_books_a_positive_true_up():
 
 
 async def test_negative_difference_books_a_negative_correction():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     # Real cost BELOW the 3.60 estimate: the sales understated profit.
     await _book_lot(TRIT, 1000, JITA, unit_cost="2.00")
     await _sell(TRIT, 60, DODIXIE, ref=104)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _run(esi)
     _, _, (suggestion,) = await _state()
 
@@ -430,11 +397,11 @@ async def test_negative_difference_books_a_negative_correction():
 
 
 async def test_double_confirm_is_a_no_op_and_retired_qty_never_repairs():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
     await _sell(TRIT, 60, DODIXIE, ref=105)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _run(esi)
     _, _, (suggestion,) = await _state()
 
@@ -454,12 +421,12 @@ async def test_double_confirm_is_a_no_op_and_retired_qty_never_repairs():
 
 
 async def test_stranded_remainder_repairs_as_sold_and_retires():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     lot = await _book_lot(TRIT, 100, JITA, unit_cost="5.00")
     # The whole 100 was hauled to the Amarr hangar; the sync pairs the counted
     # excess and books the deemed lot (the #200 case).
-    esi.hangar = {(JITA, TRIT): 0, (AMARR, TRIT): 100}
+    esi.stock = {(JITA, TRIT): 0, (AMARR, TRIT): 100}
     await _run(esi)
     _, _, (counted_pair,) = await _state()
     assert counted_pair.qty == 100 and counted_pair.qty_sold == 0
@@ -473,7 +440,7 @@ async def test_stranded_remainder_repairs_as_sold_and_retires():
 
     # The next sync closes the loop (#207): the stranded 60 re-flag as a
     # shortfall and re-pair against the 60 estimated-cost sales at Amarr.
-    esi.hangar = {(JITA, TRIT): 0, (AMARR, TRIT): 40}
+    esi.stock = {(JITA, TRIT): 0, (AMARR, TRIT): 40}
     await _run(esi)
     _, _, (sold_pair,) = await _state()
     assert (sold_pair.qty, sold_pair.qty_sold) == (60, 60)

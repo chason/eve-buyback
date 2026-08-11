@@ -24,10 +24,9 @@ from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
 from app.domain.reconciliation import Delta, reconcile
 from app.main import app
-from app.plugins.esi import CharacterInfo, CorporationAssetsForbidden, CorporationInfo
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, HangarAssetsEsi, login, make_client
 
 NOW = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -79,50 +78,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class AssetsEsi:
-    """ESI fake: token-connect validation + the assets read. `hangar` is the stock in
-    the marked hangar (CorpSAG2 at Jita) as {type_id: qty}; set `forbid` to test the
-    missing-scope path."""
-
-    def __init__(self):
-        self.hangar: dict[int, int] = {}
-        self.forbid = False
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    # --- token-connect validation ---
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    # --- the assets read ---
-    async def get_corporation_assets(self, corporation_id, access_token):
-        if self.forbid:
-            raise CorporationAssetsForbidden()
-        from app.plugins.esi import CorporationAsset
-
-        # The real ESI shape: hangar rows hang under the corp's OFFICE at the
-        # station — only the office row points at the station itself.
-        office_id = 1_027_000_000_001
-        stacks = [CorporationAsset(
-            item_id=office_id, type_id=27, quantity=1,
-            location_id=int(JITA), location_flag="OfficeFolder",
-        )]
-        for tid, qty in self.hangar.items():
-            stacks.append(CorporationAsset(
-                item_id=next(self._item_id), type_id=tid, quantity=qty,
-                location_id=office_id, location_flag="CorpSAG2",
-            ))
-        return stacks
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -131,7 +86,7 @@ def _user() -> AuthenticatedUser:
     )
 
 
-async def _seed(esi: AssetsEsi, *, prices: dict[int, str] | None = None) -> None:
+async def _seed(esi: HangarAssetsEsi, *, prices: dict[int, str] | None = None) -> None:
     """Registered + entitled corp, Jita config (buy percentile, default 90%), a Jita
     drop-off + marked hangar (division 2), SDE types, cached prices, and a connected
     corp ESI token."""
@@ -181,7 +136,7 @@ async def _seed(esi: AssetsEsi, *, prices: dict[int, str] | None = None) -> None
         )
 
 
-async def _run(esi: AssetsEsi, *, threshold: int = 1_000_000_000):
+async def _run(esi: HangarAssetsEsi, *, threshold: int = 1_000_000_000):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -201,9 +156,9 @@ async def _state():
 
 
 async def test_first_run_imports_opening_stock_at_deemed_cost():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 1000}
+    esi.stock = {(JITA, TRIT): 1000}
 
     result = await _run(esi)
 
@@ -226,7 +181,7 @@ async def test_first_run_imports_opening_stock_at_deemed_cost():
 
 
 async def test_matched_stock_is_never_repriced_and_excess_books_only_the_delta():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     async with SessionLocal() as session:
         corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
@@ -236,7 +191,7 @@ async def test_matched_stock_is_never_repriced_and_excess_books_only_the_delta()
             acquired_at=NOW, source="buyback", location_id=JITA,
         )
         await session.commit()
-    esi.hangar = {TRIT: 1500}
+    esi.stock = {(JITA, TRIT): 1500}
 
     result = await _run(esi)
 
@@ -252,7 +207,7 @@ async def test_matched_stock_is_never_repriced_and_excess_books_only_the_delta()
 
 
 async def test_pricing_rule_drives_deemed_cost_with_jita_fallback_for_blacklisted():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00", PYE: "8.00"})
     async with SessionLocal() as session:
         corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
@@ -269,7 +224,7 @@ async def test_pricing_rule_drives_deemed_cost_with_jita_fallback_for_blackliste
             reprocess=False, compressed_only=False, accepted=False,
         )
         await session.commit()
-    esi.hangar = {TRIT: 100, PYE: 100}
+    esi.stock = {(JITA, TRIT): 100, (JITA, PYE): 100}
 
     await _run(esi)
 
@@ -280,9 +235,9 @@ async def test_pricing_rule_drives_deemed_cost_with_jita_fallback_for_blackliste
 
 
 async def test_unpriceable_excess_is_flagged_not_invented_then_booked_once_priced():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)  # no cached prices at all
-    esi.hangar = {TRIT: 500}
+    esi.stock = {(JITA, TRIT): 500}
 
     result = await _run(esi)
     assert result.lots_added == 0 and result.flagged == 1
@@ -314,9 +269,9 @@ async def test_unpriceable_excess_is_flagged_not_invented_then_booked_once_price
 
 
 async def test_large_excess_is_booked_but_flagged():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 1000}  # deemed value 3,600 ISK
+    esi.stock = {(JITA, TRIT): 1000}  # deemed value 3,600 ISK
 
     result = await _run(esi, threshold=3_000)
 
@@ -329,7 +284,7 @@ async def test_large_excess_is_booked_but_flagged():
 
 
 async def test_shortfall_flags_without_inventing_a_lot_and_does_not_spam():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     async with SessionLocal() as session:
         corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
@@ -339,7 +294,7 @@ async def test_shortfall_flags_without_inventing_a_lot_and_does_not_spam():
             source="buyback", location_id=JITA,
         )
         await session.commit()
-    esi.hangar = {TRIT: 400}
+    esi.stock = {(JITA, TRIT): 400}
 
     result = await _run(esi)
     assert result.lots_added == 0 and result.flagged == 1
@@ -353,7 +308,7 @@ async def test_shortfall_flags_without_inventing_a_lot_and_does_not_spam():
     await _run(esi)
     _, events = await _state()
     assert len(events) == 1
-    esi.hangar = {TRIT: 300}
+    esi.stock = {(JITA, TRIT): 300}
     await _run(esi)
     _, events = await _state()
     assert len(events) == 2
@@ -390,13 +345,13 @@ async def test_reprocess_pattern_is_recorded_automatically_with_lineage():
     is RECORDED — ore lots consumed, the observed Tritanium created as children
     carrying the ore's cost and age — with a `reprocess_recorded` log entry, no
     shortfall flag, and NO deemed-cost Tritanium lot."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     # The books hold 600 Veldspar; the hangar holds none of it but does hold
     # Tritanium the reprocess would explain (≤ 6 batches × 400 = 2400).
     bought = datetime(2026, 6, 1, tzinfo=UTC)
     await _seed_veldspar(lots=[(600, "10.00", bought)])
-    esi.hangar = {TRIT: 2175}
+    esi.stock = {(JITA, TRIT): 2175}
 
     result = await _run(esi)
 
@@ -430,10 +385,10 @@ async def test_auto_reprocess_records_whole_batches_and_flags_the_remainder():
     fed the reprocess — the 50-unit remainder really is missing, so it stays a
     flagged shortfall instead of vanishing into the minerals' basis (review
     fix, ADR-0050)."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _seed_veldspar(lots=[(250, "10.00", NOW)])
-    esi.hangar = {TRIT: 750}  # ≤ 2 batches × 400 — yield-consistent
+    esi.stock = {(JITA, TRIT): 750}  # ≤ 2 batches × 400 — yield-consistent
 
     result = await _run(esi)
 
@@ -461,10 +416,10 @@ async def test_reprocess_falls_back_to_the_hint_when_the_record_refuses(
     """The defensive fallback branch (ADR-0050): when the automatic record can't
     apply, the pass keeps the suggest-only hint — flagged, nothing consumed,
     repeats without spamming."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _seed_veldspar(lots=[(600, "10.00", NOW)])
-    esi.hangar = {TRIT: 2175}
+    esi.stock = {(JITA, TRIT): 2175}
 
     async def refuse(*args, **kwargs):
         return False
@@ -491,12 +446,12 @@ async def test_auto_reprocess_flows_each_lot_s_own_cost_and_age():
     """Two ore lots of different vintage and price → the observed minerals split
     pro-rata across them, each child carrying its OWN source lot's cost and age
     (never blended, ADR-0047/0050)."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     old = datetime(2026, 5, 1, tzinfo=UTC)
     new = datetime(2026, 7, 1, tzinfo=UTC)
     await _seed_veldspar(lots=[(300, "10.00", old), (300, "16.00", new)])
-    esi.hangar = {TRIT: 2000}
+    esi.stock = {(JITA, TRIT): 2000}
 
     await _run(esi)
 
@@ -518,9 +473,9 @@ async def test_auto_reprocess_flows_each_lot_s_own_cost_and_age():
 
 
 async def test_reconciliation_log_lists_enriched_events():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 1000}
+    esi.stock = {(JITA, TRIT): 1000}
     await _run(esi)
 
     app.dependency_overrides.clear()
@@ -537,9 +492,9 @@ async def test_reconciliation_log_lists_enriched_events():
 
 
 async def test_manual_check_runs_and_returns_counts():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 1000}
+    esi.stock = {(JITA, TRIT): 1000}
 
     app.dependency_overrides.clear()
     async with make_client(esi) as http:  # the fake serves connect AND assets
@@ -550,7 +505,7 @@ async def test_manual_check_runs_and_returns_counts():
 
 
 async def test_manual_check_maps_missing_scope_to_reconnect_answer():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     esi.forbid = True
 

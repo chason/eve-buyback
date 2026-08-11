@@ -5,7 +5,13 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.plugins.cache import MemoryCache, get_cache
-from app.plugins.esi import CharacterInfo, CorporationInfo, get_esi_client
+from app.plugins.esi import (
+    CharacterInfo,
+    CorporationAsset,
+    CorporationAssetsForbidden,
+    CorporationInfo,
+    get_esi_client,
+)
 from app.plugins.esi_market import get_esi_market_client
 from app.plugins.sso import OAuthToken, VerifiedCharacter, get_sso_client
 
@@ -63,6 +69,54 @@ class CeoEsi(BaseEsi):
 
 class MemberEsi(BaseEsi):
     pass
+
+
+OFFICE_TYPE_ID = 27  # the Office item that anchors corp hangar rows at a station
+
+
+def office_nested_assets(stock, item_ids):
+    """Corp-asset rows in the REAL ESI shape (ADR-0044): division rows never sit
+    at the station — they hang under the corp's OFFICE there. One "OfficeFolder"
+    row per station points at the station itself; each stock row's `location_id`
+    is that office's `item_id`, flagged CorpSAG2. `stock` is
+    {(location_id, type_id): qty}; `item_ids` mints the stock rows' item ids."""
+    offices: dict[str, int] = {}
+    assets: list[CorporationAsset] = []
+    for (loc, tid), qty in stock.items():
+        office_id = offices.get(loc)
+        if office_id is None:
+            office_id = 1_027_000_000_001 + len(offices)
+            offices[loc] = office_id
+            assets.append(CorporationAsset(
+                item_id=office_id, type_id=OFFICE_TYPE_ID, quantity=1,
+                location_id=int(loc), location_flag="OfficeFolder",
+            ))
+        assets.append(CorporationAsset(
+            item_id=next(item_ids), type_id=tid, quantity=qty,
+            location_id=office_id, location_flag="CorpSAG2",
+        ))
+    return assets
+
+
+class HangarAssetsEsi(CeoEsi):
+    """ESI fake for the reconciliation-family harnesses: token-connect
+    validation (a CEO identity) plus the corp-assets read, emitted office-nested
+    via `office_nested_assets`. `stock` is the physical truth as
+    {(location_id, type_id): qty}, all in CorpSAG2; set `forbid` to exercise the
+    missing-assets-scope path."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stock: dict[tuple[str, int], int] = {}
+        self.forbid = False
+        self._item_id = iter(range(7_000_000, 8_000_000))
+
+    async def get_corporation_assets(
+        self, corporation_id: int, access_token: str
+    ) -> list[CorporationAsset]:
+        if self.forbid:
+            raise CorporationAssetsForbidden()
+        return office_nested_assets(self.stock, self._item_id)
 
 
 class FakeEsiMarket:
