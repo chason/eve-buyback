@@ -75,10 +75,16 @@ type ManualPrefill = {
   location_id: string
 }
 
+/** Below this many units, an ore stack is leftover dust from hauling or
+ * reprocessing — folded out of the table by default, revealable as a group. */
+const SMALL_ORE_QTY = 100
+
 function StockView({ inv }: { inv: InventoryOut }) {
   // The reprocess record dialog (#177), opened from a buy row or a hangar-check
   // suggestion; one at a time, keyed by the source lot.
   const [reprocessLotId, setReprocessLotId] = useState<string | null>(null)
+  // Small ore stacks stay folded until asked for — as a group, not one by one.
+  const [showSmallOres, setShowSmallOres] = useState(false)
   // The manual-entry form's prefill (#158); bumping the key remounts the form.
   const [manualPrefill, setManualPrefill] = useState<ManualPrefill | null>(null)
   const [manualKey, setManualKey] = useState(0)
@@ -90,6 +96,11 @@ function StockView({ inv }: { inv: InventoryOut }) {
   const oldestLotOf = (typeId: number) =>
     inv.items.find((i) => i.type_id === typeId)?.lots[0]?.id ?? null
   const hangarBasis = inv.basis === "hangar"
+  const isSmallOre = (i: InventoryItemOut) => i.is_ore && i.qty < SMALL_ORE_QTY
+  const smallOres = inv.items.filter(isSmallOre)
+  const shownItems = showSmallOres
+    ? inv.items
+    : inv.items.filter((i) => !isSmallOre(i))
   return (
     <>
       <hgroup>
@@ -155,7 +166,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
               </tr>
             </thead>
             <tbody>
-              {inv.items.map((item) => (
+              {shownItems.map((item) => (
                 <ItemRows
                   key={item.type_id}
                   item={item}
@@ -164,6 +175,18 @@ function StockView({ inv }: { inv: InventoryOut }) {
               ))}
             </tbody>
           </table>
+          {smallOres.length > 0 && (
+            <small className="field-hint">
+              {smallOreText(smallOres.length, showSmallOres)}{" "}
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => setShowSmallOres(!showSmallOres)}
+              >
+                {showSmallOres ? "Tuck them away" : "Show them"}
+              </button>
+            </small>
+          )}
           {inv.unpriced_types > 0 && (
             <small className="field-hint">
               {unpricedText(inv.unpriced_types, hangarBasis)}
@@ -1329,6 +1352,16 @@ function haulText(s: ShipmentOut): string {
   const to = s.destination_name ?? s.destination_location_id
   const sent = new Date(s.sent_at).toLocaleDateString()
   return `${s.qty.toLocaleString()} ${item} on its way from ${from} to ${to} (sent ${sent}).`
+}
+
+/** The folded-ores footnote: how many small ore stacks are tucked away (or
+ * currently shown), in plain English. */
+function smallOreText(count: number, shown: boolean): string {
+  const what =
+    count === 1
+      ? `1 small ore stack (under ${SMALL_ORE_QTY} units)`
+      : `${count} small ore stacks (under ${SMALL_ORE_QTY} units each)`
+  return shown ? `Showing ${what}.` : `${what} tucked away.`
 }
 
 /** The unpriced-rows footnote. On the ledger basis the table rows ARE the

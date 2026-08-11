@@ -176,6 +176,32 @@ async def test_reprocessable_flags_types_with_yield_data():
     assert trit.reprocessable is False  # a mineral has no yields
 
 
+async def test_is_ore_flags_asteroid_category_types():
+    """The table folds small ore stacks out of view — only category 25 (Asteroid)
+    counts as ore; minerals and unknown types don't."""
+    corp_id = await _seed_corp()
+    async with SessionLocal() as session:
+        await sde_repo.bulk_upsert_types(session, [
+            {"type_id": 1230, "name": "Veldspar", "group_id": 465,
+             "category_id": 25, "market_group_id": 2, "volume": 0.1,
+             "published": True, "portion_size": 100},
+        ])
+        await session.commit()
+    await _lot(corp_id, type_id=1230, qty=50, cost="10.00")
+    await _lot(corp_id, type_id=34, qty=100, cost="4.00")
+
+    async with SessionLocal() as session:
+        view = await lots_app.get_inventory(
+            session, corporation_eve_id=CORP_ID, stale_days=30,
+            sales_tax_rate=Decimal(0), now=NOW,
+        )
+
+    veld = next(i for i in view.items if i.type_id == 1230)
+    trit = next(i for i in view.items if i.type_id == 34)
+    assert veld.is_ore is True
+    assert trit.is_ore is False  # a mineral is not an ore
+
+
 async def _configure_market(*, prices: dict[int, str]) -> None:
     """Give the corp a default hub (Jita, buy percentile) and cache buy prices."""
     async with SessionLocal() as session:

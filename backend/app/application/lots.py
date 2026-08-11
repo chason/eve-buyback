@@ -39,6 +39,7 @@ from app.domain.lots import (
     nrv_per_unit,
     write_down_target,
 )
+from app.domain.pricing import ORE_CATEGORY_ID
 
 
 async def _nrv_by_type(
@@ -116,6 +117,9 @@ class InventoryItemView(BaseModel):
     # Whether the type has any seeded reprocessing yields — i.e. can be
     # reprocessed at all; gates the "Turned into minerals" action (#177).
     reprocessable: bool
+    # Whether the type is an ore (SDE category 25) — lets the table fold small
+    # leftover ore stacks out of view.
+    is_ore: bool
     lots: list[InventoryLotView]
 
 
@@ -287,9 +291,10 @@ def _item_view(
     if unit is not None:
         unrealized = (qty - qty_unbooked) * unit - total_cost
     days = [v.days_held for v in views]
+    sde_type = names.get(type_id)
     return InventoryItemView(
         type_id=type_id,
-        type_name=names[type_id].name if type_id in names else None,
+        type_name=sde_type.name if sde_type else None,
         qty=qty,
         qty_unbooked=qty_unbooked,
         total_cost=total_cost,
@@ -299,6 +304,7 @@ def _item_view(
         worth=worth,
         unrealized=unrealized,
         reprocessable=type_id in reprocessable_ids,
+        is_ore=sde_type is not None and sde_type.category_id == ORE_CATEGORY_ID,
         lots=views,
     )
 

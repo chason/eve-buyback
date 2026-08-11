@@ -943,6 +943,10 @@
             "title": "Any Estimated",
             "type": "boolean"
           },
+          "is_ore": {
+            "title": "Is Ore",
+            "type": "boolean"
+          },
           "lots": {
             "items": {
               "$ref": "#/components/schemas/InventoryLotOut"
@@ -1030,6 +1034,7 @@
           "stale",
           "any_estimated",
           "reprocessable",
+          "is_ore",
           "lots"
         ],
         "title": "InventoryItemOut",
@@ -3099,7 +3104,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "116"
+    "version": "120"
   },
   "openapi": "3.1.0",
   "paths": {
