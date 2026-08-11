@@ -951,11 +951,23 @@
             "type": "array"
           },
           "oldest_days": {
-            "title": "Oldest Days",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Days"
           },
           "qty": {
             "title": "Qty",
+            "type": "integer"
+          },
+          "qty_unbooked": {
+            "default": 0,
+            "title": "Qty Unbooked",
             "type": "integer"
           },
           "reprocessable": {
@@ -1015,7 +1027,6 @@
           "type_id",
           "qty",
           "total_cost",
-          "oldest_days",
           "stale",
           "any_estimated",
           "reprocessable",
@@ -1084,6 +1095,26 @@
       },
       "InventoryOut": {
         "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "basis": {
+            "enum": [
+              "hangar",
+              "ledger"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
           "estimated_cost": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Estimated Cost",
@@ -1094,6 +1125,14 @@
               "$ref": "#/components/schemas/InventoryItemOut"
             },
             "title": "Items",
+            "type": "array"
+          },
+          "listed": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ListedStockOut"
+            },
+            "title": "Listed",
             "type": "array"
           },
           "stale_days": {
@@ -1126,6 +1165,7 @@
           }
         },
         "required": [
+          "basis",
           "total_cost",
           "verified_cost",
           "estimated_cost",
@@ -1136,6 +1176,64 @@
           "items"
         ],
         "title": "InventoryOut",
+        "type": "object"
+      },
+      "ListedStockOut": {
+        "description": "One stack of owned stock sitting in sell-order escrow (ADR-0050) \u2014\nphysically out of the hangar, shown in its own small section.",
+        "properties": {
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          },
+          "worth": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worth"
+          }
+        },
+        "required": [
+          "type_id",
+          "location_id",
+          "qty"
+        ],
+        "title": "ListedStockOut",
         "type": "object"
       },
       "LocationCreateRequest": {

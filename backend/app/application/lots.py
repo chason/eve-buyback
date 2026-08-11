@@ -20,10 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import entitlements as entitlements_app
 from app.application.corporations import get_registered_corporation
+from app.application.reconciliation import location_names
+from app.data.records import HangarStockRecord, LotRecord
 from app.data.repositories import appraisals as appraisals_repo
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import expenses as expenses_repo
+from app.data.repositories import hangar_stock as hangar_stock_repo
+from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
+from app.data.repositories import market_orders as orders_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import sde as sde_repo
 from app.domain.contracts import ContractLink
@@ -89,13 +94,20 @@ class InventoryItemView(BaseModel):
     """One item type's holdings: its open lots plus the rollup the table row shows.
     `type_name` is None when the type is missing from the seeded SDE. `worth` /
     `unrealized` (#153) are None when the type has no cached market price — surfaced,
-    never invented."""
+    never invented.
+
+    On the hangar basis (ADR-0050) `qty` is what's physically there, `lots` are the
+    ledger entries backing it (portion-capped to the physical count), and
+    `qty_unbooked` is the part no ledger entry explains yet — its age is unknown
+    (`oldest_days` is None when NOTHING is booked) and it carries no cost, so
+    `unrealized` compares the market's answer against the booked portion only."""
 
     type_id: int
     type_name: str | None
     qty: int
+    qty_unbooked: int = 0
     total_cost: Decimal
-    oldest_days: int
+    oldest_days: int | None
     stale: bool
     any_estimated: bool
     worth: Decimal | None = None
@@ -106,14 +118,38 @@ class InventoryItemView(BaseModel):
     lots: list[InventoryLotView]
 
 
+class ListedStockView(BaseModel):
+    """One stack of the corp's stock sitting in sell-order escrow (ADR-0050):
+    physically out of the hangar but still owned, so the Stock page lists it in
+    its own small section rather than letting it vanish from view. `worth` is the
+    same net-of-tax market answer the main table uses (None when unpriced)."""
+
+    type_id: int
+    type_name: str | None
+    location_id: str
+    location_name: str | None
+    qty: int
+    worth: Decimal | None = None
+
+
 class InventoryView(BaseModel):
     """The whole "What we've got" view (ADR-0043, #152/#153): inventory carried at
     cost, with verified and estimated cost kept apart so they never silently blend.
     `worth_total` is "if we sold it all today" (net of sales tax) and
     `unrealized_total` the paper gain/loss — its OWN line, never folded into assets;
     both cover only the types the market cache can price (`unpriced_types` counts
-    the rest)."""
+    the rest).
 
+    Two bases (ADR-0050): `hangar` — `items` are what the last hangar snapshot
+    actually counted in the marked buyback hangars (taken `as_of`), with the ledger
+    joined in for cost and age, and `listed` carrying the sell-order stock that is
+    physically elsewhere; `ledger` — the pre-ADR-0050 books view, used while no
+    hangar snapshot exists (no marked hangars, or no sync yet). The summary totals
+    are ALWAYS ledger-wide ("everything we hold", wherever it sits) so switching
+    basis never changes what the corp owns on paper."""
+
+    basis: str  # "hangar" | "ledger"
+    as_of: datetime | None = None
     total_cost: Decimal
     verified_cost: Decimal
     estimated_cost: Decimal
@@ -122,6 +158,7 @@ class InventoryView(BaseModel):
     unrealized_total: Decimal
     unpriced_types: int
     items: list[InventoryItemView]
+    listed: list[ListedStockView] = []
 
 
 async def get_inventory(
@@ -132,11 +169,15 @@ async def get_inventory(
     sales_tax_rate: Decimal,
     now: datetime | None = None,
 ) -> InventoryView:
-    """What the corp's buyback owns right now, at cost (#152), and what it would
-    fetch today (#153): every open lot rolled up per item type, oldest-first within
-    a type (FIFO order), items sorted by what was paid (biggest holdings first). A
-    lot sitting `stale_days` or longer is flagged. Gated: the accounting entitlement
-    is required (ADR-0042)."""
+    """The "What we've got" view (#152/#153, ADR-0050). When a hangar snapshot
+    exists, the table shows what is PHYSICALLY in the marked buyback hangars —
+    minerals show as minerals, whatever the contracts delivered — with the open
+    lots joined in FIFO for cost and age (a lot's age reaches back to the contract
+    that bought it). Stock sitting in sell-order escrow rides along in `listed`.
+    Without a snapshot it falls back to the ledger view: every open lot rolled up
+    per type. Either way lots sitting `stale_days` or longer are flagged, items
+    sort biggest-holdings-first, and the summary totals cover every open lot.
+    Gated: the accounting entitlement is required (ADR-0042)."""
     corp = await get_registered_corporation(session, corporation_eve_id)
     await entitlements_app.require_entitlement(
         session, corporation_id=corp.id, feature="accounting", now=now
@@ -144,7 +185,23 @@ async def get_inventory(
     now = now or datetime.now(UTC)
 
     lots = await lots_repo.open_lots(session, corporation_id=corp.id)
-    type_ids = sorted({lot.item_type_id for lot in lots})
+    synced_at = None
+    if await hangars_repo.list_for_corp(session, corp.id):
+        synced_at = await hangar_stock_repo.synced_at(session, corporation_id=corp.id)
+    snapshot: list[HangarStockRecord] = []
+    listed_map: dict[tuple[str, int], int] = {}
+    if synced_at is not None:
+        snapshot = await hangar_stock_repo.list_for_corp(
+            session, corporation_id=corp.id
+        )
+        listed_map = await orders_repo.listed_by_location_type(
+            session, corporation_id=corp.id
+        )
+
+    lot_types = {lot.item_type_id for lot in lots}
+    snapshot_types = {row.type_id for row in snapshot}
+    listed_types = {tid for _, tid in listed_map}
+    type_ids = sorted(lot_types | snapshot_types | listed_types)
     names = await sde_repo.get_types(session, type_ids)
     reprocessable_ids = await sde_repo.types_with_materials(session, type_ids)
     nrv = await _nrv_by_type(
@@ -154,71 +211,244 @@ async def get_inventory(
         sales_tax_rate=sales_tax_rate,
     )
 
-    by_type: dict[int, list[InventoryLotView]] = {}
-    estimated_flags: dict[int, bool] = {}
-    for lot in lots:  # already FIFO-ordered: oldest acquired first
-        unit_cost = landed_unit_cost(
-            lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
+    if synced_at is not None:
+        items = _hangar_items(
+            lots, snapshot, names, reprocessable_ids, nrv, now, stale_days
         )
-        days_held = max(0, (now - lot.acquired_at).days)
-        by_type.setdefault(lot.item_type_id, []).append(
-            InventoryLotView(
-                id=lot.id,
-                source=lot.source,
-                qty=lot.qty_remaining,
-                unit_cost=unit_cost,
-                total_cost=lot.qty_remaining * unit_cost,
-                acquired_at=lot.acquired_at,
-                days_held=days_held,
-                stale=days_held >= stale_days,
-                cost_is_estimated=lot.cost_is_estimated,
-            )
-        )
-        estimated_flags[lot.item_type_id] = (
-            estimated_flags.get(lot.item_type_id, False) or lot.cost_is_estimated
-        )
+        listed = await _listed_stock(session, corp.id, listed_map, names, nrv)
+    else:
+        items = _ledger_items(lots, names, reprocessable_ids, nrv, now, stale_days)
+        listed = []
+    items.sort(key=_item_sort_key)
 
+    totals = _ledger_totals(lots, nrv, now, stale_days)
+    return InventoryView(
+        basis="hangar" if synced_at is not None else "ledger",
+        as_of=synced_at,
+        total_cost=totals["total"],
+        verified_cost=totals["total"] - totals["estimated"],
+        estimated_cost=totals["estimated"],
+        stale_days=stale_days,
+        worth_total=totals["worth"],
+        unrealized_total=totals["unrealized"],
+        unpriced_types=sum(1 for item in items if item.worth is None),
+        items=items,
+        listed=listed,
+    )
+
+
+def _lot_view(
+    lot: LotRecord, qty: int, now: datetime, stale_days: int
+) -> InventoryLotView:
+    """One lot as the table's expander shows it, for `qty` of its units — the full
+    remainder on the ledger basis, the physically-present portion on the hangar
+    basis (ADR-0050)."""
+    unit_cost = landed_unit_cost(
+        lot.unit_purchase_cost, lot.unit_hauling_cost, lot.written_down_to
+    )
+    days_held = max(0, (now - lot.acquired_at).days)
+    return InventoryLotView(
+        id=lot.id,
+        source=lot.source,
+        qty=qty,
+        unit_cost=unit_cost,
+        total_cost=qty * unit_cost,
+        acquired_at=lot.acquired_at,
+        days_held=days_held,
+        stale=days_held >= stale_days,
+        cost_is_estimated=lot.cost_is_estimated,
+    )
+
+
+def _item_view(
+    type_id: int,
+    qty: int,
+    qty_unbooked: int,
+    views: list[InventoryLotView],
+    names: dict,
+    reprocessable_ids: set[int],
+    nrv: dict[int, Decimal],
+) -> InventoryItemView:
+    """The rollup a table row shows. `worth` prices the whole quantity shown;
+    `unrealized` compares only the booked portion against its cost — an unbooked
+    stack has no basis to be up or down against (ADR-0050)."""
+    total_cost = sum((v.total_cost for v in views), Decimal(0))
+    unit = nrv.get(type_id)
+    worth = qty * unit if unit is not None else None
+    unrealized = None
+    if unit is not None:
+        unrealized = (qty - qty_unbooked) * unit - total_cost
+    days = [v.days_held for v in views]
+    return InventoryItemView(
+        type_id=type_id,
+        type_name=names[type_id].name if type_id in names else None,
+        qty=qty,
+        qty_unbooked=qty_unbooked,
+        total_cost=total_cost,
+        oldest_days=max(days) if days else None,
+        stale=any(v.stale for v in views),
+        any_estimated=any(v.cost_is_estimated for v in views),
+        worth=worth,
+        unrealized=unrealized,
+        reprocessable=type_id in reprocessable_ids,
+        lots=views,
+    )
+
+
+def _ledger_items(
+    lots: Sequence[LotRecord],
+    names: dict,
+    reprocessable_ids: set[int],
+    nrv: dict[int, Decimal],
+    now: datetime,
+    stale_days: int,
+) -> list[InventoryItemView]:
+    """The books view (pre-ADR-0050 fallback): every open lot, rolled up per type."""
+    by_type: dict[int, list[InventoryLotView]] = {}
+    for lot in lots:  # already FIFO-ordered: oldest acquired first
+        view = _lot_view(lot, lot.qty_remaining, now, stale_days)
+        by_type.setdefault(lot.item_type_id, []).append(view)
     items = []
     for type_id, views in by_type.items():
         qty = sum(v.qty for v in views)
-        total_cost = sum((v.total_cost for v in views), Decimal(0))
-        worth = qty * nrv[type_id] if type_id in nrv else None
         items.append(
-            InventoryItemView(
-                type_id=type_id,
-                type_name=names[type_id].name if type_id in names else None,
-                qty=qty,
-                total_cost=total_cost,
-                oldest_days=max(v.days_held for v in views),
-                stale=any(v.stale for v in views),
-                any_estimated=estimated_flags[type_id],
-                worth=worth,
-                unrealized=worth - total_cost if worth is not None else None,
-                reprocessable=type_id in reprocessable_ids,
-                lots=views,
+            _item_view(type_id, qty, 0, views, names, reprocessable_ids, nrv)
+        )
+    return items
+
+
+def _hangar_items(
+    lots: Sequence[LotRecord],
+    snapshot: Sequence[HangarStockRecord],
+    names: dict,
+    reprocessable_ids: set[int],
+    nrv: dict[int, Decimal],
+    now: datetime,
+    stale_days: int,
+) -> list[InventoryItemView]:
+    """The hangar view (ADR-0050): one row per type the snapshot counted, backed by
+    the open lots at the same `(location, type)` slot, matched FIFO and capped at
+    the physical count. Lot units beyond the count are NOT shown here — they are
+    the reconciliation's business (a standing shortfall flag, a move card, escrow);
+    physical units beyond the lots surface as `qty_unbooked`."""
+    lots_by_slot: dict[tuple[str, int], list[LotRecord]] = {}
+    for lot in lots:  # FIFO order within each slot is inherited
+        if lot.location_id is not None:
+            slot = (lot.location_id, lot.item_type_id)
+            lots_by_slot.setdefault(slot, []).append(lot)
+
+    qty_by_type: dict[int, int] = {}
+    unbooked_by_type: dict[int, int] = {}
+    views_by_type: dict[int, list[InventoryLotView]] = {}
+    for row in snapshot:
+        remaining = row.qty
+        views = views_by_type.setdefault(row.type_id, [])
+        for lot in lots_by_slot.get((row.location_id, row.type_id), []):
+            if remaining <= 0:
+                break
+            take = min(remaining, lot.qty_remaining)
+            views.append(_lot_view(lot, take, now, stale_days))
+            remaining -= take
+        qty_by_type[row.type_id] = qty_by_type.get(row.type_id, 0) + row.qty
+        unbooked_by_type[row.type_id] = (
+            unbooked_by_type.get(row.type_id, 0) + remaining
+        )
+
+    items = []
+    for type_id, qty in qty_by_type.items():
+        views = views_by_type[type_id]
+        views.sort(key=lambda v: (v.acquired_at, v.id))  # FIFO across hangars
+        items.append(
+            _item_view(
+                type_id,
+                qty,
+                unbooked_by_type[type_id],
+                views,
+                names,
+                reprocessable_ids,
+                nrv,
             )
         )
-    items.sort(key=lambda item: item.total_cost, reverse=True)
+    return items
 
-    estimated_cost = sum(
-        (v.total_cost for item in items for v in item.lots if v.cost_is_estimated),
-        Decimal(0),
+
+async def _listed_stock(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    listed_map: dict[tuple[str, int], int],
+    names: dict,
+    nrv: dict[int, Decimal],
+) -> list[ListedStockView]:
+    """The "listed for sale" section (ADR-0050): sell-order escrow per station —
+    owned stock that is physically out of the hangar. Location names resolve like
+    the reconciliation's (configured hangar name, else seeded SDE station)."""
+    if not listed_map:
+        return []
+    location_ids = {loc for loc, _ in listed_map}
+    locations = await location_names(session, corporation_id, location_ids)
+    rows = []
+    for (location_id, type_id), qty in sorted(listed_map.items()):
+        unit = nrv.get(type_id)
+        rows.append(
+            ListedStockView(
+                type_id=type_id,
+                type_name=names[type_id].name if type_id in names else None,
+                location_id=location_id,
+                location_name=locations.get(location_id),
+                qty=qty,
+                worth=qty * unit if unit is not None else None,
+            )
+        )
+    rows.sort(key=_listed_sort_key)
+    return rows
+
+
+def _ledger_totals(
+    lots: Sequence[LotRecord],
+    nrv: dict[int, Decimal],
+    now: datetime,
+    stale_days: int,
+) -> dict[str, Decimal]:
+    """The summary cards, ALWAYS over every open lot (ADR-0050): what the corp
+    owns on paper doesn't change with the table's basis. `worth`/`unrealized`
+    cover only the lots whose type the market cache can price (#153)."""
+    total = Decimal(0)
+    estimated = Decimal(0)
+    worth = Decimal(0)
+    unrealized = Decimal(0)
+    for lot in lots:
+        view = _lot_view(lot, lot.qty_remaining, now, stale_days)
+        total += view.total_cost
+        if view.cost_is_estimated:
+            estimated += view.total_cost
+        unit = nrv.get(lot.item_type_id)
+        if unit is not None:
+            worth += view.qty * unit
+            unrealized += view.qty * unit - view.total_cost
+    return {
+        "total": total,
+        "estimated": estimated,
+        "worth": worth,
+        "unrealized": unrealized,
+    }
+
+
+def _item_sort_key(item: InventoryItemView):
+    """Biggest holdings first: by cost, then market worth (covers all-unbooked
+    rows, which carry no cost), then a stable name/type tiebreak."""
+    return (
+        -item.total_cost,
+        -(item.worth if item.worth is not None else Decimal(0)),
+        item.type_name or "",
+        item.type_id,
     )
-    total_cost = sum((item.total_cost for item in items), Decimal(0))
-    return InventoryView(
-        total_cost=total_cost,
-        verified_cost=total_cost - estimated_cost,
-        estimated_cost=estimated_cost,
-        stale_days=stale_days,
-        worth_total=sum(
-            (item.worth for item in items if item.worth is not None), Decimal(0)
-        ),
-        unrealized_total=sum(
-            (item.unrealized for item in items if item.unrealized is not None),
-            Decimal(0),
-        ),
-        unpriced_types=sum(1 for item in items if item.worth is None),
-        items=items,
+
+
+def _listed_sort_key(row: ListedStockView):
+    return (
+        -(row.worth if row.worth is not None else Decimal(0)),
+        row.type_name or "",
+        row.type_id,
     )
 
 

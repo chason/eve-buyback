@@ -18,6 +18,7 @@ from app.application.corporations import get_registered_corporation
 from app.application.errors import HangarLocationUnknown
 from app.data.records import BuybackHangarRecord
 from app.data.repositories import buyback_locations as locations_repo
+from app.data.repositories import hangar_stock as hangar_stock_repo
 from app.data.repositories import hangars as hangars_repo
 from app.domain.hangar import AssetStack, HangarKey, hangar_counts
 from app.plugins.esi import EsiClient
@@ -86,6 +87,12 @@ async def remove_hangar(
     await hangars_repo.delete_for_corp(
         session, corporation_id=corp.id, location_id=location_id, division=division
     )
+    # Privacy cleanup (ADR-0050): unmarking the LAST hangar deletes the stored
+    # snapshot — with no marked hangars there is nothing the stored contents
+    # describe, and the privacy page promises they go when the marking does.
+    # (While other hangars remain, the next sync overwrites the snapshot anyway.)
+    if not await hangars_repo.list_for_corp(session, corp.id):
+        await hangar_stock_repo.clear_for_corp(session, corporation_id=corp.id)
     await session.commit()
 
 

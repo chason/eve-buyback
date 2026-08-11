@@ -31,6 +31,7 @@ from app.application.errors import (
 )
 from app.data.records import MoveSuggestionRecord, ReconciliationEventRecord
 from app.data.repositories import buyback_config as config_repo
+from app.data.repositories import hangar_stock as hangar_stock_repo
 from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
 from app.data.repositories import market_orders as orders_repo
@@ -120,6 +121,14 @@ async def reconcile_hangars(
     hangars = await hangars_repo.list_for_corp(session, corp.id)
     if not hangars:
         return HangarCheckResult(lots_added=0, flagged=0)
+    # The snapshot the Stock page shows (ADR-0050): what this sync actually saw,
+    # persisted before any delta reasoning so the page and the reconciliation
+    # artifacts always describe the same photograph. Only reached after a
+    # successful ESI read — a token/scope failure raised above, leaving the
+    # previous snapshot (and its honest `synced_at`) in place.
+    await hangar_stock_repo.replace_for_corp(
+        session, corporation_id=corp.id, counts=counted, synced_at=now
+    )
 
     locations = sorted({h.location_id for h in hangars})
     listed = await orders_repo.listed_by_location_type(

@@ -325,6 +325,17 @@ class BuybackHangarRecord(BaseModel):
     division: int
 
 
+class HangarStockRecord(BaseModel):
+    """One counted stack from the last hangar snapshot (ADR-0050): what a sync
+    actually saw at `(location, type)` across the marked buyback hangars."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    location_id: str
+    type_id: int
+    qty: int
+
+
 class SaleRecord(BaseModel):
     """One realized sale event against one lot (ADR-0043/0045). Realized profit is
     derived (`domain/lots.realized_profit`), never stored; `unit_cost` /

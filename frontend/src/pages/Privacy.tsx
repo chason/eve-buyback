@@ -153,10 +153,13 @@ export default function Privacy() {
             When the corp ESI token can read assets, and a manager has marked one or
             more corp hangar divisions as the buyback&apos;s on the Stock page, the app
             periodically reads the corporation&apos;s <strong>asset list</strong> and
-            keeps only <strong>item type and quantity counts for those marked
-            hangars</strong> — so the stock ledger can be checked against what&apos;s
-            physically there. It never reads members&apos; personal assets, and asset
-            rows outside the marked hangars are discarded, not stored.
+            stores only <strong>item type and quantity counts for those marked
+            hangars</strong> — the snapshot the Stock page shows, and what the stock
+            ledger is checked against. Each check replaces the previous snapshot;
+            unmarking the last hangar deletes it. It never reads members&apos;
+            personal assets, and asset rows outside the marked hangars are discarded,
+            not stored — no item ids, containers, or locations beyond the hangars you
+            marked.
           </p>
           <p>
             If the token lacks the assets scope (grants made before this feature), or

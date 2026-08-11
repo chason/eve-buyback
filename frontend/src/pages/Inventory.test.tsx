@@ -17,6 +17,8 @@ vi.mock("../api/locations")
 vi.mock("../api/sde")
 
 const INVENTORY: InventoryOut = {
+  basis: "ledger",
+  as_of: null,
   total_cost: "4200000000.00",
   verified_cost: "3350000000.00",
   estimated_cost: "850000000.00",
@@ -24,11 +26,13 @@ const INVENTORY: InventoryOut = {
   worth_total: "4600000000.00",
   unrealized_total: "400000000.00",
   unpriced_types: 0,
+  listed: [],
   items: [
     {
       type_id: 34,
       type_name: "Tritanium",
       qty: 150,
+      qty_unbooked: 0,
       total_cost: "4200000000.00",
       oldest_days: 45,
       stale: true,
@@ -1113,5 +1117,100 @@ describe("Inventory", () => {
     ).toBeInTheDocument()
     // Nothing is priced → the valuation cards stay hidden.
     expect(screen.queryByText("If we sold it all today")).not.toBeInTheDocument()
+  })
+
+  it("shows the hangar snapshot with its taken-at line (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: new Date(Date.now() - 30 * 60_000).toISOString(),
+      },
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(/What's sitting in the buyback hangars/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Last looked in the hangars 30 minutes ago/),
+    ).toBeInTheDocument()
+    // The books-view hint belongs to the ledger fallback only.
+    expect(screen.queryByText(/This is the books view/)).not.toBeInTheDocument()
+  })
+
+  it("explains the books view until a hangar snapshot exists (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY, // basis "ledger"
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText(/This is the books view/)).toBeInTheDocument()
+  })
+
+  it("chips hangar stock the books don't explain yet (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: "2026-07-14T12:00:00Z",
+        items: [
+          {
+            ...INVENTORY.items[0],
+            type_name: "Pyerite",
+            qty: 250,
+            qty_unbooked: 250,
+            total_cost: "0",
+            oldest_days: null,
+            stale: false,
+            any_estimated: false,
+            lots: [],
+          },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("Pyerite")).toBeInTheDocument()
+    expect(screen.getByText("Not on the books yet")).toBeInTheDocument()
+    // Unknown age reads as a dash with a plain-English tooltip.
+    const dash = screen
+      .getAllByText("—")
+      .find((el) => el.title.includes("when this arrived"))
+    expect(dash).toBeTruthy()
+  })
+
+  it("lists sell-order stock in its own section (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: "2026-07-14T12:00:00Z",
+        listed: [
+          {
+            type_id: 34,
+            type_name: "Tritanium",
+            location_id: "60008494",
+            location_name: "Amarr VIII (Oris)",
+            qty: 200,
+            worth: "760.00",
+          },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("Listed for sale")).toBeInTheDocument()
+    const section = screen.getByText("Listed for sale").closest("section")!
+    expect(within(section).getByText("200")).toBeInTheDocument()
+    expect(within(section).getByText("Amarr VIII (Oris)")).toBeInTheDocument()
   })
 })
