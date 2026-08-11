@@ -332,6 +332,11 @@ class InventoryOut(BaseModel):
     # the types the market cache can price; `unpriced_types` counts the rest.
     worth_total: Decimal
     unrealized_total: Decimal
+    # Whether ANY open lot's type has a cached price — gates the valuation cards,
+    # ledger-wide like the totals they show (ADR-0050). `unpriced_types` counts
+    # the displayed table rows without a price (the table's footnote) — on the
+    # hangar basis that is a different population than the totals'.
+    anything_priced: bool
     unpriced_types: int
     items: list[InventoryItemOut]
     listed: list[ListedStockOut] = []

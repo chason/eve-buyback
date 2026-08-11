@@ -1481,6 +1481,8 @@ export interface components {
         };
         /** InventoryOut */
         InventoryOut: {
+            /** Anything Priced */
+            anything_priced: boolean;
             /** As Of */
             as_of?: string | null;
             /**
