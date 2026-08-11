@@ -1498,7 +1498,7 @@
         "type": "object"
       },
       "MoveSuggestionOut": {
-        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. Read-only\nin this slice \u2014 confirm/dismiss actions land in follow-ups.",
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the confirm action (#201).",
         "properties": {
           "destination_location_id": {
             "title": "Destination Location Id",
@@ -1514,6 +1514,11 @@
               }
             ],
             "title": "Destination Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
           "noticed_at": {
             "format": "date-time",
@@ -1556,6 +1561,7 @@
           }
         },
         "required": [
+          "id",
           "type_id",
           "origin_location_id",
           "destination_location_id",
@@ -3911,7 +3917,7 @@
     },
     "/api/v1/corporations/me/accounting/move-suggestions": {
       "get": {
-        "description": "The pending \"looks like a move\" cards (ADR-0049, #200) \u2014 read-only.",
+        "description": "The pending \"looks like a move\" cards (ADR-0049, #200).",
         "operationId": "list_move_suggestions_api_v1_corporations_me_accounting_move_suggestions_get",
         "responses": {
           "200": {
@@ -3930,6 +3936,43 @@
           }
         },
         "summary": "List Move Suggestions",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/confirm": {
+      "post": {
+        "description": "\"Yes, this was a move\" (ADR-0049, #201): reverses the estimated-value\nstock at the destination and moves the origin's oldest matching stock there,\ncost basis and aging intact \u2014 atomically, logged with who confirmed.",
+        "operationId": "confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Move Suggestion",
         "tags": [
           "accounting"
         ]

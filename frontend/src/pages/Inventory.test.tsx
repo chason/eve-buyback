@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -445,14 +445,14 @@ describe("Inventory", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("shows a move suggestion as a plain-English read-only card (#200)", async () => {
+  it("shows a move suggestion as a plain-English card (#200)", async () => {
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
       access: true,
       inventory: INVENTORY,
     })
     vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([
       {
-        type_id: 34, type_name: "Tritanium",
+        id: "sug-1", type_id: 34, type_name: "Tritanium",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
         qty: 40, noticed_at: "2026-08-11T10:00:00Z",
@@ -461,12 +461,46 @@ describe("Inventory", () => {
 
     renderInventory()
 
-    // Plain English only — no "pairing", "reconciliation", or "lot" — and no
-    // action buttons in this slice (read-only detection, ADR-0049).
+    // Plain English only — no "pairing", "reconciliation", or "lot"; the one
+    // action is the confirm (#201 — dismiss is its own slice).
     const card = await screen.findByText(
       /Looks like 40 Tritanium moved from Amarr VIII to Jita IV - Moon 4 — was this a move\?/,
     )
-    expect(within(card.closest("li")!).queryByRole("button")).toBeNull()
+    expect(
+      within(card.closest("li")!).getByRole("button", {
+        name: "Yes, this was a move",
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it("confirms a move and the card leaves the pending list (#201)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    // Pending before the confirm; the invalidation refetch finds it handled.
+    vi.mocked(accountingApi.listMoveSuggestions)
+      .mockResolvedValueOnce([
+        {
+          id: "sug-1", type_id: 34, type_name: "Tritanium",
+          origin_location_id: "60008494", origin_name: "Amarr VIII",
+          destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+          qty: 40, noticed_at: "2026-08-11T10:00:00Z",
+        },
+      ])
+      .mockResolvedValue([])
+    vi.mocked(accountingApi.confirmMoveSuggestion).mockResolvedValue(undefined)
+
+    renderInventory()
+
+    await u.click(
+      await screen.findByRole("button", { name: "Yes, this was a move" }),
+    )
+    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledWith("sug-1")
+    await waitFor(() =>
+      expect(screen.queryByText(/was this a move\?/)).not.toBeInTheDocument(),
+    )
   })
 
   it("offers Record it on a reprocess suggestion (#177)", async () => {

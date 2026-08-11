@@ -223,3 +223,19 @@ class ReprocessQtyUnavailable(ApplicationError):
 
 class ReceivableNotFound(ApplicationError):
     default_detail = "That owed-ISK entry no longer exists"
+
+
+class MoveSuggestionNotFound(ApplicationError):
+    """Unknown suggestion id — or another corp's (ADR-0049): the corp-scoped
+    lookup makes cross-tenant probing indistinguishable from absence."""
+
+    default_detail = "That move suggestion no longer exists"
+
+
+class MoveSuggestionNotPending(ApplicationError):
+    """The suggestion was already dismissed (ADR-0049, #201) — confirming it now
+    would contradict a decision already on record. (A double *confirm* is a
+    no-op, not this error: re-clicking an action that already happened is
+    harmless, the `clear_receivable` posture.)"""
+
+    default_detail = "That suggestion has already been handled"

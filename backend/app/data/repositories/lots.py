@@ -90,6 +90,48 @@ async def consume(
     return LotRecord.model_validate(lot)
 
 
+async def move_to_location(
+    session: AsyncSession, *, lot_id: uuid.UUID, qty: int, location_id: str
+) -> LotRecord:
+    """Relocate `qty` units of a lot to `location_id` (ADR-0049 confirm-a-move):
+    the whole open remainder moves in place; a partial move splits off a child at
+    the destination whose cost fields — `unit_purchase_cost`, `unit_hauling_cost`,
+    `acquired_at`, `source`, `cost_is_estimated`, `written_down_to` — are carried
+    unchanged (the ADR-0047 split mechanic). A move is not an acquisition: aging,
+    FIFO order, and carrying value are all preserved. Returns the lot now at the
+    destination (the lot itself, or the split-off child)."""
+    lot = (
+        await session.execute(select(Lot).where(Lot.id == lot_id))
+    ).scalar_one()
+    if qty <= 0 or qty > lot.qty_remaining:
+        raise ValueError(
+            f"cannot move {qty} from lot {lot_id}: only {lot.qty_remaining} remain"
+        )
+    if qty == lot.qty_remaining:
+        lot.location_id = location_id
+        await session.flush()
+        return LotRecord.model_validate(lot)
+    lot.qty_remaining -= qty
+    child = Lot(
+        corporation_id=lot.corporation_id,
+        item_type_id=lot.item_type_id,
+        qty_original=qty,
+        qty_remaining=qty,
+        unit_purchase_cost=lot.unit_purchase_cost,
+        unit_hauling_cost=lot.unit_hauling_cost,
+        acquired_at=lot.acquired_at,
+        source=lot.source,
+        source_lot_id=lot.id,
+        cost_is_estimated=lot.cost_is_estimated,
+        location_id=location_id,
+        written_down_to=lot.written_down_to,
+    )
+    session.add(child)
+    await session.flush()
+    await session.refresh(child)
+    return LotRecord.model_validate(child)
+
+
 async def get_for_corp(
     session: AsyncSession, *, corporation_id: uuid.UUID, lot_id: uuid.UUID
 ) -> LotRecord | None:

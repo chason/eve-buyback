@@ -527,11 +527,33 @@ export interface paths {
         };
         /**
          * List Move Suggestions
-         * @description The pending "looks like a move" cards (ADR-0049, #200) — read-only.
+         * @description The pending "looks like a move" cards (ADR-0049, #200).
          */
         get: operations["list_move_suggestions_api_v1_corporations_me_accounting_move_suggestions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Move Suggestion
+         * @description "Yes, this was a move" (ADR-0049, #201): reverses the estimated-value
+         *     stock at the destination and moves the origin's oldest matching stock there,
+         *     cost basis and aging intact — atomically, logged with who confirmed.
+         */
+        post: operations["confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1542,14 +1564,19 @@ export interface components {
         /**
          * MoveSuggestionOut
          * @description One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
-         *     the same item missing at one marked hangar and appearing at another. Read-only
-         *     in this slice — confirm/dismiss actions land in follow-ups.
+         *     the same item missing at one marked hangar and appearing at another. `id`
+         *     keys the confirm action (#201).
          */
         MoveSuggestionOut: {
             /** Destination Location Id */
             destination_location_id: string;
             /** Destination Name */
             destination_name?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /**
              * Noticed At
              * Format: date-time
@@ -2955,6 +2982,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MoveSuggestionOut"][];
+                };
+            };
+        };
+    };
+    confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
