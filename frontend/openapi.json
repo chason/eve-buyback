@@ -2569,6 +2569,110 @@
         "title": "SessionUser",
         "type": "object"
       },
+      "ShipmentCreateRequest": {
+        "description": "Record a haul before it happens (ADR-0049, #208): the quantity goes on\nthe road, so the hangar checks stop expecting it at either end until it's\nmarked arrived. Both locations must be marked buyback hangars.",
+        "properties": {
+          "destination_location_id": {
+            "title": "Destination Location Id",
+            "type": "string"
+          },
+          "origin_location_id": {
+            "title": "Origin Location Id",
+            "type": "string"
+          },
+          "qty": {
+            "exclusiveMinimum": 0.0,
+            "title": "Qty",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type_id",
+          "qty",
+          "origin_location_id",
+          "destination_location_id"
+        ],
+        "title": "ShipmentCreateRequest",
+        "type": "object"
+      },
+      "ShipmentOut": {
+        "description": "One open haul: what's on the road, from where to where, since when.\n`id` keys the \"It arrived\" action.",
+        "properties": {
+          "destination_location_id": {
+            "title": "Destination Location Id",
+            "type": "string"
+          },
+          "destination_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "origin_location_id": {
+            "title": "Origin Location Id",
+            "type": "string"
+          },
+          "origin_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Name"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "title": "Sent At",
+            "type": "string"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          }
+        },
+        "required": [
+          "id",
+          "type_id",
+          "origin_location_id",
+          "destination_location_id",
+          "qty",
+          "sent_at"
+        ],
+        "title": "ShipmentOut",
+        "type": "object"
+      },
       "StationSearchResult": {
         "properties": {
           "name": {
@@ -4272,6 +4376,107 @@
           }
         },
         "summary": "List Reconciliation Events",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/shipments": {
+      "get": {
+        "description": "The open hauls (ADR-0049, #208): stock a manager declared on the move\nbetween hangars, awaiting its \"It arrived\".",
+        "operationId": "list_shipments_api_v1_corporations_me_accounting_shipments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShipmentOut"
+                  },
+                  "title": "Response List Shipments Api V1 Corporations Me Accounting Shipments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Shipments",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "description": "Record a haul (ADR-0049, #208): the quantity goes on the road, and the\nhangar checks stop expecting it at either end until it's marked arrived.",
+        "operationId": "record_shipment_api_v1_corporations_me_accounting_shipments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShipmentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Shipment",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/shipments/{shipment_id}/arrived": {
+      "post": {
+        "description": "\"It arrived\" (ADR-0049, #208): the origin's oldest matching stock moves\nto the destination \u2014 what we paid, and how long we've held it, move with\nit \u2014 and the haul closes, logged with who marked it.",
+        "operationId": "mark_shipment_arrived_api_v1_corporations_me_accounting_shipments__shipment_id__arrived_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "shipment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Shipment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Shipment Arrived",
         "tags": [
           "accounting"
         ]

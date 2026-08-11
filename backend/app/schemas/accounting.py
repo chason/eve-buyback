@@ -197,6 +197,32 @@ class MoveConfirmRequest(BaseModel):
     haul_cost: Decimal | None = Field(default=None, ge=0)
 
 
+class ShipmentCreateRequest(BaseModel):
+    """Record a haul before it happens (ADR-0049, #208): the quantity goes on
+    the road, so the hangar checks stop expecting it at either end until it's
+    marked arrived. Both locations must be marked buyback hangars."""
+
+    type_id: int
+    qty: int = Field(gt=0)
+    origin_location_id: str
+    destination_location_id: str
+
+
+class ShipmentOut(BaseModel):
+    """One open haul: what's on the road, from where to where, since when.
+    `id` keys the "It arrived" action."""
+
+    id: uuid.UUID
+    type_id: int
+    type_name: str | None = None
+    origin_location_id: str
+    origin_name: str | None = None
+    destination_location_id: str
+    destination_name: str | None = None
+    qty: int
+    sent_at: datetime
+
+
 class ReprocessOutputIn(BaseModel):
     type_id: int
     quantity: int = Field(gt=0)

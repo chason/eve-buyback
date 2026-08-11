@@ -16,6 +16,7 @@ from app.application import moves as moves_app
 from app.application import profit as profit_app
 from app.application import reconciliation as reconciliation_app
 from app.application import sales as sales_app
+from app.application import shipments as shipments_app
 from app.application import transformations as transformations_app
 from app.application.auth import AuthenticatedUser
 from app.config import get_settings
@@ -46,6 +47,8 @@ from app.schemas.accounting import (
     ReprocessPreviewOut,
     ReprocessRequest,
     ReprocessResultOut,
+    ShipmentCreateRequest,
+    ShipmentOut,
     WalletDivisionOut,
     WalletDivisionUpdateRequest,
 )
@@ -229,6 +232,71 @@ async def confirm_move_suggestion(
         confirmed_by_character_id=user.character_id,
         confirmed_by_name=user.character_name,
         haul_cost=payload.haul_cost if payload else None,
+    )
+
+
+@router.get("/shipments", response_model=list[ShipmentOut])
+async def list_shipments(
+    user: ManagerUser, session: SessionDep
+) -> list[ShipmentOut]:
+    """The open hauls (ADR-0049, #208): stock a manager declared on the move
+    between hangars, awaiting its "It arrived"."""
+    views = await shipments_app.list_open_shipments(
+        session, corporation_eve_id=user.corporation_id
+    )
+    return [_shipment_out(v) for v in views]
+
+
+@router.post(
+    "/shipments", status_code=status.HTTP_201_CREATED
+)
+async def record_shipment(
+    payload: ShipmentCreateRequest, user: ManagerUser, session: SessionDep
+) -> None:
+    """Record a haul (ADR-0049, #208): the quantity goes on the road, and the
+    hangar checks stop expecting it at either end until it's marked arrived."""
+    await shipments_app.record_shipment(
+        session,
+        corporation_eve_id=user.corporation_id,
+        type_id=payload.type_id,
+        qty=payload.qty,
+        origin_location_id=payload.origin_location_id,
+        destination_location_id=payload.destination_location_id,
+        recorded_by_character_id=user.character_id,
+        recorded_by_name=user.character_name,
+    )
+
+
+@router.post(
+    "/shipments/{shipment_id}/arrived",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def mark_shipment_arrived(
+    shipment_id: uuid.UUID, user: ManagerUser, session: SessionDep
+) -> None:
+    """"It arrived" (ADR-0049, #208): the origin's oldest matching stock moves
+    to the destination — what we paid, and how long we've held it, move with
+    it — and the haul closes, logged with who marked it."""
+    await shipments_app.mark_arrived(
+        session,
+        corporation_eve_id=user.corporation_id,
+        shipment_id=shipment_id,
+        marked_by_character_id=user.character_id,
+        marked_by_name=user.character_name,
+    )
+
+
+def _shipment_out(v: shipments_app.ShipmentView) -> ShipmentOut:
+    return ShipmentOut(
+        id=v.record.id,
+        type_id=v.record.type_id,
+        type_name=v.type_name,
+        origin_location_id=v.record.origin_location_id,
+        origin_name=v.origin_name,
+        destination_location_id=v.record.destination_location_id,
+        destination_name=v.destination_name,
+        qty=v.record.qty,
+        sent_at=v.record.created_at,
     )
 
 

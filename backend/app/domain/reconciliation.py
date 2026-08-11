@@ -19,6 +19,10 @@ from typing import Literal
 # state: a human said a suggested move wasn't one, or a later sync invalidated
 # the pair — the sync's latest-per-slot dedupe skips over them (but NOT over
 # `move_confirmed`, which is real slot state).
+# `shipment_recorded`/`shipment_arrived` are the declared-move pair (ADR-0049,
+# #208): a manager sent a haul (logged at the origin) and later marked it
+# arrived (logged at the destination) — the disciplined path the heuristic
+# exists as a fallback for.
 ReconciliationKind = Literal[
     "excess",
     "shortfall",
@@ -28,6 +32,8 @@ ReconciliationKind = Literal[
     "move_confirmed",
     "move_dismissed",
     "move_withdrawn",
+    "shipment_recorded",
+    "shipment_arrived",
 ]
 
 

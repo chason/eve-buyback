@@ -225,6 +225,40 @@ class ReceivableNotFound(ApplicationError):
     default_detail = "That owed-ISK entry no longer exists"
 
 
+class ShipmentStockUnavailable(ApplicationError):
+    """A haul can't take more than sits idle at the origin (ADR-0049, #208):
+    open stock there, minus what's listed for sale and what earlier hauls
+    already have on the road."""
+
+    default_detail = "That hangar doesn't have that much sitting free to send"
+
+
+class ShipmentNotFound(ApplicationError):
+    """Unknown shipment id — or another corp's: the corp-scoped lookup makes
+    cross-tenant probing indistinguishable from absence."""
+
+    default_detail = "That haul no longer exists"
+
+
+class ShipmentAlreadyArrived(ApplicationError):
+    default_detail = "That haul was already marked as arrived"
+
+
+class ShipmentHangarUnknown(ApplicationError):
+    """Both ends of a haul must be marked buyback hangars (ADR-0049, #208) —
+    those are the hangars the checks watch, so anywhere else the declaration
+    couldn't keep the books honest."""
+
+    default_detail = (
+        "Both ends of a haul must be hangars marked under Our hangars — "
+        "mark the hangar first"
+    )
+
+
+class ShipmentSameHangar(ApplicationError):
+    default_detail = "A haul needs two different hangars"
+
+
 class MoveSuggestionNotFound(ApplicationError):
     """Unknown suggestion id — or another corp's (ADR-0049): the corp-scoped
     lookup makes cross-tenant probing indistinguishable from absence."""

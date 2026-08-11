@@ -13,11 +13,17 @@ from app.data.models import ReconciliationEvent
 from app.data.records import ReconciliationEventRecord
 from app.domain.reconciliation import ReconciliationKind
 
-# Log entries about a move suggestion's fate (ADR-0049, #202), not about the
+# Log entries about a manager action (ADR-0049, #202/#208), not about the
 # slot's stock: the sync's "already logged?" dedupe must look past them, or a
-# dismissal at a slot would make the standing shortfall look new again — spam
-# re-flagged, and the anchor event id the pairing keys on silently replaced.
-_MOVE_ANNOTATION_KINDS = ("move_dismissed", "move_withdrawn")
+# dismissal — or a haul recorded/arrived at a slot with an unrelated standing
+# shortfall — would make that shortfall look new again: spam re-flagged, and
+# the anchor event id the pairing keys on silently replaced.
+_MOVE_ANNOTATION_KINDS = (
+    "move_dismissed",
+    "move_withdrawn",
+    "shipment_recorded",
+    "shipment_arrived",
+)
 
 
 async def add_event(
