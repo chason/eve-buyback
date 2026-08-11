@@ -10,7 +10,11 @@ summed per destination so retired quantity never re-pairs). Both server-default
 `expense_kind` grows `cost_true_up` (ADR-0021 CHECK recreated, no data change):
 the one aggregate correction a confirmed move books for the sold portion — real
 landed cost minus the estimated COGS those sales recognized, positive or
-negative. All existing kinds preserved.
+negative. All existing kinds preserved. The column also WIDENS to VARCHAR(12):
+`check_enum` sizes the column to the longest literal, and `cost_true_up`
+(12 chars) outgrows the VARCHAR(10) that `broker_fee` fixed at creation —
+without the widening, booking a true-up truncation-errors on any migrated
+database (fresh `create_all` schemas already get 12).
 
 Revision ID: c4e7f2a9d851
 Revises: b3d5e8f1a742
@@ -42,6 +46,13 @@ def upgrade() -> None:
             'qty_retired', sa.BigInteger(), nullable=False, server_default='0'
         ),
     )
+    op.alter_column(
+        "expenses",
+        "kind",
+        type_=sa.String(length=12),
+        existing_type=sa.String(length=10),
+        existing_nullable=False,
+    )
     op.drop_constraint("expense_kind", "expenses", type_="check")
     op.create_check_constraint(
         "expense_kind",
@@ -59,6 +70,13 @@ def downgrade() -> None:
         "expense_kind",
         "expenses",
         "kind IN ('broker_fee', 'relist_fee', 'hauling', 'write_down', 'other')",
+    )
+    op.alter_column(
+        "expenses",
+        "kind",
+        type_=sa.String(length=10),
+        existing_type=sa.String(length=12),
+        existing_nullable=False,
     )
     op.drop_column('move_suggestions', 'qty_retired')
     op.drop_column('move_suggestions', 'qty_sold')
