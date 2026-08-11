@@ -990,6 +990,9 @@ function eventText(e: ReconciliationEventOut): string {
   if (e.kind === "reprocess_hint") {
     return `Looks like ${qty} ${item} at ${where} was turned into minerals — record it to carry what we paid into them.`
   }
+  if (e.kind === "reprocess_recorded") {
+    return `${qty} ${item} at ${where} was turned into minerals — recorded automatically, so what we paid (and how long it sat) carried into them.`
+  }
   if (e.kind === "unmatched_sale") {
     return `Sold ${qty} ${item} at ${where} the books didn't have — recorded at estimated value.`
   }

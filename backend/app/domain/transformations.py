@@ -133,13 +133,45 @@ def base_yield_outputs(
 class ReprocessHint:
     """A hangar difference that looks like an unrecorded reprocess (ADR-0047): a
     reprocessable type is short while its OWN materials are in excess at the same
-    location. Surfaced as a suggestion — never auto-applied (actual yields vary
-    with skills/structures, so a human confirms the real quantities)."""
+    location. Recorded automatically when it can be applied cleanly (ADR-0050 —
+    the outputs recorded are the OBSERVED excess, not an assumed yield, so the
+    only inference is the link itself); surfaced as a suggestion when it can't."""
 
     location_id: str
     type_id: int  # the reprocessable source type that is short
     qty: int  # how many units are missing
     material_type_ids: frozenset[int]  # the excess types the pattern explains
+
+
+def apportion_outputs(
+    consumed_qtys: list[int], outputs: dict[int, int]
+) -> list[dict[int, int]] | None:
+    """Split observed outputs across consumed source portions pro-rata by quantity
+    (largest remainder per output type, index as the deterministic tiebreak), so an
+    automatic reprocess (ADR-0050) can flow each source lot's own cost and age into
+    its own children. Returns None in the degenerate case where some consumed
+    portion would receive no output at all — cost must never silently vanish, so
+    the caller folds everything into one group instead."""
+    total = sum(consumed_qtys)
+    if total <= 0:
+        return None
+    shares: list[dict[int, int]] = [{} for _ in consumed_qtys]
+    for type_id, qty in sorted(outputs.items()):
+        ideal = [Decimal(qty) * take / total for take in consumed_qtys]
+        floored = [int(share) for share in ideal]
+        leftover = qty - sum(floored)
+        by_remainder = sorted(
+            range(len(consumed_qtys)), key=lambda i: (floored[i] - ideal[i], i)
+        )
+        for i in by_remainder[:leftover]:
+            floored[i] += 1
+        for i, units in enumerate(floored):
+            if units > 0:
+                shares[i][type_id] = units
+    pairs = zip(shares, consumed_qtys, strict=True)
+    if any(not share for share, take in pairs if take > 0):
+        return None
+    return shares
 
 
 def match_reprocess_hints(

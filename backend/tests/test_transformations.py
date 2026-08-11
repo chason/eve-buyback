@@ -346,3 +346,71 @@ async def test_record_via_api_and_member_is_403():
             f"/api/v1/corporations/me/accounting/lots/{source.id}/reprocess-preview"
         )
     assert resp.status_code == 403
+
+
+# --- automatic recording (ADR-0050) -------------------------------------------------
+
+
+def test_apportion_splits_outputs_pro_rata_with_largest_remainder():
+    from app.domain.transformations import apportion_outputs
+
+    shares = apportion_outputs([300, 300], {TRIT: 2001, PYE: 3})
+    assert shares == [{TRIT: 1001, PYE: 2}, {TRIT: 1000, PYE: 1}]
+    # Every observed unit lands somewhere — nothing dropped, nothing invented.
+    assert sum(s.get(TRIT, 0) for s in shares) == 2001
+    assert sum(s.get(PYE, 0) for s in shares) == 3
+
+
+def test_apportion_refuses_when_a_portion_would_get_nothing():
+    from app.domain.transformations import apportion_outputs
+
+    # 3 sources, 2 output units: someone's consumed cost would vanish — fold.
+    assert apportion_outputs([100, 100, 100], {TRIT: 2}) is None
+    assert apportion_outputs([0, 0], {TRIT: 5}) is None
+
+
+async def test_observed_reprocess_refuses_when_lots_cannot_cover_it():
+    """The defensive fallback (ADR-0050): open lots at the slot must cover the
+    consumed quantity, or nothing is touched and the caller keeps the hint."""
+    corp_id = await _seed(prices={TRIT: "4.00"})
+    await _lot(corp_id, qty=100)
+
+    async with SessionLocal() as session:
+        recorded = await transformations_app.record_observed_reprocess(
+            session, corporation_id=corp_id, location_id=JITA,
+            source_type_id=VELD, qty=600, outputs={TRIT: 2000}, now=NOW,
+        )
+        await session.commit()
+
+    assert recorded is False
+    async with SessionLocal() as session:
+        lots = await lots_repo.open_lots(session, corporation_id=corp_id)
+    assert [(lot.item_type_id, lot.qty_remaining) for lot in lots] == [(VELD, 100)]
+
+
+async def test_observed_reprocess_folds_to_one_group_when_outputs_are_scarce():
+    """Degenerate split (ADR-0050): more source lots than output units → one group
+    carrying the OLDEST lot's age and an any-estimated flag; cost still conserved
+    exactly."""
+    corp_id = await _seed(prices={PYE: "8.00"})
+    oldest = NOW - timedelta(days=40)
+    await _lot(corp_id, qty=100, cost="10.00", acquired_at=oldest)
+    await _lot(corp_id, qty=100, cost="20.00", cost_is_estimated=True,
+               acquired_at=NOW - timedelta(days=5))
+
+    async with SessionLocal() as session:
+        recorded = await transformations_app.record_observed_reprocess(
+            session, corporation_id=corp_id, location_id=JITA,
+            source_type_id=VELD, qty=200, outputs={PYE: 1}, now=NOW,
+        )
+        await session.commit()
+
+    assert recorded is True
+    async with SessionLocal() as session:
+        lots = await lots_repo.open_lots(session, corporation_id=corp_id)
+    (child,) = [lot for lot in lots if lot.qty_remaining > 0]
+    assert (child.item_type_id, child.qty_remaining) == (PYE, 1)
+    # 100×10 + 100×20 = 3000, all of it on the single unit.
+    assert child.unit_purchase_cost.quantize(Decimal("0.01")) == Decimal("3000.00")
+    assert child.acquired_at == oldest
+    assert child.cost_is_estimated is True

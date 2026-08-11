@@ -354,13 +354,12 @@ async def test_shortfall_flags_without_inventing_a_lot_and_does_not_spam():
     assert events[0].qty == 700  # newest first
 
 
-async def test_reprocess_pattern_becomes_a_hint_not_a_loss_plus_windfall():
-    """ADR-0047: Veldspar short + yield-consistent Tritanium excess → one
-    `reprocess_hint`, no shortfall flag, and NO deemed-cost Tritanium lot (that
-    would sever the cost lineage the reprocess record preserves)."""
-    esi = AssetsEsi()
-    await _seed(esi, prices={TRIT: "4.00"})
-    VELD = 1230
+VELD = 1230
+
+
+async def _seed_veldspar(*, lots: list[tuple[int, str, datetime]]) -> None:
+    """Veldspar with Tritanium yield data (portion 100 → 400 Trit) plus the given
+    `(qty, unit_cost, acquired_at)` open lots at Jita."""
     async with SessionLocal() as session:
         corp = await corporations_repo.get_by_eve_id(session, CORP_ID)
         await sde_repo.bulk_upsert_types(session, [
@@ -371,30 +370,80 @@ async def test_reprocess_pattern_becomes_a_hint_not_a_loss_plus_windfall():
         await sde_repo.bulk_upsert_type_materials(session, [
             {"type_id": VELD, "material_type_id": TRIT, "quantity": 400},
         ])
-        # The books hold 600 Veldspar; the hangar holds none of it but does hold
-        # Tritanium the reprocess would explain (≤ 6 batches × 400 = 2400).
-        await lots_repo.create_lot(
-            session, corporation_id=corp.id, item_type_id=VELD, qty=600,
-            unit_purchase_cost=Decimal("10.00"), acquired_at=NOW,
-            source="buyback", location_id=JITA,
-        )
+        for qty, unit_cost, acquired_at in lots:
+            await lots_repo.create_lot(
+                session, corporation_id=corp.id, item_type_id=VELD, qty=qty,
+                unit_purchase_cost=Decimal(unit_cost), acquired_at=acquired_at,
+                source="buyback", location_id=JITA,
+            )
         await session.commit()
+
+
+async def test_reprocess_pattern_is_recorded_automatically_with_lineage():
+    """ADR-0050: Veldspar short + yield-consistent Tritanium excess → the reprocess
+    is RECORDED — ore lots consumed, the observed Tritanium created as children
+    carrying the ore's cost and age — with a `reprocess_recorded` log entry, no
+    shortfall flag, and NO deemed-cost Tritanium lot."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    # The books hold 600 Veldspar; the hangar holds none of it but does hold
+    # Tritanium the reprocess would explain (≤ 6 batches × 400 = 2400).
+    bought = datetime(2026, 6, 1, tzinfo=UTC)
+    await _seed_veldspar(lots=[(600, "10.00", bought)])
     esi.hangar = {TRIT: 2175}
 
     result = await _run(esi)
 
     assert result.lots_added == 0  # the Tritanium was NOT booked as deemed cost
-    assert result.flagged == 1
+    assert result.flagged == 0  # nothing needs a human — it was recorded
     lots, events = await _state()
-    assert {lot.item_type_id for lot in lots} == {VELD}  # nothing invented
+    open_types = {lot.item_type_id for lot in lots if lot.qty_remaining > 0}
+    assert open_types == {TRIT}  # ore consumed, minerals on the books
+    (child,) = [lot for lot in lots if lot.qty_remaining > 0]
+    assert child.qty_remaining == 2175 and child.source == "reprocess"
+    # Cost conservation: the children carry exactly what the ore cost…
+    carried = child.qty_remaining * child.unit_purchase_cost
+    assert carried.quantize(Decimal("0.01")) == Decimal("6000.00")
+    # …and the ore's age and honesty flag, not a fresh estimate (ADR-0050).
+    assert child.acquired_at == bought
+    assert child.cost_is_estimated is False
     (event,) = events
-    assert event.kind == "reprocess_hint"
-    assert (event.type_id, event.qty, event.flagged) == (VELD, 600, True)
+    assert event.kind == "reprocess_recorded"
+    assert (event.type_id, event.qty, event.flagged) == (VELD, 600, False)
 
-    # The suggestion repeats-without-spamming until someone records it.
-    await _run(esi)
+    # Self-healing: the next sync sees books that match the hangar — no new
+    # events, nothing invented.
+    again = await _run(esi)
+    assert again.lots_added == 0 and again.flagged == 0
     _, events = await _state()
     assert len(events) == 1
+
+
+async def test_auto_reprocess_flows_each_lot_s_own_cost_and_age():
+    """Two ore lots of different vintage and price → the observed minerals split
+    pro-rata across them, each child carrying its OWN source lot's cost and age
+    (never blended, ADR-0047/0050)."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    old = datetime(2026, 5, 1, tzinfo=UTC)
+    new = datetime(2026, 7, 1, tzinfo=UTC)
+    await _seed_veldspar(lots=[(300, "10.00", old), (300, "16.00", new)])
+    esi.hangar = {TRIT: 2000}
+
+    await _run(esi)
+
+    lots, _ = await _state()
+    children = [lot for lot in lots if lot.qty_remaining > 0]
+    assert {c.item_type_id for c in children} == {TRIT}
+    by_age = {c.acquired_at: c for c in children}
+    # 2000 units split 1000/1000 across the two 300-unit consumptions.
+    assert by_age[old].qty_remaining == 1000
+    assert by_age[new].qty_remaining == 1000
+    # Each child carries exactly its own ore's cost: 300×10 and 300×16.
+    old_cost = by_age[old].qty_remaining * by_age[old].unit_purchase_cost
+    new_cost = by_age[new].qty_remaining * by_age[new].unit_purchase_cost
+    assert old_cost.quantize(Decimal("0.01")) == Decimal("3000.00")
+    assert new_cost.quantize(Decimal("0.01")) == Decimal("4800.00")
 
 
 # --- API -----------------------------------------------------------------------------

@@ -1121,6 +1121,31 @@ describe("Inventory", () => {
     expect(screen.queryByText("If we sold it all today")).not.toBeInTheDocument()
   })
 
+  it("tells the automatic-reprocess story in the log (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "reprocess_recorded", type_id: 1230, type_name: "Veldspar",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 600, unit_cost: null, booked: false, flagged: false,
+        note: null, occurred_at: "2026-07-14T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(
+        /600 Veldspar at Jita IV - Moon 4 was turned into minerals — recorded automatically/,
+      ),
+    ).toBeInTheDocument()
+    // Recorded, not a to-do: no "Record it" button rides this entry.
+    expect(screen.queryByText("Record it")).not.toBeInTheDocument()
+  })
+
   it("shows the hangar snapshot with its taken-at line (ADR-0050)", async () => {
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
       access: true,
