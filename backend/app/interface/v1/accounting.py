@@ -313,6 +313,7 @@ def _move_suggestion_out(
         destination_name=v.destination_name,
         qty=v.convertible_qty,
         qty_listed=v.record.qty_listed,
+        qty_sold=v.record.qty_sold,
         noticed_at=v.record.created_at,
         group_id=v.record.excess_lot_id,
     )

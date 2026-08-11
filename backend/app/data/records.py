@@ -387,8 +387,11 @@ class MoveSuggestionRecord(BaseModel):
     """One "looks like a move" pairing (ADR-0049): decorates the shortfall flag
     event and (when the pair has a counted portion) the deemed-cost excess lot
     the sync booked anyway. `qty_listed` of `qty` is sell-order-escrow evidence
-    (#206) with no lot behind it; `excess_lot_id` is None for pure sell-side
-    pairs, or if the lot is ever deleted (SET NULL)."""
+    (#206) and `qty_sold` already-sold-at-estimated-cost evidence (#207), both
+    with no lot behind them; `excess_lot_id` is None for pure sell-side pairs,
+    or if the lot is ever deleted (SET NULL). `qty_retired` is what a
+    confirmation actually retired for the sold portion — the state that keeps
+    retired quantity from ever re-pairing."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -398,6 +401,8 @@ class MoveSuggestionRecord(BaseModel):
     destination_location_id: str
     qty: int
     qty_listed: int = 0
+    qty_sold: int = 0
+    qty_retired: int = 0
     shortfall_event_id: uuid.UUID
     excess_lot_id: uuid.UUID | None = None
     status: MoveSuggestionStatus

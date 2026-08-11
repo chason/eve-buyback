@@ -22,9 +22,12 @@ from app.domain.lots import SaleChannel
 from app.domain.profit import SaleFact, summarize_sales
 
 # UI groupings for expense kinds (the vocabulary map: "market fees" vs everything
-# else); `write_down` stands alone as its own line.
+# else); `write_down` stands alone as its own line. The move true-up (#207) folds
+# into "other": it's a real-ISK cost correction — positive lowers profit, negative
+# raises it — and profit subtracts it like any other expense, keeping the paired
+# period's total exact without a new line item.
 _FEE_KINDS = frozenset({"broker_fee", "relist_fee"})
-_OTHER_KINDS = frozenset({"hauling", "other"})
+_OTHER_KINDS = frozenset({"hauling", "other", "cost_true_up"})
 
 
 class ChannelProfitView(BaseModel):

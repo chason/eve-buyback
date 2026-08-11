@@ -6,10 +6,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.models import Sale
+from app.data.models import Lot, Sale
 from app.data.records import SaleRecord
 from app.domain.lots import EntrySource, SaleChannel
 
@@ -118,6 +118,60 @@ async def list_between(
     if until is not None:
         stmt = stmt.where(Sale.sold_at < until)
     rows = (await session.execute(stmt.order_by(Sale.sold_at))).scalars().all()
+    return [SaleRecord.model_validate(row) for row in rows]
+
+
+async def estimated_cost_sold_by_location_type(
+    session: AsyncSession, *, corporation_id: uuid.UUID
+) -> dict[tuple[str, int], int]:
+    """Units sold at an ESTIMATED cost per `(location_id, type_id)` — the
+    ADR-0045 no-lot fallback and consumed deemed lots (ADR-0049, #207). A sale
+    row carries no location of its own; the consumed lot's does (the fallback
+    lot is created at the sale's location, and deemed excess lots sit where
+    they were counted). Lots without a location can't be placed and are
+    excluded."""
+    rows = (
+        await session.execute(
+            select(Lot.location_id, Lot.item_type_id, func.sum(Sale.qty))
+            .join(Lot, Sale.lot_id == Lot.id)
+            .where(
+                Sale.corporation_id == corporation_id,
+                Sale.cost_is_estimated.is_(True),
+                Lot.location_id.is_not(None),
+            )
+            .group_by(Lot.location_id, Lot.item_type_id)
+        )
+    ).all()
+    return {(loc, tid): int(qty) for loc, tid, qty in rows}
+
+
+async def estimated_sales_oldest_first(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    location_id: str,
+    type_id: int,
+) -> list[SaleRecord]:
+    """The estimated-cost sale rows behind one `(location, type)` sold-evidence
+    slot, oldest sale first (deterministic tiebreak) — the walk order the #207
+    true-up uses, mirroring the FIFO order retirement consumes origin lots."""
+    rows = (
+        (
+            await session.execute(
+                select(Sale)
+                .join(Lot, Sale.lot_id == Lot.id)
+                .where(
+                    Sale.corporation_id == corporation_id,
+                    Sale.cost_is_estimated.is_(True),
+                    Lot.location_id == location_id,
+                    Lot.item_type_id == type_id,
+                )
+                .order_by(Sale.sold_at, Sale.created_at, Sale.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [SaleRecord.model_validate(row) for row in rows]
 
 
