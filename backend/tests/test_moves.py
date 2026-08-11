@@ -33,14 +33,9 @@ from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
 from app.domain.moves import MovePair, match_move_pairs
 from app.main import app
-from app.plugins.esi import (
-    CharacterInfo,
-    CorporationAsset,
-    CorporationInfo,
-)
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, HangarAssetsEsi, login, make_client
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -146,38 +141,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class MultiHangarEsi:
-    """ESI fake: token-connect validation + an assets read spanning multiple
-    stations. `hangar` is `(location_id, type_id) → qty` in CorpSAG2."""
-
-    def __init__(self):
-        self.hangar: dict[tuple[str, int], int] = {}
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        assets = []
-        for (loc, tid), qty in self.hangar.items():
-            assets.append(
-                CorporationAsset(
-                    item_id=next(self._item_id), type_id=tid, quantity=qty,
-                    location_id=int(loc), location_flag="CorpSAG2",
-                )
-            )
-        return assets
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -187,7 +150,7 @@ def _user() -> AuthenticatedUser:
 
 
 async def _seed(
-    esi: MultiHangarEsi,
+    esi: HangarAssetsEsi,
     *,
     prices: dict[int, str] | None = None,
     entitled: bool = True,
@@ -253,7 +216,7 @@ async def _book_lot(type_id: int, qty: int, location_id: str) -> None:
         await session.commit()
 
 
-async def _run(esi: MultiHangarEsi):
+async def _run(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -274,11 +237,11 @@ async def _state():
 
 
 async def test_sync_suggests_a_move_and_still_books_the_defaults():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
     # 600 gone from Jita; 350 of the same type surfaced at Amarr.
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
 
     result = await _run(esi)
 
@@ -308,10 +271,10 @@ async def test_sync_suggests_a_move_and_still_books_the_defaults():
 
 
 async def test_unpriceable_excess_pairs_once_the_lot_books():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)  # no cached prices at all
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 600}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 600}
 
     await _run(esi)
     _, events, suggestions = await _state()
@@ -336,7 +299,7 @@ async def test_unpriceable_excess_pairs_once_the_lot_books():
 
 
 async def test_list_move_suggestions_requires_the_accounting_entitlement():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, entitled=False)
     async with SessionLocal() as session:
         with pytest.raises(EntitlementRequired):
@@ -346,10 +309,10 @@ async def test_list_move_suggestions_requires_the_accounting_entitlement():
 
 
 async def test_move_suggestions_endpoint_returns_plain_named_cards():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
     await _run(esi)
 
     app.dependency_overrides.clear()
@@ -387,11 +350,11 @@ async def _suggestion_status(suggestion_id: uuid.UUID) -> str:
     return record.status
 
 
-async def _suggest_one(esi: MultiHangarEsi):
+async def _suggest_one(esi: HangarAssetsEsi):
     """Seed + book + run one sync that proposes exactly one pair; returns it."""
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 350}
     await _run(esi)
     _, _, suggestions = await _state()
     (s,) = suggestions
@@ -399,7 +362,7 @@ async def _suggest_one(esi: MultiHangarEsi):
 
 
 async def test_dismiss_resolves_logs_and_leaves_the_defaults_alone():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     s = await _suggest_one(esi)
 
     await _dismiss(s.id, name="Boss")
@@ -430,7 +393,7 @@ async def test_dismiss_resolves_logs_and_leaves_the_defaults_alone():
 
 
 async def test_dismissed_pattern_is_not_reasked_but_a_changed_one_is():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     s = await _suggest_one(esi)
     await _dismiss(s.id)
 
@@ -438,14 +401,14 @@ async def test_dismissed_pattern_is_not_reasked_but_a_changed_one_is():
     # the SAME standing shortfall flag → same anchor, same qty. The default
     # (deemed lot) still books; the question a human already answered doesn't
     # come back.
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 700}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 700}
     result = await _run(esi)
     assert result.lots_added == 1
     _, _, suggestions = await _state()
     assert suggestions == []
 
     # A different quantity is a changed pattern — it may suggest again.
-    esi.hangar = {(JITA, TRIT): 400, (AMARR, TRIT): 900}
+    esi.stock = {(JITA, TRIT): 400, (AMARR, TRIT): 900}
     await _run(esi)
     _, _, suggestions = await _state()
     (fresh,) = suggestions
@@ -454,21 +417,21 @@ async def test_dismissed_pattern_is_not_reasked_but_a_changed_one_is():
 
 
 async def test_dismiss_requires_the_accounting_entitlement():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, entitled=False)
     with pytest.raises(EntitlementRequired):
         await _dismiss(uuid.uuid4())
 
 
 async def test_dismissing_an_unknown_suggestion_is_not_found():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     with pytest.raises(MoveSuggestionNotFound):
         await _dismiss(uuid.uuid4())
 
 
 async def test_dismiss_is_idempotent_but_conflicts_once_resolved_otherwise():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     s = await _suggest_one(esi)
 
     await _dismiss(s.id)
@@ -488,7 +451,7 @@ async def test_dismiss_is_idempotent_but_conflicts_once_resolved_otherwise():
 
 
 async def test_dismiss_endpoint_removes_the_card():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _suggest_one(esi)
 
     app.dependency_overrides.clear()
@@ -513,14 +476,14 @@ async def test_dismiss_endpoint_removes_the_card():
 
 
 async def test_withdraws_when_the_excess_evaporates():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     s = await _suggest_one(esi)
 
     # The found stock leaves Amarr before anyone confirmed: the pair no longer
     # holds. The withdrawal is bookkeeping — logged with its own kind, never
     # worded like a human's dismissal — and the new Amarr shortfall gets the
     # normal default treatment.
-    esi.hangar = {(JITA, TRIT): 400}
+    esi.stock = {(JITA, TRIT): 400}
     await _run(esi)
 
     _, events, suggestions = await _state()
@@ -536,12 +499,12 @@ async def test_withdraws_when_the_excess_evaporates():
 
 
 async def test_withdraws_when_the_shortfall_resolves_some_other_way():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     s = await _suggest_one(esi)
 
     # The missing stock turns up back at Jita — the hangar matches the books
     # again (no deltas at all), so the flag the pair decorated is moot.
-    esi.hangar = {(JITA, TRIT): 1000, (AMARR, TRIT): 350}
+    esi.stock = {(JITA, TRIT): 1000, (AMARR, TRIT): 350}
     result = await _run(esi)
     assert result.lots_added == 0 and result.flagged == 0
 

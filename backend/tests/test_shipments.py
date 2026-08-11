@@ -37,10 +37,9 @@ from app.data.repositories import sde as sde_repo
 from app.domain.reconciliation import Delta
 from app.domain.shipments import absorb_open_shipments
 from app.main import app
-from app.plugins.esi import CharacterInfo, CorporationInfo
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, MemberEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, HangarAssetsEsi, MemberEsi, login, make_client
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -100,39 +99,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class TwoHangarEsi:
-    """ESI fake: token-connect validation + an assets read spanning the two
-    marked hangars (CorpSAG2 at Jita and Amarr). `stock` is the physical truth
-    as {(location_id, type_id): qty}."""
-
-    def __init__(self):
-        self.stock: dict[tuple[str, int], int] = {}
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        from app.plugins.esi import CorporationAsset
-
-        return [
-            CorporationAsset(
-                item_id=next(self._item_id), type_id=tid, quantity=qty,
-                location_id=int(loc), location_flag="CorpSAG2",
-            )
-            for (loc, tid), qty in self.stock.items()
-        ]
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -142,7 +108,7 @@ def _user() -> AuthenticatedUser:
 
 
 async def _seed(
-    esi: TwoHangarEsi | None = None, *, entitled: bool = True
+    esi: HangarAssetsEsi | None = None, *, entitled: bool = True
 ) -> None:
     """Registered corp with marked hangars at Jita and Amarr, Jita config +
     cached price (so an excess WOULD book a deemed lot if a shipment failed to
@@ -239,7 +205,7 @@ async def _arrive(shipment_id, *, corporation_eve_id: int = CORP_ID):
         )
 
 
-async def _sync(esi: TwoHangarEsi):
+async def _sync(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -263,7 +229,7 @@ async def _state():
 
 
 async def test_open_shipment_hides_the_haul_from_syncs_at_both_ends():
-    esi = TwoHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _lot(1000, JITA, acquired_at=NOW - timedelta(days=30))
 
@@ -298,7 +264,7 @@ async def test_open_shipment_hides_the_haul_from_syncs_at_both_ends():
 
 
 async def test_arrival_relocates_fifo_with_cost_and_aging_intact():
-    esi = TwoHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     old = await _lot(300, JITA, unit_cost="5.25",
                      acquired_at=NOW - timedelta(days=30))
@@ -348,7 +314,7 @@ async def test_shipment_preempts_the_pairing_and_residuals_keep_defaults():
     # 400 left Jita for Amarr but only 300 were declared: the declared 300 are
     # invisible to the sync, while the undeclared 100 get the full ADR-0044
     # default treatment — and only THEY may pair as a suggested move.
-    esi = TwoHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _lot(400, JITA, acquired_at=NOW - timedelta(days=30))
     await _record(300)
@@ -372,7 +338,7 @@ async def test_arrival_log_does_not_disturb_a_standing_shortfall():
     # standing flag: the shipment_arrived log entry at that slot is a manager
     # action, not slot state — the sync's dedupe must look past it, not re-flag
     # the unchanged shortfall (and churn the anchor id pairings key on).
-    esi = TwoHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _lot(30, AMARR)
     await _lot(1000, JITA)

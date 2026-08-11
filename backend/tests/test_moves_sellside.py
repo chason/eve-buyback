@@ -28,10 +28,9 @@ from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sales as sales_repo
 from app.data.repositories import sde as sde_repo
 from app.domain.moves import MovePair, match_move_pairs, unexplained_listed
-from app.plugins.esi import CharacterInfo, CorporationAsset, CorporationInfo
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID
+from tests.helpers import CHAR_ID, CORP_ID, HangarAssetsEsi
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -118,38 +117,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class MultiHangarEsi:
-    """ESI fake: token-connect validation + an assets read spanning multiple
-    stations. `hangar` is `(location_id, type_id) → qty` in CorpSAG2."""
-
-    def __init__(self):
-        self.hangar: dict[tuple[str, int], int] = {}
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        assets = []
-        for (loc, tid), qty in self.hangar.items():
-            assets.append(
-                CorporationAsset(
-                    item_id=next(self._item_id), type_id=tid, quantity=qty,
-                    location_id=int(loc), location_flag="CorpSAG2",
-                )
-            )
-        return assets
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -158,7 +125,7 @@ def _user() -> AuthenticatedUser:
     )
 
 
-async def _seed(esi: MultiHangarEsi, *, prices: dict[int, str] | None = None):
+async def _seed(esi: HangarAssetsEsi, *, prices: dict[int, str] | None = None):
     """Registered + entitled corp with marked hangars at Jita AND Amarr, Jita
     config, SDE types + stations, cached prices, and a corp ESI token. Dodixie
     is deliberately NOT a hangar — the sell side isn't scoped by the list."""
@@ -249,7 +216,7 @@ async def _list_orders(rows: list[tuple[str, int, int]]) -> None:
         await session.commit()
 
 
-async def _run(esi: MultiHangarEsi):
+async def _run(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -278,12 +245,12 @@ async def _confirm(suggestion_id):
 
 
 async def test_unexplained_listed_stock_at_any_station_pairs():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
     # 60 gone from the Jita hangar; the division has 60 listed at Dodixie —
     # not a configured hangar — with no idle lots there to explain them.
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 60)])
 
     await _run(esi)
@@ -308,13 +275,13 @@ async def test_unexplained_listed_stock_at_any_station_pairs():
 
 
 async def test_listed_stock_explained_by_idle_lots_there_does_not_pair():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
     # The books DO have 40 idle at Dodixie: of the 100 listed, only the 60
     # beyond those lots are evidence that stock arrived off the books.
     await _book_lot(TRIT, 40, DODIXIE)
-    esi.hangar = {(JITA, TRIT): 900}
+    esi.stock = {(JITA, TRIT): 900}
     await _list_orders([(DODIXIE, TRIT, 100)])
 
     await _run(esi)
@@ -325,11 +292,11 @@ async def test_listed_stock_explained_by_idle_lots_there_does_not_pair():
 
 
 async def test_fully_explained_listed_stock_pairs_nothing():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
     await _book_lot(TRIT, 100, DODIXIE)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 100)])
 
     await _run(esi)
@@ -340,13 +307,13 @@ async def test_fully_explained_listed_stock_pairs_nothing():
 
 
 async def test_counted_and_listed_signals_sum_without_double_counting():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA)
     # 100 missing at Jita; at the Amarr hangar 40 were COUNTED beyond the books
     # (→ deemed lot) and 60 more sit in sell-order escrow (counts can't see
     # escrow — disjoint by construction). One pair, both portions.
-    esi.hangar = {(JITA, TRIT): 900, (AMARR, TRIT): 40}
+    esi.stock = {(JITA, TRIT): 900, (AMARR, TRIT): 40}
     await _list_orders([(AMARR, TRIT, 60)])
 
     await _run(esi)
@@ -362,10 +329,10 @@ async def test_counted_and_listed_signals_sum_without_double_counting():
 
 
 async def test_sold_out_or_cancelled_listing_withdraws_the_pending_pair():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 60)])
     await _run(esi)
     _, _, (pending,) = await _state()
@@ -385,10 +352,10 @@ async def test_sold_out_or_cancelled_listing_withdraws_the_pending_pair():
 
 
 async def test_partly_sold_listing_withdraws_and_repairs_at_the_smaller_qty():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 60)])
     await _run(esi)
 
@@ -409,13 +376,13 @@ async def test_partly_sold_listing_withdraws_and_repairs_at_the_smaller_qty():
 
 
 async def test_confirm_relocates_and_subsequent_fills_consume_verified_cost():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     old = await _book_lot(TRIT, 50, JITA, unit_cost="5.00",
                           acquired_at=NOW - timedelta(days=40))
     newer = await _book_lot(TRIT, 950, JITA, unit_cost="6.00",
                             acquired_at=NOW - timedelta(days=10))
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 60)])
     await _run(esi)
     _, _, (suggestion,) = await _state()
@@ -460,7 +427,7 @@ async def test_confirm_relocates_and_subsequent_fills_consume_verified_cost():
     # And the next hangar sync is clean at BOTH ends: the origin's books now
     # match its hangar, and the destination isn't a hangar at all — the sold
     # units left the ledger through the sale, not a discrepancy.
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([])
     result = await _run(esi)
     assert result.lots_added == 0 and result.flagged == 0
@@ -469,10 +436,10 @@ async def test_confirm_relocates_and_subsequent_fills_consume_verified_cost():
 
 
 async def test_confirm_mixed_pair_reverses_only_the_counted_portion():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _book_lot(TRIT, 1000, JITA, unit_cost="5.25")
-    esi.hangar = {(JITA, TRIT): 900, (AMARR, TRIT): 40}
+    esi.stock = {(JITA, TRIT): 900, (AMARR, TRIT): 40}
     await _list_orders([(AMARR, TRIT, 60)])
     await _run(esi)
     _, _, (suggestion,) = await _state()
@@ -495,10 +462,10 @@ async def test_confirm_mixed_pair_reverses_only_the_counted_portion():
 
 
 async def test_sellside_card_resolves_station_names_and_carries_the_portion():
-    esi = MultiHangarEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
     await _book_lot(TRIT, 1000, JITA)
-    esi.hangar = {(JITA, TRIT): 940}
+    esi.stock = {(JITA, TRIT): 940}
     await _list_orders([(DODIXIE, TRIT, 60)])
     await _run(esi)
 
