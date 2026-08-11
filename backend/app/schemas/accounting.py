@@ -45,6 +45,9 @@ class InventoryItemOut(BaseModel):
     # Whether the type has seeded reprocessing yields — gates the reprocess
     # record action (#177): a type without any cannot be reprocessed.
     reprocessable: bool
+    # Whether the type is an ore (SDE category 25) — the table folds small
+    # leftover ore stacks (under 100 units) out of view, revealable as a group.
+    is_ore: bool
     lots: list[InventoryLotOut]
 
 

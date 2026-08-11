@@ -41,6 +41,7 @@ const INVENTORY: InventoryOut = {
       worth: "4600000000.00",
       unrealized: "400000000.00",
       reprocessable: true,
+      is_ore: false,
       lots: [
         {
           id: "lot-old",
@@ -1096,6 +1097,46 @@ describe("Inventory", () => {
 
     await u.click(await screen.findByRole("button", { name: "2 buys" }))
     expect(screen.getByText("Entered by hand")).toBeInTheDocument()
+  })
+
+  it("tucks small ore stacks away and reveals them as a group", async () => {
+    const u = userEvent.setup()
+    const item = INVENTORY.items[0]
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        items: [
+          item, // a non-ore, stays put
+          // A small non-ore stack stays visible too — only ores fold.
+          { ...item, type_id: 44992, type_name: "PLEX", qty: 3 },
+          // A big ore stack stays visible; the two small ones fold.
+          { ...item, type_id: 1230, type_name: "Veldspar", qty: 5000, is_ore: true },
+          { ...item, type_id: 1228, type_name: "Scordite", qty: 42, is_ore: true },
+          { ...item, type_id: 18, type_name: "Plagioclase", qty: 99, is_ore: true },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("Tritanium")).toBeInTheDocument()
+    expect(screen.getByText("PLEX")).toBeInTheDocument()
+    expect(screen.getByText("Veldspar")).toBeInTheDocument()
+    expect(screen.queryByText("Scordite")).not.toBeInTheDocument()
+    expect(screen.queryByText("Plagioclase")).not.toBeInTheDocument()
+
+    // The footnote says what's folded; one click reveals the whole group.
+    expect(
+      screen.getByText(/2 small ore stacks \(under 100 units each\) tucked away\./),
+    ).toBeInTheDocument()
+    await u.click(screen.getByRole("button", { name: "Show them" }))
+    expect(screen.getByText("Scordite")).toBeInTheDocument()
+    expect(screen.getByText("Plagioclase")).toBeInTheDocument()
+
+    // And one click tucks them back away.
+    await u.click(screen.getByRole("button", { name: "Tuck them away" }))
+    expect(screen.queryByText("Scordite")).not.toBeInTheDocument()
   })
 
   it("dashes unpriced items and counts them under the table", async () => {

@@ -1422,6 +1422,8 @@ export interface components {
         InventoryItemOut: {
             /** Any Estimated */
             any_estimated: boolean;
+            /** Is Ore */
+            is_ore: boolean;
             /** Lots */
             lots: components["schemas"]["InventoryLotOut"][];
             /** Oldest Days */
