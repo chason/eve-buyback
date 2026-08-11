@@ -1498,7 +1498,7 @@
         "type": "object"
       },
       "MoveSuggestionOut": {
-        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202).",
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202). `qty` is what\nconfirming would actually convert now (#204) \u2014 units already sold or\nreprocessed since the pairing are excluded, so the card never\noverstates.",
         "properties": {
           "destination_location_id": {
             "title": "Destination Location Id",
@@ -2847,7 +2847,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "108"
+    "version": "109"
   },
   "openapi": "3.1.0",
   "paths": {

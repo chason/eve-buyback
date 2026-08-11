@@ -73,9 +73,12 @@ class ReconciliationEventView:
 @dataclass(frozen=True)
 class MoveSuggestionView:
     """A pending "looks like a move" pairing enriched for display (ADR-0049):
-    names resolved so the UI stays plain."""
+    names resolved so the UI stays plain. `convertible_qty` is what confirming
+    would actually convert NOW (#204) — the paired quantity capped by what the
+    deemed lot still holds — so the card never promises stale units."""
 
     record: MoveSuggestionRecord
+    convertible_qty: int
     type_name: str | None
     origin_name: str | None
     destination_name: str | None
@@ -563,13 +566,43 @@ async def list_move_suggestions(
     await entitlements_app.require_entitlement(
         session, corporation_id=corp.id, feature="accounting"
     )
-    records = await moves_repo.list_pending(session, corporation_id=corp.id)
+    pending = await moves_repo.list_pending(session, corporation_id=corp.id)
+    # The card shows what confirming would actually convert, not the stale
+    # paired quantity (#204): units of the deemed lot sold or transformed since
+    # the pairing are spoken for and can't convert. A fully-consumed pair has
+    # nothing left to act on here — the stranded sold remainder at the origin
+    # is the sell-side pairing's business (ADR-0049), so no card at all.
+    convertible: dict[uuid.UUID, int] = {}
+    for record in pending:
+        convertible[record.id] = await _convertible_qty(session, corp.id, record)
+    records = [r for r in pending if convertible[r.id] > 0]
     types = await sde_repo.get_types(session, sorted({r.type_id for r in records}))
     hangar_names = {
         h.location_id: h.location_name
         for h in await hangars_repo.list_for_corp(session, corp.id)
     }
-    return [_suggestion_view(r, types, hangar_names) for r in records]
+    return [
+        _suggestion_view(r, convertible[r.id], types, hangar_names)
+        for r in records
+    ]
+
+
+async def _convertible_qty(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    record: MoveSuggestionRecord,
+) -> int:
+    """The units a confirm would convert right now (#204): the paired quantity
+    capped by the deemed lot's `qty_remaining` — the same cap `confirm_move`
+    applies. Zero when the lot is gone (SET NULL) or fully consumed."""
+    if record.excess_lot_id is None:
+        return 0
+    deemed = await lots_repo.get_for_corp(
+        session, corporation_id=corporation_id, lot_id=record.excess_lot_id
+    )
+    if deemed is None:
+        return 0
+    return min(record.qty, deemed.qty_remaining)
 
 
 async def dismiss_move_suggestion(
@@ -618,11 +651,15 @@ async def dismiss_move_suggestion(
 
 
 def _suggestion_view(
-    record: MoveSuggestionRecord, types: dict, hangar_names: dict[str, str]
+    record: MoveSuggestionRecord,
+    convertible_qty: int,
+    types: dict,
+    hangar_names: dict[str, str],
 ) -> MoveSuggestionView:
     type_name = types[record.type_id].name if record.type_id in types else None
     return MoveSuggestionView(
         record=record,
+        convertible_qty=convertible_qty,
         type_name=type_name,
         origin_name=hangar_names.get(record.origin_location_id),
         destination_name=hangar_names.get(record.destination_location_id),
