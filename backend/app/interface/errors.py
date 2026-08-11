@@ -45,6 +45,11 @@ from app.application.errors import (
     ReprocessQtyUnavailable,
     RosterAccessDenied,
     RosterRefreshTooSoon,
+    ShipmentAlreadyArrived,
+    ShipmentHangarUnknown,
+    ShipmentNotFound,
+    ShipmentSameHangar,
+    ShipmentStockUnavailable,
     SsoNotConfigured,
     StructureEncryptionNotConfigured,
     StructureMarketUnavailable,
@@ -94,6 +99,11 @@ _STATUS: dict[type[ApplicationError], int] = {
     ReceivableNotFound: 404,
     MoveSuggestionNotFound: 404,
     MoveSuggestionNotPending: 409,
+    ShipmentStockUnavailable: 422,
+    ShipmentNotFound: 404,
+    ShipmentAlreadyArrived: 409,
+    ShipmentHangarUnknown: 422,
+    ShipmentSameHangar: 422,
 }
 
 

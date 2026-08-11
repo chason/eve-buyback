@@ -39,9 +39,11 @@ from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import reconciliation as recon_repo
 from app.data.repositories import sde as sde_repo
+from app.data.repositories import shipments as shipments_repo
 from app.domain import pricing as pricing_domain
 from app.domain.moves import MovePair, match_move_pairs
 from app.domain.reconciliation import Delta, reconcile
+from app.domain.shipments import absorb_open_shipments
 from app.domain.transformations import match_reprocess_hints
 from app.plugins.esi import CorporationAssetsForbidden, EsiClient
 from app.plugins.sso import EveSsoClient
@@ -124,7 +126,28 @@ async def reconcile_hangars(
     for slot, qty in listed.items():
         if slot in expected:
             expected[slot] = max(0, expected[slot] - qty)
+    # Units on a declared haul (ADR-0049, #208) have left the origin hangar the
+    # same way — a freighter instead of escrow. Excluding them keeps a sync
+    # during transit from flagging a shortfall the manager already explained.
+    in_transit = await shipments_repo.open_by_origin_type(
+        session, corporation_id=corp.id
+    )
+    for slot, qty in in_transit.items():
+        if slot in expected:
+            expected[slot] = max(0, expected[slot] - qty)
     deltas = reconcile(counted, expected)
+    # The haul's physical goods sit at ONE end while it is open — still at the
+    # origin before pickup (where the subtraction above would now read them as
+    # excess), or already at the destination before anyone marks them arrived.
+    # Either way that stock is spoken for, not off-app excess to book (and
+    # never a move pair to propose).
+    covered = dict(in_transit)
+    inbound = await shipments_repo.open_by_destination_type(
+        session, corporation_id=corp.id
+    )
+    for slot, qty in inbound.items():
+        covered[slot] = covered.get(slot, 0) + qty
+    deltas = absorb_open_shipments(deltas, covered)
     if not deltas:
         # A clean hangar still invalidates any pending move pair: no deltas
         # means no standing shortfall, so nothing is left for a pair to

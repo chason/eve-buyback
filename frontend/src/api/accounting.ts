@@ -13,6 +13,8 @@ import type {
   ReconciliationEventOut,
   ReprocessPreviewOut,
   ReprocessResultOut,
+  ShipmentCreateRequest,
+  ShipmentOut,
 } from "./types"
 
 export type {
@@ -32,6 +34,8 @@ export type {
   ReconciliationEventOut,
   ReprocessPreviewOut,
   ReprocessResultOut,
+  ShipmentCreateRequest,
+  ShipmentOut,
 } from "./types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1"
@@ -135,6 +139,30 @@ export async function dismissMoveSuggestion(id: string): Promise<void> {
     `/corporations/me/accounting/move-suggestions/${id}/dismiss`,
   )
   if (!res.ok) await throwApiError(res, "Dismissing the suggestion failed")
+}
+
+/** Open hauls (ADR-0049, #208): stock recorded as on the move between hangars,
+ * awaiting its "It arrived". */
+export const listShipments = () =>
+  apiGet<ShipmentOut[]>("/corporations/me/accounting/shipments")
+
+/** Record a haul before it happens: the hangar checks stop expecting the stock
+ * at either end until it's marked arrived. */
+export async function recordShipment(
+  payload: ShipmentCreateRequest,
+): Promise<void> {
+  const res = await apiSend("POST", "/corporations/me/accounting/shipments", payload)
+  if (!res.ok) await throwApiError(res, "Recording the haul failed")
+}
+
+/** "It arrived": the stock lands at the destination — what we paid, and how
+ * long we've held it, move with it. */
+export async function markShipmentArrived(id: string): Promise<void> {
+  const res = await apiSend(
+    "POST",
+    `/corporations/me/accounting/shipments/${id}/arrived`,
+  )
+  if (!res.ok) await throwApiError(res, "Marking the arrival failed")
 }
 
 /** Run a hangar check right now instead of waiting for the hourly sync. */

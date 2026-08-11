@@ -85,6 +85,7 @@ describe("Inventory", () => {
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
     vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([])
+    vi.mocked(accountingApi.listShipments).mockResolvedValue([])
     vi.mocked(accountingApi.getWalletDivision).mockResolvedValue({ division: null })
     vi.mocked(accountingApi.listReceivables).mockResolvedValue([])
     // No division names by default — pickers fall back to generic labels.
@@ -740,6 +741,125 @@ describe("Inventory", () => {
     expect(
       screen.getByText(
         /The move hint for 12 Pyerite from Jita IV - Moon 4 no longer adds up — it was taken back\./,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("records a haul between two marked hangars (#208)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listHangars).mockResolvedValue([
+      { location_id: "60003760", location_name: "Jita IV - Moon 4", division: 2 },
+      { location_id: "60008494", location_name: "Amarr VIII", division: 2 },
+    ])
+    vi.mocked(sdeApi.searchTypes).mockResolvedValue([
+      { type_id: 34, name: "Tritanium", market_group_id: 1857 },
+    ])
+    vi.mocked(accountingApi.recordShipment).mockResolvedValue(undefined)
+
+    renderInventory()
+
+    const heading = await screen.findByRole("heading", {
+      name: "Hauls between hangars",
+    })
+    const section = within(heading.closest("section")!)
+    await u.type(
+      await section.findByPlaceholderText("Search items to haul…"), "trit",
+    )
+    await u.click(await section.findByRole("button", { name: "Tritanium" }))
+    await u.type(section.getByLabelText("How many"), "400")
+    await u.selectOptions(
+      section.getByRole("combobox", { name: "From hangar" }), "60003760",
+    )
+    await u.selectOptions(
+      section.getByRole("combobox", { name: "To hangar" }), "60008494",
+    )
+    await u.click(section.getByRole("button", { name: "Record the haul" }))
+
+    expect(accountingApi.recordShipment).toHaveBeenCalledWith({
+      type_id: 34, qty: 400,
+      origin_location_id: "60003760", destination_location_id: "60008494",
+    })
+    expect(
+      await section.findByText("On the road — mark it arrived when it lands."),
+    ).toBeInTheDocument()
+  })
+
+  it("marks an open haul arrived and it leaves the list (#208)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listShipments).mockResolvedValue([
+      {
+        id: "ship-1", type_id: 34, type_name: "Tritanium",
+        origin_location_id: "60003760", origin_name: "Jita IV - Moon 4",
+        destination_location_id: "60008494", destination_name: "Amarr VIII",
+        qty: 400, sent_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+    vi.mocked(accountingApi.markShipmentArrived).mockImplementation(
+      async () => {
+        // The haul leaves the list on the refetch the arrival triggers.
+        vi.mocked(accountingApi.listShipments).mockResolvedValue([])
+      },
+    )
+
+    renderInventory()
+
+    // Plain English: what's on the road, from where to where — and, with no
+    // second hangar marked, the record form yields to a hint instead.
+    const haul = await screen.findByText(
+      /400 Tritanium on its way from Jita IV - Moon 4 to Amarr VIII/,
+    )
+    expect(
+      screen.getByText(/mark a second one above first/),
+    ).toBeInTheDocument()
+    await u.click(
+      within(haul.closest("li")!).getByRole("button", { name: "It arrived" }),
+    )
+    expect(accountingApi.markShipmentArrived).toHaveBeenCalledWith("ship-1")
+    await waitFor(() =>
+      expect(screen.queryByText(/on its way from/)).not.toBeInTheDocument(),
+    )
+  })
+
+  it("tells the haul stories in the log (#208)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([
+      {
+        kind: "shipment_recorded", type_id: 34, type_name: "Tritanium",
+        location_id: "60003760", location_name: "Jita IV - Moon 4",
+        qty: 400, unit_cost: null, booked: false, flagged: false,
+        note: "on its way to Amarr VIII, sent by Boss",
+        occurred_at: "2026-08-11T10:00:00Z",
+      },
+      {
+        kind: "shipment_arrived", type_id: 34, type_name: "Tritanium",
+        location_id: "60008494", location_name: "Amarr VIII",
+        qty: 400, unit_cost: null, booked: false, flagged: false,
+        note: "hauled from Jita IV - Moon 4, marked arrived by Boss",
+        occurred_at: "2026-08-11T14:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(
+        /Sent 400 Tritanium from Jita IV - Moon 4 — on its way to Amarr VIII, sent by Boss\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /400 Tritanium arrived at Amarr VIII — hauled from Jita IV - Moon 4, marked arrived by Boss\./,
       ),
     ).toBeInTheDocument()
   })

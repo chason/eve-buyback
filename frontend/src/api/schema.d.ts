@@ -656,6 +656,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/corporations/me/accounting/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Shipments
+         * @description The open hauls (ADR-0049, #208): stock a manager declared on the move
+         *     between hangars, awaiting its "It arrived".
+         */
+        get: operations["list_shipments_api_v1_corporations_me_accounting_shipments_get"];
+        put?: never;
+        /**
+         * Record Shipment
+         * @description Record a haul (ADR-0049, #208): the quantity goes on the road, and the
+         *     hangar checks stop expecting it at either end until it's marked arrived.
+         */
+        post: operations["record_shipment_api_v1_corporations_me_accounting_shipments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/shipments/{shipment_id}/arrived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Shipment Arrived
+         * @description "It arrived" (ADR-0049, #208): the origin's oldest matching stock moves
+         *     to the destination — what we paid, and how long we've held it, move with
+         *     it — and the haul closes, logged with who marked it.
+         */
+        post: operations["mark_shipment_arrived_api_v1_corporations_me_accounting_shipments__shipment_id__arrived_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/corporations/me/accounting/wallet-division": {
         parameters: {
             query?: never;
@@ -2013,6 +2061,53 @@ export interface components {
              */
             role: "member" | "manager" | "ceo";
         };
+        /**
+         * ShipmentCreateRequest
+         * @description Record a haul before it happens (ADR-0049, #208): the quantity goes on
+         *     the road, so the hangar checks stop expecting it at either end until it's
+         *     marked arrived. Both locations must be marked buyback hangars.
+         */
+        ShipmentCreateRequest: {
+            /** Destination Location Id */
+            destination_location_id: string;
+            /** Origin Location Id */
+            origin_location_id: string;
+            /** Qty */
+            qty: number;
+            /** Type Id */
+            type_id: number;
+        };
+        /**
+         * ShipmentOut
+         * @description One open haul: what's on the road, from where to where, since when.
+         *     `id` keys the "It arrived" action.
+         */
+        ShipmentOut: {
+            /** Destination Location Id */
+            destination_location_id: string;
+            /** Destination Name */
+            destination_name?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Origin Location Id */
+            origin_location_id: string;
+            /** Origin Name */
+            origin_name?: string | null;
+            /** Qty */
+            qty: number;
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+        };
         /** StationSearchResult */
         StationSearchResult: {
             /** Name */
@@ -3225,6 +3320,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationEventOut"][];
+                };
+            };
+        };
+    };
+    list_shipments_api_v1_corporations_me_accounting_shipments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"][];
+                };
+            };
+        };
+    };
+    record_shipment_api_v1_corporations_me_accounting_shipments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_shipment_arrived_api_v1_corporations_me_accounting_shipments__shipment_id__arrived_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -29,6 +29,7 @@ from app.data.models.sde_metadata import SdeMetadata
 from app.data.models.sde_station import SdeStation
 from app.data.models.sde_type import SdeType
 from app.data.models.sde_type_material import SdeTypeMaterial
+from app.data.models.shipment import Shipment
 from app.data.models.wallet_payment import WalletPayment
 
 __all__ = [
@@ -61,6 +62,7 @@ __all__ = [
     "SdeStation",
     "SdeType",
     "SdeTypeMaterial",
+    "Shipment",
     "CorpEsiToken",
     "WalletPayment",
 ]

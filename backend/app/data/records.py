@@ -19,6 +19,7 @@ from app.domain.market import HubKind
 from app.domain.moves import MoveSuggestionStatus
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 from app.domain.reconciliation import ReconciliationKind
+from app.domain.shipments import ShipmentStatus
 
 
 class CharacterRecord(BaseModel):
@@ -398,6 +399,23 @@ class MoveSuggestionRecord(BaseModel):
     excess_lot_id: uuid.UUID | None = None
     status: MoveSuggestionStatus
     created_at: datetime
+
+
+class ShipmentRecord(BaseModel):
+    """One declared haul (ADR-0049, #208). While `open` it is the in-transit
+    allocation (ADR-0043): the shipped quantity is excluded from idle at the
+    origin and spoken-for at the destination until a manager marks it arrived."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    type_id: int
+    origin_location_id: str
+    destination_location_id: str
+    qty: int
+    status: ShipmentStatus
+    created_at: datetime
+    arrived_at: datetime | None = None
 
 
 class ExpenseRecord(BaseModel):

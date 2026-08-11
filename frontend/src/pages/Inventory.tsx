@@ -16,10 +16,13 @@ import {
   listMoveSuggestions,
   listReceivables,
   listReconciliationEvents,
+  listShipments,
+  markShipmentArrived,
   recordManualExpense,
   recordManualLot,
   recordManualSale,
   recordReprocess,
+  recordShipment,
   removeHangar,
   runHangarCheck,
   setWalletDivision,
@@ -29,6 +32,7 @@ import type {
   InventoryOut,
   MoveSuggestionOut,
   ReconciliationEventOut,
+  ShipmentOut,
 } from "../api/accounting"
 import { listLocations } from "../api/locations"
 import { searchTypes } from "../api/sde"
@@ -152,6 +156,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
       <ManualEntrySection key={manualKey} prefill={manualPrefill} />
       <ReceivablesSection />
       <HangarsSection />
+      <HaulsSection />
       <WalletSection />
       <ReconciliationSection
         onRecordReprocess={(typeId) => {
@@ -952,6 +957,14 @@ function eventText(e: ReconciliationEventOut): string {
   if (e.kind === "move_withdrawn") {
     return `The move hint for ${qty} ${item} from ${where} no longer adds up — it was taken back.`
   }
+  if (e.kind === "shipment_recorded") {
+    // The note carries where it's headed and who sent it, in plain words.
+    return `Sent ${qty} ${item} from ${where}${e.note ? ` — ${e.note}` : ""}.`
+  }
+  if (e.kind === "shipment_arrived") {
+    // The note carries where it came from and who marked it, in plain words.
+    return `${qty} ${item} arrived at ${where}${e.note ? ` — ${e.note}` : ""}.`
+  }
   if (e.kind === "shortfall") {
     return `${qty} ${item} missing at ${where} — sold or moved outside the app?`
   }
@@ -1057,6 +1070,213 @@ function HangarsSection() {
       )}
     </section>
   )
+}
+
+/** Declared hauls (ADR-0049, #208): record a move between hangars before the
+ * hangar check notices it. While a haul is on the road neither hangar's check
+ * cries wolf over it; "It arrived" lands the stock at the destination with
+ * what we paid — and how long we've held it — intact. Plain English only. */
+function HaulsSection() {
+  const queryClient = useQueryClient()
+  const shipments = useQuery({ queryKey: ["shipments"], queryFn: listShipments })
+  const hangars = useQuery({ queryKey: ["hangars"], queryFn: listHangars })
+  const [typeQuery, setTypeQuery] = useState("")
+  const [picked, setPicked] = useState<{ id: number; name: string } | null>(null)
+  const [qty, setQty] = useState(0)
+  const [fromId, setFromId] = useState("")
+  const [toId, setToId] = useState("")
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const search = useQuery({
+    queryKey: ["typeSearch", typeQuery],
+    queryFn: () => searchTypes(typeQuery),
+    enabled: typeQuery.length >= 2,
+  })
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["shipments"] })
+    void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
+    void queryClient.invalidateQueries({ queryKey: ["inventory"] })
+  }
+  const record = useMutation({
+    mutationFn: () =>
+      recordShipment({
+        type_id: picked!.id,
+        qty,
+        origin_location_id: fromId,
+        destination_location_id: toId,
+      }),
+    onSuccess: () => {
+      invalidate()
+      setPicked(null)
+      setQty(0)
+      record.reset()
+      setFeedback("On the road — mark it arrived when it lands.")
+    },
+  })
+  const arrived = useMutation({
+    mutationFn: (id: string) => markShipmentArrived(id),
+    onSuccess: invalidate,
+  })
+
+  // Hangars can share a location across divisions — the ends of a haul are
+  // locations, so offer each one once.
+  const stops = new Map(
+    (hangars.data ?? []).map((h) => [h.location_id, h.location_name]),
+  )
+  const ready = picked && qty > 0 && fromId && toId && fromId !== toId
+
+  return (
+    <section className="panel">
+      <h2>Hauls between hangars</h2>
+      <p>
+        <small className="field-hint">
+          Moving stock to another hangar? Record the haul here first and the
+          hangar checks won&apos;t flag it as missing on one end or found on the
+          other. When it lands, mark it arrived — what we paid, and how long
+          we&apos;ve held it, move with it.
+        </small>
+      </p>
+      {shipments.data && shipments.data.length > 0 && (
+        <ul className="recon-list">
+          {shipments.data.map((s) => (
+            <li key={s.id}>
+              <small>
+                {haulText(s)}{" "}
+                <button
+                  type="button"
+                  className="linkbtn"
+                  disabled={arrived.isPending}
+                  onClick={() => arrived.mutate(s.id)}
+                >
+                  It arrived
+                </button>
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
+      {arrived.isError && (
+        <p>
+          <small className="error">{(arrived.error as Error).message}</small>
+        </p>
+      )}
+      {stops.size < 2 ? (
+        <p>
+          <small className="field-hint">
+            Hauls run between two marked hangars — mark a second one above
+            first.
+          </small>
+        </p>
+      ) : (
+        <>
+          <div className="access-actions">
+            {picked ? (
+              <span>
+                {picked.name || `Type ${picked.id}`}{" "}
+                <button
+                  type="button"
+                  className="linkbtn"
+                  onClick={() => setPicked(null)}
+                >
+                  Change item
+                </button>
+              </span>
+            ) : (
+              <label>
+                Item
+                <input
+                  type="search"
+                  placeholder="Search items to haul…"
+                  value={typeQuery}
+                  onChange={(e) => setTypeQuery(e.target.value)}
+                />
+                {(search.data ?? []).length > 0 && (
+                  <ul className="search-results">
+                    {(search.data ?? []).slice(0, 8).map((t) => (
+                      <li key={t.type_id}>
+                        <button
+                          type="button"
+                          className="linkbtn"
+                          onClick={() => {
+                            setPicked({ id: t.type_id, name: t.name })
+                            setTypeQuery("")
+                          }}
+                        >
+                          {t.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </label>
+            )}
+            <label>
+              How many
+              <input
+                type="number"
+                min={1}
+                value={qty || ""}
+                onChange={(e) => setQty(Number(e.target.value))}
+              />
+            </label>
+            <select
+              aria-label="From hangar"
+              value={fromId}
+              onChange={(e) => setFromId(e.target.value)}
+            >
+              <option value="">From…</option>
+              {[...stops].map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="To hangar"
+              value={toId}
+              onChange={(e) => setToId(e.target.value)}
+            >
+              <option value="">To…</option>
+              {[...stops].map(([id, name]) => (
+                <option key={id} value={id} disabled={id === fromId}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!ready || record.isPending}
+              onClick={() => record.mutate()}
+            >
+              {record.isPending ? "Recording…" : "Record the haul"}
+            </button>
+          </div>
+          {feedback && (
+            <p>
+              <small className="field-hint" role="status">
+                {feedback}
+              </small>
+            </p>
+          )}
+          {record.isError && (
+            <p>
+              <small className="error">{(record.error as Error).message}</small>
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+/** One open haul, in plain words: what's on the road, from where to where,
+ * since when. */
+function haulText(s: ShipmentOut): string {
+  const item = s.type_name ?? `Type ${s.type_id}`
+  const from = s.origin_name ?? s.origin_location_id
+  const to = s.destination_name ?? s.destination_location_id
+  const sent = new Date(s.sent_at).toLocaleDateString()
+  return `${s.qty.toLocaleString()} ${item} on its way from ${from} to ${to} (sent ${sent}).`
 }
 
 /** The paper gain/loss card (#153): what selling everything today would mean
