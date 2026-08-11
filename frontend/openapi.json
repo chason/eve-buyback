@@ -1521,7 +1521,7 @@
         "type": "object"
       },
       "MoveSuggestionOut": {
-        "description": "One pending \"looks like a move\" card (ADR-0049, #200/#206): a hangar\ncheck saw the same item missing at one marked hangar and appearing\nsomewhere else \u2014 counted in a hangar there, and/or listed for sale there\n(`qty_listed` of `qty`; a sell-side destination needn't be a marked\nhangar). `id` keys the card's actions (confirm #201, dismiss #202). `qty`\nis what confirming would actually convert now (#204) \u2014 units already sold\nor reprocessed since the pairing are excluded, so the card never\noverstates. Suggestions sharing a `group_id` are candidate origins for the\nsame found stock (#203) \u2014 the UI folds them into one card and the manager\npicks which origin to confirm; confirming one resolves the claim for all\nof them.",
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200/#206/#207): a\nhangar check saw the same item missing at one marked hangar and appearing\nsomewhere else \u2014 counted in a hangar there, listed for sale there\n(`qty_listed` of `qty`), and/or already sold there at an estimated value\n(`qty_sold` of `qty`; a sell-side destination needn't be a marked\nhangar). `id` keys the card's actions (confirm #201, dismiss #202). `qty`\nis what confirming would actually convert now (#204) \u2014 units already sold\nor reprocessed since the pairing are excluded, so the card never\noverstates. Suggestions sharing a `group_id` are candidate origins for the\nsame found stock (#203) \u2014 the UI folds them into one card and the manager\npicks which origin to confirm; confirming one resolves the claim for all\nof them.",
         "properties": {
           "destination_location_id": {
             "title": "Destination Location Id",
@@ -1583,6 +1583,10 @@
             "title": "Qty Listed",
             "type": "integer"
           },
+          "qty_sold": {
+            "title": "Qty Sold",
+            "type": "integer"
+          },
           "type_id": {
             "title": "Type Id",
             "type": "integer"
@@ -1606,6 +1610,7 @@
           "destination_location_id",
           "qty",
           "qty_listed",
+          "qty_sold",
           "noticed_at"
         ],
         "title": "MoveSuggestionOut",
@@ -2991,7 +2996,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "115"
+    "version": "116"
   },
   "openapi": "3.1.0",
   "paths": {

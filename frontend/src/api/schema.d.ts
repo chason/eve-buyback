@@ -1645,10 +1645,11 @@ export interface components {
         };
         /**
          * MoveSuggestionOut
-         * @description One pending "looks like a move" card (ADR-0049, #200/#206): a hangar
-         *     check saw the same item missing at one marked hangar and appearing
-         *     somewhere else — counted in a hangar there, and/or listed for sale there
-         *     (`qty_listed` of `qty`; a sell-side destination needn't be a marked
+         * @description One pending "looks like a move" card (ADR-0049, #200/#206/#207): a
+         *     hangar check saw the same item missing at one marked hangar and appearing
+         *     somewhere else — counted in a hangar there, listed for sale there
+         *     (`qty_listed` of `qty`), and/or already sold there at an estimated value
+         *     (`qty_sold` of `qty`; a sell-side destination needn't be a marked
          *     hangar). `id` keys the card's actions (confirm #201, dismiss #202). `qty`
          *     is what confirming would actually convert now (#204) — units already sold
          *     or reprocessed since the pairing are excluded, so the card never
@@ -1682,6 +1683,8 @@ export interface components {
             qty: number;
             /** Qty Listed */
             qty_listed: number;
+            /** Qty Sold */
+            qty_sold: number;
             /** Type Id */
             type_id: number;
             /** Type Name */

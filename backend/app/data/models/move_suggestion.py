@@ -30,10 +30,21 @@ class MoveSuggestion(Base):
     origin_location_id: Mapped[str] = mapped_column(String)
     destination_location_id: Mapped[str] = mapped_column(String)
     # The paired overlap — min(shortfall, total excess); residuals keep the
-    # defaults. `qty_listed` of it is the sell-order-escrow portion (#206); the
-    # rest is hangar-counted excess backed by `excess_lot_id`.
+    # defaults. `qty_listed` of it is the sell-order-escrow portion (#206) and
+    # `qty_sold` the already-sold-at-estimated-cost portion (#207); the rest is
+    # hangar-counted excess backed by `excess_lot_id`.
     qty: Mapped[int] = mapped_column(BigInteger)
     qty_listed: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default="0"
+    )
+    qty_sold: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default="0"
+    )
+    # What the confirmation actually retired for the sold portion (#207) — 0
+    # until confirmed, and at most `qty_sold` (the origin may hold less by
+    # confirm time). Summed per (destination, type) so retired quantity drops
+    # out of future pairings; sale rows are frozen and can't carry this state.
+    qty_retired: Mapped[int] = mapped_column(
         BigInteger, default=0, server_default="0"
     )
     shortfall_event_id: Mapped[uuid.UUID] = mapped_column(

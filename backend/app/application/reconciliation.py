@@ -38,10 +38,16 @@ from app.data.repositories import move_suggestions as moves_repo
 from app.data.repositories import prices as prices_repo
 from app.data.repositories import pricing_rules as rules_repo
 from app.data.repositories import reconciliation as recon_repo
+from app.data.repositories import sales as sales_repo
 from app.data.repositories import sde as sde_repo
 from app.data.repositories import shipments as shipments_repo
 from app.domain import pricing as pricing_domain
-from app.domain.moves import MovePair, match_move_pairs, unexplained_listed
+from app.domain.moves import (
+    MovePair,
+    match_move_pairs,
+    unexplained_listed,
+    unretired_sold,
+)
 from app.domain.reconciliation import Delta, reconcile
 from app.domain.shipments import absorb_open_shipments
 from app.domain.transformations import match_reprocess_hints
@@ -77,8 +83,9 @@ class MoveSuggestionView:
     """A pending "looks like a move" pairing enriched for display (ADR-0049):
     names resolved so the UI stays plain. `convertible_qty` is what confirming
     would actually convert NOW (#204) — the counted portion capped by what the
-    deemed lot still holds, plus the listed portion in full (#206, re-checked
-    against the escrow every sync) — so the card never promises stale units."""
+    deemed lot still holds, plus the listed and sold portions in full
+    (#206/#207, re-checked against the fresh sell-side evidence every sync) —
+    so the card never promises stale units."""
 
     record: MoveSuggestionRecord
     convertible_qty: int
@@ -143,11 +150,19 @@ async def reconcile_hangars(
     for slot, qty in in_transit.items():
         if slot in expected:
             expected[slot] = max(0, expected[slot] - qty)
-    # The sell-side evidence (#206): the division's sell-order escrow beyond
-    # what idle lots at that location explain — any station it trades at, not
-    # just configured hangars (ADR-0045 scopes the sell side by the wallet
+    # The sell-side evidence (#206/#207): the division's sell-order escrow
+    # beyond what idle lots at that location explain, and its estimated-cost
+    # sales not yet retired by a confirmed move — any station it trades at,
+    # not just configured hangars (ADR-0045 scopes the sell side by the wallet
     # division, ADR-0049).
     listed_evidence = unexplained_listed(listed, idle)
+    sold = await sales_repo.estimated_cost_sold_by_location_type(
+        session, corporation_id=corp.id
+    )
+    retired = await moves_repo.sold_retired_by_destination_type(
+        session, corporation_id=corp.id
+    )
+    sold_evidence = unretired_sold(sold, retired)
     deltas = reconcile(counted, expected)
     # The haul's physical goods sit at ONE end while it is open — still at the
     # origin before pickup (where the subtraction above would now read them as
@@ -171,6 +186,7 @@ async def reconcile_hangars(
             shortfall_events={},
             shortfall_slots=set(),
             listed_evidence=listed_evidence,
+            sold_evidence=sold_evidence,
             now=now,
         )
         await session.commit()
@@ -306,21 +322,23 @@ async def reconcile_hangars(
         shortfall_events=shortfall_events,
         shortfall_slots=shortfall_slots,
         listed_evidence=listed_evidence,
+        sold_evidence=sold_evidence,
         now=now,
     )
 
     # A same-type shortfall at one hangar + excess evidence elsewhere looks
-    # like a haul nobody recorded (ADR-0049, #200/#206): stock counted at
-    # another hangar beyond the books, and/or the division's sell-order escrow
-    # beyond what idle lots there explain. Suggest-only — the defaults above
-    # are already booked (the shortfall flag stands, the deemed-cost lot
-    # exists), and the suggestion merely decorates them so a human can act
-    # later. Counted excess that couldn't be priced has no lot to decorate yet
-    # — the pair proposes on the pass that books it. A still-pending pair is
-    # never duplicated by a later sync, and a pattern a human already dismissed
-    # (same standing flag, same quantity) is never re-asked (#202).
+    # like a haul nobody recorded (ADR-0049, #200/#206/#207): stock counted at
+    # another hangar beyond the books, the division's sell-order escrow beyond
+    # what idle lots there explain, and/or its still-estimated sales there.
+    # Suggest-only — the defaults above are already booked (the shortfall flag
+    # stands, the deemed-cost lot exists), and the suggestion merely decorates
+    # them so a human can act later. Counted excess that couldn't be priced
+    # has no lot to decorate yet — the pair proposes on the pass that books
+    # it. A still-pending pair is never duplicated by a later sync, and a
+    # pattern a human already dismissed (same standing flag, same quantity) is
+    # never re-asked (#202).
     for pair in _move_pairs(
-        deltas, hinted_sources, hinted_materials, listed_evidence
+        deltas, hinted_sources, hinted_materials, listed_evidence, sold_evidence
     ):
         event_id = shortfall_events.get((pair.origin_location_id, pair.type_id))
         lot_id = excess_lots.get((pair.destination_location_id, pair.type_id))
@@ -350,6 +368,7 @@ async def reconcile_hangars(
             destination_location_id=pair.destination_location_id,
             qty=pair.qty,
             qty_listed=pair.qty_listed,
+            qty_sold=pair.qty_sold,
             shortfall_event_id=event_id,
             excess_lot_id=lot_id if pair.qty_counted > 0 else None,
         )
@@ -394,11 +413,12 @@ def _move_pairs(
     hinted_sources: set[tuple[str, int]],
     hinted_materials: set[tuple[str, int]],
     listed_evidence: list[tuple[str, int, int]],
+    sold_evidence: list[tuple[str, int, int]],
 ) -> list[MovePair]:
-    """Feed the default-treated deltas plus the sell-side listed evidence to
-    the pure pairer (ADR-0049, #200/#206). Slots the reprocess suggestion
-    claimed are excluded: they skipped the default treatment, so there is no
-    flag or lot for a move pair to decorate."""
+    """Feed the default-treated deltas plus the sell-side evidence to the pure
+    pairer (ADR-0049, #200/#206/#207). Slots the reprocess suggestion claimed
+    are excluded: they skipped the default treatment, so there is no flag or
+    lot for a move pair to decorate."""
     shortfalls: list[tuple[str, int, int]] = []
     excesses: list[tuple[str, int, int]] = []
     for delta in deltas:
@@ -407,9 +427,11 @@ def _move_pairs(
             shortfalls.append((delta.location_id, delta.type_id, delta.qty))
         elif delta.kind == "excess" and slot not in hinted_materials:
             excesses.append((delta.location_id, delta.type_id, delta.qty))
-    if not shortfalls or (not excesses and not listed_evidence):
+    if not shortfalls:
         return []
-    return match_move_pairs(shortfalls, excesses, listed_evidence)
+    if not excesses and not listed_evidence and not sold_evidence:
+        return []
+    return match_move_pairs(shortfalls, excesses, listed_evidence, sold_evidence)
 
 
 async def _withdraw_invalid_suggestions(
@@ -419,20 +441,24 @@ async def _withdraw_invalid_suggestions(
     shortfall_events: dict[tuple[str, int], uuid.UUID],
     shortfall_slots: set[tuple[str, int]],
     listed_evidence: list[tuple[str, int, int]],
+    sold_evidence: list[tuple[str, int, int]],
     now: datetime,
 ) -> None:
     """Withdraw pending suggestions whose pair no longer holds (ADR-0049, #202)
     against the fresh sync: `shortfall_events` maps each still-short slot to its
     standing flag event, `shortfall_slots` is every slot the fresh pass found
-    short, `listed_evidence` is the fresh unexplained sell-order escrow the
-    listed portion of a pair (#206) must still be backed by. A withdrawal is
-    bookkeeping, not a decision — it's logged with its own kind so it never
-    reads like a dismissal, and it never suppresses a future pairing the way a
-    dismissal does."""
+    short, `listed_evidence` / `sold_evidence` are the fresh sell-side signals
+    the listed and sold portions of a pair (#206/#207) must still be backed by.
+    A withdrawal is bookkeeping, not a decision — it's logged with its own kind
+    so it never reads like a dismissal, and it never suppresses a future
+    pairing the way a dismissal does."""
     listed_now = {(loc, tid): qty for loc, tid, qty in listed_evidence}
+    sold_now = {(loc, tid): qty for loc, tid, qty in sold_evidence}
     pending = await moves_repo.list_pending(session, corporation_id=corporation_id)
     for s in pending:
-        reason = _withdraw_reason(s, shortfall_events, shortfall_slots, listed_now)
+        reason = _withdraw_reason(
+            s, shortfall_events, shortfall_slots, listed_now, sold_now
+        )
         if reason is None:
             continue
         await moves_repo.set_status(
@@ -455,24 +481,31 @@ def _withdraw_reason(
     shortfall_events: dict[tuple[str, int], uuid.UUID],
     shortfall_slots: set[tuple[str, int]],
     listed_now: dict[tuple[str, int], int],
+    sold_now: dict[tuple[str, int], int],
 ) -> str | None:
     """Why a pending pair stopped holding, or None while it still does. The
     counted end fails when the deemed lot is gone or the destination now counts
     SHORT of the books (the found stock left again); the listed end (#206)
     fails when the fresh unexplained escrow no longer covers the portion it
     claimed (the listing sold or was taken down — a smaller pair, if one still
-    holds, re-proposes on this same pass); the shortfall end fails when the
-    flag this pair decorates is no longer the slot's standing anchor — resolved
-    some other way, or superseded by a changed magnitude. A pure sell-side pair
-    carries no lot, so `excess_lot_id is None` only condemns a pair with a
-    counted portion."""
+    holds, re-proposes on this same pass); the sold end (#207) likewise when
+    the fresh unretired estimated sales no longer cover it (sale rows are
+    frozen, so this only moves when another confirmation retired them or their
+    lots left the location); the shortfall end fails when the flag this pair
+    decorates is no longer the slot's standing anchor — resolved some other
+    way, or superseded by a changed magnitude. A pure sell-side pair carries
+    no lot, so `excess_lot_id is None` only condemns a pair with a counted
+    portion."""
     destination = (s.destination_location_id, s.type_id)
-    if s.qty > s.qty_listed and s.excess_lot_id is None:
+    qty_counted = s.qty - s.qty_listed - s.qty_sold
+    if qty_counted > 0 and s.excess_lot_id is None:
         return "The found stock it pointed at is no longer on the books"
-    if s.qty > s.qty_listed and destination in shortfall_slots:
+    if qty_counted > 0 and destination in shortfall_slots:
         return "The found stock is no longer there"
     if s.qty_listed > 0 and listed_now.get(destination, 0) < s.qty_listed:
         return "The stock listed for sale there sold or was taken down"
+    if s.qty_sold > 0 and sold_now.get(destination, 0) < s.qty_sold:
+        return "The sold stock it pointed at no longer adds up"
     if shortfall_events.get((s.origin_location_id, s.type_id)) != s.shortfall_event_id:
         return "The missing-stock flag was resolved another way"
     return None
@@ -679,18 +712,19 @@ async def _convertible_qty(
     """The units a confirm would convert right now, per portion — the same
     caps `confirm_move` applies. The counted portion is capped by the deemed
     lot's `qty_remaining` (#204), and contributes nothing when the lot is gone
-    (SET NULL) or fully consumed; the listed portion (#206) has no lot — the
-    withdraw sweep re-checks it against the fresh escrow every sync, so it
-    counts in full here."""
-    counted = record.qty - record.qty_listed
+    (SET NULL) or fully consumed; the listed portion (#206) and the sold
+    portion (#207) have no lot — the withdraw sweep re-checks them against
+    the fresh sell-side evidence every sync, so they count in full here."""
+    sell_side = record.qty_listed + record.qty_sold
+    counted = record.qty - sell_side
     if counted <= 0 or record.excess_lot_id is None:
-        return record.qty_listed
+        return sell_side
     deemed = await lots_repo.get_for_corp(
         session, corporation_id=corporation_id, lot_id=record.excess_lot_id
     )
     if deemed is None:
-        return record.qty_listed
-    return min(counted, deemed.qty_remaining) + record.qty_listed
+        return sell_side
+    return min(counted, deemed.qty_remaining) + sell_side
 
 
 async def dismiss_move_suggestion(

@@ -456,7 +456,7 @@ describe("Inventory", () => {
         id: "sug-1", type_id: 34, type_name: "Tritanium",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-        qty: 40, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z",
+        qty: 40, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
       },
     ])
 
@@ -489,14 +489,14 @@ describe("Inventory", () => {
         id: "sug-2", type_id: 34, type_name: "Tritanium",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60011866", destination_name: "Dodixie IX",
-        qty: 60, qty_listed: 60, noticed_at: "2026-08-11T10:00:00Z",
+        qty: 60, qty_listed: 60, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
       },
       {
         // Mixed pair: part counted in the hangar, part listed.
         id: "sug-3", type_id: 35, type_name: "Pyerite",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-        qty: 100, qty_listed: 30, noticed_at: "2026-08-11T10:00:00Z",
+        qty: 100, qty_listed: 30, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
       },
     ])
 
@@ -514,6 +514,42 @@ describe("Inventory", () => {
     ).toBeInTheDocument()
   })
 
+  it("tells the already-sold story on a sold-evidence card (#207)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([
+      {
+        // Pure sold pair: everything already sold at Jita at estimated cost.
+        id: "sug-4", type_id: 34, type_name: "Tritanium",
+        origin_location_id: "60008494", origin_name: "Amarr VIII",
+        destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+        qty: 40, qty_listed: 0, qty_sold: 40, noticed_at: "2026-08-11T10:00:00Z",
+      },
+      {
+        // The full ADR wording: part listed, part already sold.
+        id: "sug-5", type_id: 35, type_name: "Pyerite",
+        origin_location_id: "60008494", origin_name: "Amarr VIII",
+        destination_location_id: "60011866", destination_name: "Dodixie IX",
+        qty: 100, qty_listed: 60, qty_sold: 40, noticed_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    expect(
+      await screen.findByText(
+        /Looks like 40 Tritanium moved from Amarr VIII to Jita IV - Moon 4 and already sold — was this a move\?/,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /Looks like 100 Pyerite moved from Amarr VIII to Dodixie IX — 60 of them are listed for sale there and 40 already sold\. Was this a move\?/,
+      ),
+    ).toBeInTheDocument()
+  })
+
   it("confirms a move and the card leaves the pending list (#201)", async () => {
     const u = userEvent.setup()
     vi.mocked(accountingApi.getInventory).mockResolvedValue({
@@ -527,7 +563,7 @@ describe("Inventory", () => {
           id: "sug-1", type_id: 34, type_name: "Tritanium",
           origin_location_id: "60008494", origin_name: "Amarr VIII",
           destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-          qty: 40, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z",
+          qty: 40, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
         },
       ])
       .mockResolvedValue([])
@@ -565,7 +601,7 @@ describe("Inventory", () => {
           id: "sug-1", type_id: 34, type_name: "Tritanium",
           origin_location_id: "60008494", origin_name: "Amarr VIII",
           destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-          qty: 40, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z",
+          qty: 40, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
         },
       ])
       .mockResolvedValue([])
@@ -598,7 +634,7 @@ describe("Inventory", () => {
         id: "sug-1", type_id: 34, type_name: "Tritanium",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-        qty: 40, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z",
+        qty: 40, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
       },
     ])
 
@@ -625,7 +661,7 @@ describe("Inventory", () => {
         id: "sug-1", type_id: 34, type_name: "Tritanium",
         origin_location_id: "60008494", origin_name: "Amarr VIII",
         destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
-        qty: 40, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z",
+        qty: 40, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z",
       },
     ])
     vi.mocked(accountingApi.dismissMoveSuggestion).mockImplementation(
@@ -652,13 +688,13 @@ describe("Inventory", () => {
       id: "cand-jita", type_id: 34, type_name: "Tritanium",
       origin_location_id: "60003760", origin_name: "Jita IV - Moon 4",
       destination_location_id: "60008494", destination_name: "Amarr VIII",
-      qty: 100, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
+      qty: 100, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
     },
     {
       id: "cand-dodixie", type_id: 34, type_name: "Tritanium",
       origin_location_id: "60011866", origin_name: "Dodixie IX",
       destination_location_id: "60008494", destination_name: "Amarr VIII",
-      qty: 50, qty_listed: 0, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
+      qty: 50, qty_listed: 0, qty_sold: 0, noticed_at: "2026-08-11T10:00:00Z", group_id: "lot-1",
     },
   ]
 

@@ -5,7 +5,7 @@ read the pending list for the "Needs a look" area, and move a suggestion out of
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import MoveSuggestion
@@ -24,6 +24,7 @@ async def add(
     shortfall_event_id: uuid.UUID,
     excess_lot_id: uuid.UUID | None = None,
     qty_listed: int = 0,
+    qty_sold: int = 0,
 ) -> MoveSuggestionRecord:
     suggestion = MoveSuggestion(
         corporation_id=corporation_id,
@@ -32,6 +33,7 @@ async def add(
         destination_location_id=destination_location_id,
         qty=qty,
         qty_listed=qty_listed,
+        qty_sold=qty_sold,
         shortfall_event_id=shortfall_event_id,
         excess_lot_id=excess_lot_id,
         status="pending",
@@ -112,17 +114,49 @@ async def set_status(
     *,
     suggestion_id: uuid.UUID,
     status: MoveSuggestionStatus,
+    qty_retired: int | None = None,
 ) -> None:
     """Advance a suggestion's lifecycle (pending → confirmed/dismissed/
     withdrawn). The application decides the transition rules; this only
-    writes it."""
+    writes it. A confirmation passes `qty_retired` — what it actually retired
+    for the sold portion (#207), the state that keeps retired quantity from
+    re-pairing."""
     row = (
         await session.execute(
             select(MoveSuggestion).where(MoveSuggestion.id == suggestion_id)
         )
     ).scalar_one()
     row.status = status
+    if qty_retired is not None:
+        row.qty_retired = qty_retired
     await session.flush()
+
+
+async def sold_retired_by_destination_type(
+    session: AsyncSession, *, corporation_id: uuid.UUID
+) -> dict[tuple[str, int], int]:
+    """Quantity prior confirmations retired for already-sold evidence (#207),
+    per `(destination_location_id, type_id)` — subtracted from the fresh
+    estimated-cost sales so retired quantity never re-pairs (ADR-0049), and
+    the offset a new confirmation's true-up walk skips."""
+    rows = (
+        await session.execute(
+            select(
+                MoveSuggestion.destination_location_id,
+                MoveSuggestion.type_id,
+                func.sum(MoveSuggestion.qty_retired),
+            )
+            .where(
+                MoveSuggestion.corporation_id == corporation_id,
+                MoveSuggestion.status == "confirmed",
+                MoveSuggestion.qty_retired > 0,
+            )
+            .group_by(
+                MoveSuggestion.destination_location_id, MoveSuggestion.type_id
+            )
+        )
+    ).all()
+    return {(loc, tid): int(qty) for loc, tid, qty in rows}
 
 
 async def list_pending(

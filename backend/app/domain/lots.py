@@ -35,8 +35,13 @@ EntrySource = Literal["esi", "manual", "system"]
 
 # Costs not embedded in a lot's basis (ADR-0043/0045): selling fees, outbound freight
 # (hauling is a SELLING cost in this app — members haul in, ADR-0030), write-downs,
-# and anything else a manager needs to book.
-ExpenseKind = Literal["broker_fee", "relist_fee", "hauling", "write_down", "other"]
+# anything else a manager needs to book, and the aggregate cost true-up a confirmed
+# move books for stock that had already sold at an estimated cost (ADR-0049, #207 —
+# real landed cost minus estimated COGS, positive or negative; the sale rows stay
+# frozen). App-booked only — never a manual entry kind.
+ExpenseKind = Literal[
+    "broker_fee", "relist_fee", "hauling", "write_down", "other", "cost_true_up"
+]
 
 
 def landed_unit_cost(

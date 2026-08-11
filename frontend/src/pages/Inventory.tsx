@@ -924,23 +924,35 @@ function candidateOrigin(s: MoveSuggestionOut): string {
   return `${name} (${s.qty.toLocaleString()} missing)`
 }
 
-/** A "looks like a move" suggestion (ADR-0049, #200/#206): the same item went
- * missing in one marked hangar and turned up somewhere else — counted in
- * another marked hangar, and/or listed for sale by the buyback wallet (#206).
- * Confirming it (#201) carries what we paid — and how long we've held it — to
- * the new place. */
+/** A "looks like a move" suggestion (ADR-0049, #200/#206/#207): the same item
+ * went missing in one marked hangar and turned up somewhere else — counted in
+ * another marked hangar, listed for sale by the buyback wallet (#206), and/or
+ * already sold there (#207). Confirming it (#201) carries what we paid — and
+ * how long we've held it — to the new place; the already-sold part corrects
+ * the profit those sales guessed at. */
 function suggestionText(s: MoveSuggestionOut): string {
   const item = s.type_name ?? `Type ${s.type_id}`
   const from = s.origin_name ?? s.origin_location_id
   const to = s.destination_name ?? s.destination_location_id
   const base = `Looks like ${s.qty.toLocaleString()} ${item} moved from ${from} to ${to}`
-  if (s.qty_listed > 0 && s.qty_listed === s.qty) {
-    return `${base} — they're listed for sale there. Was this a move?`
+  if (s.qty_sold > 0 && s.qty_sold === s.qty) {
+    return `${base} and already sold — was this a move?`
   }
+  const clauses: string[] = []
   if (s.qty_listed > 0) {
-    return `${base} — ${s.qty_listed.toLocaleString()} of them are listed for sale there. Was this a move?`
+    clauses.push(
+      s.qty_listed === s.qty
+        ? "they're listed for sale there"
+        : `${s.qty_listed.toLocaleString()} of them are listed for sale there`,
+    )
   }
-  return `${base} — was this a move?`
+  if (s.qty_sold > 0) {
+    clauses.push(`${s.qty_sold.toLocaleString()} already sold`)
+  }
+  if (clauses.length === 0) {
+    return `${base} — was this a move?`
+  }
+  return `${base} — ${clauses.join(" and ")}. Was this a move?`
 }
 
 function eventText(e: ReconciliationEventOut): string {
