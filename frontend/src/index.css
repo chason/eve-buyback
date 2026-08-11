@@ -686,6 +686,19 @@ label:has(> .search-results) > input {
   text-decoration: none;
 }
 
+/* Move-suggestion decisions (ADR-0049): actions that rewrite the books get real
+   button chrome — the primary confirm filled, the dismiss secondary — instead of
+   the link-text used for lighter inline actions. Compact so the card stays a
+   thin strip inside its <small> sentence. */
+.suggestion-btn {
+  display: inline-block;
+  width: auto;
+  margin: 0 0 0 0.25rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
 /* The ambiguous-move origin pick (#203): a compact inline select sitting in the
    card sentence — choosing an origin opens the confirm prompt, so the pick is
    the card's only extra control. Right padding leaves room for Pico's arrow. */
