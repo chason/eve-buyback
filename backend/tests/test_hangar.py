@@ -127,6 +127,46 @@ def test_hangar_counts_include_container_contents_recursively():
     }
 
 
+def test_hangar_counts_resolve_the_office_hop():
+    """The REAL corp-asset shape: division rows hang under the corp's OFFICE at
+    the station (their location_id is the office's item_id), and only the office
+    row points at the station. The count must resolve that hop — this exact shape
+    counted ZERO before the fix."""
+    hangars = [HangarKey(location_id=JITA, division=2)]
+    office = _stack(27, 1, flag="OfficeFolder", item_id=1_027_000_000_001)
+    counts = hangar_counts(
+        [
+            office,
+            _stack(34, 100, location=1_027_000_000_001),
+            _stack(34, 50, location=1_027_000_000_001),
+            _stack(35, 10, location=1_027_000_000_001),
+            # Another division under the same office — not buyback.
+            _stack(34, 999, location=1_027_000_000_001, flag="CorpSAG1"),
+            # Deliveries under the office are not hangar stock either.
+            _stack(34, 999, location=1_027_000_000_001, flag="CorpDeliveries"),
+        ],
+        hangars,
+    )
+    # The office row itself is not stock (never CorpSAG-flagged).
+    assert counts == {(JITA, 34): 150, (JITA, 35): 10}
+
+
+def test_hangar_counts_office_containers_resolve_transitively():
+    hangars = [HangarKey(location_id=JITA, division=2)]
+    office = _stack(27, 1, flag="OfficeFolder", item_id=1_027_000_000_001)
+    box = _stack(17366, 1, location=1_027_000_000_001, item_id=5001)
+    counts = hangar_counts(
+        [
+            office,
+            box,
+            _stack(34, 100, location=5001, flag="Unlocked"),
+            _stack(34, 25, location=1_027_000_000_001),  # loose in the hangar
+        ],
+        hangars,
+    )
+    assert counts == {(JITA, 34): 125, (JITA, 17366): 1}
+
+
 def test_hangar_counts_spans_multiple_hangars():
     hangars = [
         HangarKey(location_id=JITA, division=2),

@@ -108,13 +108,19 @@ class AssetsEsi:
             raise CorporationAssetsForbidden()
         from app.plugins.esi import CorporationAsset
 
-        return [
-            CorporationAsset(
+        # The real ESI shape: hangar rows hang under the corp's OFFICE at the
+        # station — only the office row points at the station itself.
+        office_id = 1_027_000_000_001
+        stacks = [CorporationAsset(
+            item_id=office_id, type_id=27, quantity=1,
+            location_id=int(JITA), location_flag="OfficeFolder",
+        )]
+        for tid, qty in self.hangar.items():
+            stacks.append(CorporationAsset(
                 item_id=next(self._item_id), type_id=tid, quantity=qty,
-                location_id=int(JITA), location_flag="CorpSAG2",
-            )
-            for tid, qty in self.hangar.items()
-        ]
+                location_id=office_id, location_flag="CorpSAG2",
+            ))
+        return stacks
 
 
 def _user() -> AuthenticatedUser:

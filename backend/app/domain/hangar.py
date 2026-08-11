@@ -42,8 +42,26 @@ def hangar_counts(
     with station containers, and their contents are still buyback stock. Contained
     items attribute to the hangar's station, since that's the granularity the ledger
     tracks. The containers themselves count too — they're physically there, and the
-    reconciliation must not read them as missing."""
+    reconciliation must not read them as missing.
+
+    Corp hangar rows do NOT sit at the station directly: ESI parents them under the
+    corp's OFFICE there — the division-flagged row's `location_id` is the office's
+    `item_id`, and only the office row (flag "OfficeFolder") points at the station.
+    So any row sitting AT a marked location anchors its children: a child whose own
+    flag is the marked division counts, wherever the division flag actually hangs
+    (under the office in real data; directly at the location in the degenerate
+    shape). The office row itself is not stock — it never carries a CorpSAG flag —
+    and children under an anchor count ONLY on their own division flag, so nothing
+    at the station leaks in by mere adjacency."""
     wanted = {(h.location_id, division_flag(h.division)) for h in hangars}
+    marked_locations = {h.location_id for h in hangars}
+    # item_id → marked location, for rows sitting AT a marked location (the
+    # office, in real data) — the anchor the division-flagged children hang from.
+    anchors: dict[int, str] = {}
+    for asset in assets:
+        if str(asset.location_id) in marked_locations:
+            anchors[asset.item_id] = str(asset.location_id)
+
     counts: dict[tuple[str, int], int] = {}
     # item_id → the marked hangar's station, for everything known to be inside one.
     station_of: dict[int, str] = {}
@@ -55,8 +73,9 @@ def hangar_counts(
 
     remaining: list[AssetStack] = []
     for asset in assets:
-        if (str(asset.location_id), asset.location_flag) in wanted:
-            _count(asset, str(asset.location_id))
+        station = anchors.get(asset.location_id, str(asset.location_id))
+        if (station, asset.location_flag) in wanted:
+            _count(asset, station)
         else:
             remaining.append(asset)
 
