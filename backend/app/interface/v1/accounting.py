@@ -35,6 +35,7 @@ from app.schemas.accounting import (
     ManualLotRequest,
     ManualSaleRequest,
     ManualSaleResult,
+    MoveConfirmRequest,
     MoveSuggestionOut,
     ProfitOut,
     ReceivableClearRequest,
@@ -211,17 +212,23 @@ async def list_move_suggestions(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def confirm_move_suggestion(
-    suggestion_id: uuid.UUID, user: ManagerUser, session: SessionDep
+    suggestion_id: uuid.UUID,
+    user: ManagerUser,
+    session: SessionDep,
+    payload: MoveConfirmRequest | None = None,
 ) -> None:
     """"Yes, this was a move" (ADR-0049, #201): reverses the estimated-value
     stock at the destination and moves the origin's oldest matching stock there,
-    cost basis and aging intact — atomically, logged with who confirmed."""
+    cost basis and aging intact — atomically, logged with who confirmed. An
+    optional haul cost (#205) books as a hauling expense against the move; the
+    body may be omitted entirely."""
     await moves_app.confirm_move(
         session,
         corporation_eve_id=user.corporation_id,
         suggestion_id=suggestion_id,
         confirmed_by_character_id=user.character_id,
         confirmed_by_name=user.character_name,
+        haul_cost=payload.haul_cost if payload else None,
     )
 
 

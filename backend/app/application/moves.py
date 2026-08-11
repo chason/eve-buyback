@@ -14,16 +14,19 @@ change. Everything booked here is a reversing entry away from undone (ADR-0045)
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import entitlements as entitlements_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import MoveSuggestionNotFound, MoveSuggestionNotPending
+from app.data.repositories import expenses as expenses_repo
 from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
 from app.data.repositories import move_suggestions as moves_repo
 from app.data.repositories import reconciliation as recon_repo
+from app.data.repositories import sde as sde_repo
 from app.domain.lots import OpenLot, plan_fifo
 
 
@@ -43,6 +46,7 @@ async def confirm_move(
     suggestion_id: uuid.UUID,
     confirmed_by_character_id: int,
     confirmed_by_name: str | None = None,
+    haul_cost: Decimal | None = None,
     now: datetime | None = None,
 ) -> ConfirmMoveResult:
     """Confirm one pending suggestion (ADR-0049, #201) — the happy path. Owns
@@ -59,6 +63,14 @@ async def confirm_move(
       always convert the SAME quantity, so the books stay balanced.
     - A double confirm is a no-op (idempotent); a dismissed suggestion raises
       `MoveSuggestionNotPending` — see the error's docstring.
+    - An optional `haul_cost` (#205) books a hauling expense in the same UoW —
+      a SELLING cost (ADR-0043/0045), never landed cost: the moved lots'
+      carrying value must not change. Attribution: `LotExpense` carries one
+      optional `lot_id`, and a move can relocate several lots, so the expense
+      attaches to the relocated lot when exactly one moved and otherwise
+      attributes through its note, which always names the move — allocating
+      one ISK figure across lots would imply a precision it doesn't have.
+      Omitted, zero, or a confirm that converted nothing books nothing.
 
     The log entry is written at the ORIGIN slot: append-only, it supersedes the
     shortfall as that slot's latest event, which is what "resolving the flag"
@@ -105,18 +117,43 @@ async def confirm_move(
     plan = plan_fifo(open_lots, convertible)
     moved = convertible - plan.shortfall
 
+    relocated: list[uuid.UUID] = []
     for consumption in plan.consumptions:
-        await lots_repo.move_to_location(
+        destination_lot = await lots_repo.move_to_location(
             session,
             lot_id=consumption.lot_id,
             qty=consumption.qty,
             location_id=suggestion.destination_location_id,
         )
+        relocated.append(destination_lot.id)
     if moved > 0 and deemed is not None:
         # The reversing entry: the deemed-cost units the excess pass invented
         # are consumed back out — the relocated lots now carry the destination's
         # stock at its real, measured cost basis.
         await lots_repo.consume(session, lot_id=deemed.id, qty=moved)
+
+    if haul_cost and moved > 0:
+        # The freight the confirmer told us about (#205): a selling expense
+        # attributed to the move — see the docstring for the attribution
+        # stance. Booked in the same UoW, so a failed confirm books no cost.
+        await expenses_repo.create_expense(
+            session,
+            corporation_id=corp.id,
+            kind="hauling",
+            amount=haul_cost,
+            source="manual",
+            incurred_at=now,
+            lot_id=relocated[0] if len(relocated) == 1 else None,
+            recorded_by_character_id=confirmed_by_character_id,
+            note=await _haul_note(
+                session,
+                corp.id,
+                type_id=suggestion.type_id,
+                qty=moved,
+                origin_location_id=suggestion.origin_location_id,
+                destination_location_id=suggestion.destination_location_id,
+            ),
+        )
 
     await moves_repo.set_status(
         session, suggestion_id=suggestion.id, status="confirmed"
@@ -160,12 +197,37 @@ async def _confirmed_note(
     """Who confirmed, and where the stock went — the log's plain-English record
     of the conversion (the acting character, per the ADR: "the log shows who
     confirmed what"). Lowercase start: the UI splices it after a dash."""
-    hangar_names = {
-        h.location_id: h.location_name
-        for h in await hangars_repo.list_for_corp(session, corporation_id)
-    }
+    hangar_names = await _hangar_names(session, corporation_id)
     destination = hangar_names.get(
         destination_location_id, destination_location_id
     )
     who = confirmed_by_name or f"character {confirmed_by_character_id}"
     return f"confirmed as a move to {destination} by {who}"
+
+
+async def _haul_note(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    *,
+    type_id: int,
+    qty: int,
+    origin_location_id: str,
+    destination_location_id: str,
+) -> str:
+    """The hauling expense's attribution (#205), in plain English: which move
+    the cost belongs to, named the way the confirm card named it."""
+    types = await sde_repo.get_types(session, [type_id])
+    item = types[type_id].name if type_id in types else f"type {type_id}"
+    hangar_names = await _hangar_names(session, corporation_id)
+    origin = hangar_names.get(origin_location_id, origin_location_id)
+    destination = hangar_names.get(
+        destination_location_id, destination_location_id
+    )
+    return f"Hauling for the move of {qty} {item} from {origin} to {destination}"
+
+
+async def _hangar_names(
+    session: AsyncSession, corporation_id: uuid.UUID
+) -> dict[str, str]:
+    hangars = await hangars_repo.list_for_corp(session, corporation_id)
+    return {h.location_id: h.location_name for h in hangars}

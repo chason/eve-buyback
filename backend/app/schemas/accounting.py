@@ -185,6 +185,15 @@ class MoveSuggestionOut(BaseModel):
     noticed_at: datetime
 
 
+class MoveConfirmRequest(BaseModel):
+    """The optional detail on a "yes, this was a move" (#205): what the haul
+    cost in ISK. Booked as a hauling expense against the move — never added to
+    the moved stock's value (ADR-0049: relocation must not change carrying
+    value). Omitted or zero books nothing."""
+
+    haul_cost: Decimal | None = Field(default=None, ge=0)
+
+
 class ReprocessOutputIn(BaseModel):
     type_id: int
     quantity: int = Field(gt=0)

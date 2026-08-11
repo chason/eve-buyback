@@ -551,9 +551,32 @@ export interface paths {
          * Confirm Move Suggestion
          * @description "Yes, this was a move" (ADR-0049, #201): reverses the estimated-value
          *     stock at the destination and moves the origin's oldest matching stock there,
-         *     cost basis and aging intact — atomically, logged with who confirmed.
+         *     cost basis and aging intact — atomically, logged with who confirmed. An
+         *     optional haul cost (#205) books as a hauling expense against the move; the
+         *     body may be omitted entirely.
          */
         post: operations["confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Move Suggestion
+         * @description "Not a move" (ADR-0049, #202): the card goes away and won't come back
+         *     while nothing changed; everything already booked stays as it is.
+         */
+        post: operations["dismiss_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1562,12 +1585,24 @@ export interface components {
             parent_id: number | null;
         };
         /**
+         * MoveConfirmRequest
+         * @description The optional detail on a "yes, this was a move" (#205): what the haul
+         *     cost in ISK. Booked as a hauling expense against the move — never added to
+         *     the moved stock's value (ADR-0049: relocation must not change carrying
+         *     value). Omitted or zero books nothing.
+         */
+        MoveConfirmRequest: {
+            /** Haul Cost */
+            haul_cost?: number | string | null;
+        };
+        /**
          * MoveSuggestionOut
          * @description One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
          *     the same item missing at one marked hangar and appearing at another. `id`
-         *     keys the confirm action (#201). `qty` is what confirming would actually
-         *     convert now (#204) — units already sold or reprocessed since the pairing
-         *     are excluded, so the card never overstates.
+         *     keys the card's actions (confirm #201, dismiss #202). `qty` is what
+         *     confirming would actually convert now (#204) — units already sold or
+         *     reprocessed since the pairing are excluded, so the card never
+         *     overstates.
          */
         MoveSuggestionOut: {
             /** Destination Location Id */
@@ -2989,6 +3024,39 @@ export interface operations {
         };
     };
     confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MoveConfirmRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__dismiss_post: {
         parameters: {
             query?: never;
             header?: never;

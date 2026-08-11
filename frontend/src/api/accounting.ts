@@ -112,11 +112,17 @@ export const listMoveSuggestions = () =>
 
 /** "Yes, this was a move" (ADR-0049, #201): the estimated-value stock at the
  * destination is replaced by the origin's real stock — what we paid, and how
- * long we've held it, move with it. */
-export async function confirmMoveSuggestion(id: string): Promise<void> {
+ * long we've held it, move with it. An optional haul cost (#205) books as a
+ * selling expense against the move — it never changes what the stock is
+ * carried at. */
+export async function confirmMoveSuggestion(
+  id: string,
+  haulCost?: string,
+): Promise<void> {
   const res = await apiSend(
     "POST",
     `/corporations/me/accounting/move-suggestions/${id}/confirm`,
+    haulCost ? { haul_cost: haulCost } : undefined,
   )
   if (!res.ok) await throwApiError(res, "Confirming the move failed")
 }
