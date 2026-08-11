@@ -780,21 +780,26 @@ function ReconciliationSection({
                     Yes, this was a move
                   </button>
                 ) : (
-                  group.map((c) => (
-                    <span key={c.id}>
-                      <button
-                        type="button"
-                        className="linkbtn"
-                        disabled={confirmMove.isPending || dismiss.isPending}
-                        onClick={() => {
-                          setConfirmingId(c.id)
-                          setHaulCost("")
-                        }}
-                      >
-                        From {c.origin_name ?? c.origin_location_id}
-                      </button>{" "}
-                    </span>
-                  ))
+                  // Picking an origin IS the choice: it opens the same confirm
+                  // prompt as a plain card, so the card stays at two controls
+                  // no matter how many hangars are candidates.
+                  <select
+                    className="suggestion-pick"
+                    aria-label="Where did it come from?"
+                    value={chosen?.id ?? ""}
+                    disabled={confirmMove.isPending || dismiss.isPending}
+                    onChange={(e) => {
+                      setConfirmingId(e.target.value || null)
+                      setHaulCost("")
+                    }}
+                  >
+                    <option value="">Where did it come from?…</option>
+                    {group.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        From {candidateOrigin(c)}
+                      </option>
+                    ))}
+                  </select>
                 )}{" "}
                 <button
                   type="button"
@@ -900,12 +905,13 @@ function groupSuggestions(list: MoveSuggestionOut[]): MoveSuggestionOut[][] {
 }
 
 /** The ambiguous card's question (#203): the same item is missing at more than
- * one hangar and turned up at one — plain English, the manager picks. */
+ * one hangar and turned up at one — plain English, the manager picks. The
+ * per-origin detail (name + how many are missing there) lives in the dropdown
+ * options, so the sentence stays short however many hangars are candidates. */
 function ambiguousText(group: MoveSuggestionOut[]): string {
   const item = group[0].type_name ?? `Type ${group[0].type_id}`
   const to = group[0].destination_name ?? group[0].destination_location_id
-  const origins = group.map(candidateOrigin).join(" or from ")
-  return `Looks like some ${item} moved to ${to} — from ${origins}: which was it?`
+  return `Looks like some ${item} moved to ${to} — it could have come from more than one hangar.`
 }
 
 function candidateOrigin(s: MoveSuggestionOut): string {
