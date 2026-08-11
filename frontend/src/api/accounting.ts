@@ -7,6 +7,7 @@ import type {
   ManualExpenseRequest,
   ManualLotRequest,
   ManualSaleRequest,
+  MoveSuggestionOut,
   ProfitOut,
   ReceivableOut,
   ReconciliationEventOut,
@@ -25,6 +26,7 @@ export type {
   ManualExpenseRequest,
   ManualLotRequest,
   ManualSaleRequest,
+  MoveSuggestionOut,
   ProfitOut,
   ReceivableOut,
   ReconciliationEventOut,
@@ -103,6 +105,10 @@ export async function removeHangar(
 /** The recent hangar-check log (ADR-0044) — the "Needs a look" list's data. */
 export const listReconciliationEvents = () =>
   apiGet<ReconciliationEventOut[]>("/corporations/me/accounting/reconciliation")
+
+/** Pending "looks like a move" suggestions (ADR-0049, #200) — read-only. */
+export const listMoveSuggestions = () =>
+  apiGet<MoveSuggestionOut[]>("/corporations/me/accounting/move-suggestions")
 
 /** Run a hangar check right now instead of waiting for the hourly sync. */
 export async function runHangarCheck(): Promise<HangarCheckResult> {

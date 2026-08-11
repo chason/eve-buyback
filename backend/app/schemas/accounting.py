@@ -166,6 +166,21 @@ class HangarCheckResult(BaseModel):
     flagged: int
 
 
+class MoveSuggestionOut(BaseModel):
+    """One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
+    the same item missing at one marked hangar and appearing at another. Read-only
+    in this slice — confirm/dismiss actions land in follow-ups."""
+
+    type_id: int
+    type_name: str | None = None
+    origin_location_id: str
+    origin_name: str | None = None
+    destination_location_id: str
+    destination_name: str | None = None
+    qty: int
+    noticed_at: datetime
+
+
 class ReprocessOutputIn(BaseModel):
     type_id: int
     quantity: int = Field(gt=0)

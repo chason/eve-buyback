@@ -18,6 +18,7 @@ from app.data.models.lot_transformation import LotTransformation
 from app.data.models.manager_assignment import ManagerAssignment
 from app.data.models.market_hub_refresh import MarketHubRefresh
 from app.data.models.market_price import MarketPrice
+from app.data.models.move_suggestion import MoveSuggestion
 from app.data.models.operator_wallet_token import OperatorWalletToken
 from app.data.models.pricing_rule import PricingRule
 from app.data.models.receivable import Receivable
@@ -49,6 +50,7 @@ __all__ = [
     "ManagerAssignment",
     "MarketHubRefresh",
     "MarketPrice",
+    "MoveSuggestion",
     "OperatorWalletToken",
     "PricingRule",
     "Receivable",

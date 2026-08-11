@@ -1497,6 +1497,74 @@
         "title": "MarketGroupOut",
         "type": "object"
       },
+      "MoveSuggestionOut": {
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. Read-only\nin this slice \u2014 confirm/dismiss actions land in follow-ups.",
+        "properties": {
+          "destination_location_id": {
+            "title": "Destination Location Id",
+            "type": "string"
+          },
+          "destination_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Name"
+          },
+          "noticed_at": {
+            "format": "date-time",
+            "title": "Noticed At",
+            "type": "string"
+          },
+          "origin_location_id": {
+            "title": "Origin Location Id",
+            "type": "string"
+          },
+          "origin_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Name"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          },
+          "type_id": {
+            "title": "Type Id",
+            "type": "integer"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          }
+        },
+        "required": [
+          "type_id",
+          "origin_location_id",
+          "destination_location_id",
+          "qty",
+          "noticed_at"
+        ],
+        "title": "MoveSuggestionOut",
+        "type": "object"
+      },
       "OperatorWalletStatus": {
         "description": "The operator wallet connection (ADR-0042), as shown on the admin page.",
         "properties": {
@@ -2773,7 +2841,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "102"
+    "version": "106"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3836,6 +3904,32 @@
           }
         },
         "summary": "Record Manual Sale",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/move-suggestions": {
+      "get": {
+        "description": "The pending \"looks like a move\" cards (ADR-0049, #200) \u2014 read-only.",
+        "operationId": "list_move_suggestions_api_v1_corporations_me_accounting_move_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MoveSuggestionOut"
+                  },
+                  "title": "Response List Move Suggestions Api V1 Corporations Me Accounting Move Suggestions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Move Suggestions",
         "tags": [
           "accounting"
         ]

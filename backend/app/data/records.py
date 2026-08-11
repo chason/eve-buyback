@@ -16,6 +16,7 @@ from app.domain.locations import LocationKind
 from app.domain.lots import EntrySource as LotEntrySource
 from app.domain.lots import ExpenseKind, LotSource, SaleChannel
 from app.domain.market import HubKind
+from app.domain.moves import MoveSuggestionStatus
 from app.domain.pricing import AggregateField, Basis, LineStatus, TargetKind
 from app.domain.reconciliation import ReconciliationKind
 
@@ -379,6 +380,24 @@ class ReconciliationEventRecord(BaseModel):
     flagged: bool
     note: str | None = None
     occurred_at: datetime
+
+
+class MoveSuggestionRecord(BaseModel):
+    """One "looks like a move" pairing (ADR-0049): decorates the shortfall flag
+    event and the deemed-cost excess lot the sync booked anyway. `excess_lot_id`
+    goes None if the lot is ever deleted (SET NULL)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    type_id: int
+    origin_location_id: str
+    destination_location_id: str
+    qty: int
+    shortfall_event_id: uuid.UUID
+    excess_lot_id: uuid.UUID | None = None
+    status: MoveSuggestionStatus
+    created_at: datetime
 
 
 class ExpenseRecord(BaseModel):

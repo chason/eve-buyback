@@ -34,6 +34,7 @@ from app.schemas.accounting import (
     ManualLotRequest,
     ManualSaleRequest,
     ManualSaleResult,
+    MoveSuggestionOut,
     ProfitOut,
     ReceivableClearRequest,
     ReceivableCreateRequest,
@@ -191,6 +192,32 @@ async def list_reconciliation_events(
         )
         for v in views
     ]
+
+
+@router.get("/move-suggestions", response_model=list[MoveSuggestionOut])
+async def list_move_suggestions(
+    user: ManagerUser, session: SessionDep
+) -> list[MoveSuggestionOut]:
+    """The pending "looks like a move" cards (ADR-0049, #200) — read-only."""
+    views = await reconciliation_app.list_move_suggestions(
+        session, corporation_eve_id=user.corporation_id
+    )
+    return [_move_suggestion_out(v) for v in views]
+
+
+def _move_suggestion_out(
+    v: reconciliation_app.MoveSuggestionView,
+) -> MoveSuggestionOut:
+    return MoveSuggestionOut(
+        type_id=v.record.type_id,
+        type_name=v.type_name,
+        origin_location_id=v.record.origin_location_id,
+        origin_name=v.origin_name,
+        destination_location_id=v.record.destination_location_id,
+        destination_name=v.destination_name,
+        qty=v.record.qty,
+        noticed_at=v.record.created_at,
+    )
 
 
 @router.get(

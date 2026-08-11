@@ -84,6 +84,7 @@ describe("Inventory", () => {
     vi.mocked(accountingApi.listHangars).mockResolvedValue([])
     vi.mocked(locationsApi.listLocations).mockResolvedValue([])
     vi.mocked(accountingApi.listReconciliationEvents).mockResolvedValue([])
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([])
     vi.mocked(accountingApi.getWalletDivision).mockResolvedValue({ division: null })
     vi.mocked(accountingApi.listReceivables).mockResolvedValue([])
     // No division names by default — pickers fall back to generic labels.
@@ -442,6 +443,30 @@ describe("Inventory", () => {
     expect(
       screen.queryByRole("button", { name: "Turned into minerals" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("shows a move suggestion as a plain-English read-only card (#200)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([
+      {
+        type_id: 34, type_name: "Tritanium",
+        origin_location_id: "60008494", origin_name: "Amarr VIII",
+        destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+        qty: 40, noticed_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    // Plain English only — no "pairing", "reconciliation", or "lot" — and no
+    // action buttons in this slice (read-only detection, ADR-0049).
+    const card = await screen.findByText(
+      /Looks like 40 Tritanium moved from Amarr VIII to Jita IV - Moon 4 — was this a move\?/,
+    )
+    expect(within(card.closest("li")!).queryByRole("button")).toBeNull()
   })
 
   it("offers Record it on a reprocess suggestion (#177)", async () => {
