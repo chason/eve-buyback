@@ -633,17 +633,20 @@ describe("Inventory", () => {
 
     renderInventory()
 
-    // One card, both origins named with what each is missing, and the pick
-    // spelled out — no auto-choice, no jargon.
+    // One card, one dropdown carrying every origin with what each is missing —
+    // two controls total, no auto-choice, no jargon.
     const card = await screen.findByText(
-      /Looks like some Tritanium moved to Amarr VIII — from Jita IV - Moon 4 \(100 missing\) or from Dodixie IX \(50 missing\): which was it\?/,
+      /Looks like some Tritanium moved to Amarr VIII — it could have come from more than one hangar\./,
     )
     const item = card.closest("li")!
+    const pick = within(item).getByRole("combobox", {
+      name: "Where did it come from?",
+    })
     expect(
-      within(item).getByRole("button", { name: "From Jita IV - Moon 4" }),
+      within(pick).getByRole("option", { name: "From Jita IV - Moon 4 (100 missing)" }),
     ).toBeInTheDocument()
     expect(
-      within(item).getByRole("button", { name: "From Dodixie IX" }),
+      within(pick).getByRole("option", { name: "From Dodixie IX (50 missing)" }),
     ).toBeInTheDocument()
     expect(
       within(item).getByRole("button", { name: "Not a move" }),
@@ -667,10 +670,11 @@ describe("Inventory", () => {
 
     renderInventory()
 
-    // Picking an origin opens the same haul-cost prompt as a plain confirm
-    // (#205); confirming fires for the chosen candidate's id only.
-    await u.click(
-      await screen.findByRole("button", { name: "From Dodixie IX" }),
+    // Picking an origin from the dropdown opens the same haul-cost prompt as a
+    // plain confirm (#205); confirming fires for the chosen candidate's id only.
+    await u.selectOptions(
+      await screen.findByRole("combobox", { name: "Where did it come from?" }),
+      "cand-dodixie",
     )
     await u.click(screen.getByRole("button", { name: "Confirm the move" }))
     expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledTimes(1)
@@ -691,7 +695,7 @@ describe("Inventory", () => {
 
     renderInventory()
 
-    const card = await screen.findByText(/which was it\?/)
+    const card = await screen.findByText(/could have come from more than one/)
     await u.click(
       within(card.closest("li")!).getByRole("button", { name: "Not a move" }),
     )

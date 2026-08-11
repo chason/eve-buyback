@@ -686,6 +686,19 @@ label:has(> .search-results) > input {
   text-decoration: none;
 }
 
+/* The ambiguous-move origin pick (#203): a compact inline select sitting in the
+   card sentence — choosing an origin opens the confirm prompt, so the pick is
+   the card's only extra control. Right padding leaves room for Pico's arrow. */
+.suggestion-pick {
+  display: inline-block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
 /* Admin access/payments action cells: keep the date/select, primary button, and the
    Remove link on ONE line — Pico's full-width inputs otherwise force a wrap. */
 .access-actions {
