@@ -662,11 +662,19 @@ function ReconciliationSection({
       void queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
   })
-  // Confirming a move (#201): the card leaves the pending list, the stock list
-  // and the check log both change — refetch all three.
+  // Confirming a move (#201) is a two-step: "Yes, this was a move" opens a
+  // small prompt asking what the haul cost (#205, optional — leaving it empty
+  // books nothing), and the confirm itself fires from there. On success the
+  // card leaves the pending list, the stock list and the check log both
+  // change — refetch all three.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [haulCost, setHaulCost] = useState("")
   const confirmMove = useMutation({
-    mutationFn: (id: string) => confirmMoveSuggestion(id),
+    mutationFn: ({ id, cost }: { id: string; cost?: string }) =>
+      confirmMoveSuggestion(id, cost),
     onSuccess: () => {
+      setConfirmingId(null)
+      setHaulCost("")
       void queryClient.invalidateQueries({ queryKey: ["moveSuggestions"] })
       void queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
       void queryClient.invalidateQueries({ queryKey: ["inventory"] })
@@ -720,7 +728,10 @@ function ReconciliationSection({
                   type="button"
                   className="linkbtn"
                   disabled={confirmMove.isPending || dismiss.isPending}
-                  onClick={() => confirmMove.mutate(s.id)}
+                  onClick={() => {
+                    setConfirmingId(s.id)
+                    setHaulCost("")
+                  }}
                 >
                   Yes, this was a move
                 </button>{" "}
@@ -733,6 +744,42 @@ function ReconciliationSection({
                   Not a move
                 </button>
               </small>
+              {confirmingId === s.id && (
+                <div className="access-actions">
+                  <label>
+                    What did the haul cost? (optional)
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="ISK — leave empty if nothing"
+                      value={haulCost}
+                      onChange={(e) => setHaulCost(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={confirmMove.isPending}
+                    onClick={() =>
+                      confirmMove.mutate({
+                        id: s.id,
+                        cost: haulCost || undefined,
+                      })
+                    }
+                  >
+                    {confirmMove.isPending ? "Confirming…" : "Confirm the move"}
+                  </button>{" "}
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    disabled={confirmMove.isPending}
+                    onClick={() => setConfirmingId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>

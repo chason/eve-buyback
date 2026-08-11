@@ -1497,6 +1497,29 @@
         "title": "MarketGroupOut",
         "type": "object"
       },
+      "MoveConfirmRequest": {
+        "description": "The optional detail on a \"yes, this was a move\" (#205): what the haul\ncost in ISK. Booked as a hauling expense against the move \u2014 never added to\nthe moved stock's value (ADR-0049: relocation must not change carrying\nvalue). Omitted or zero books nothing.",
+        "properties": {
+          "haul_cost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Haul Cost"
+          }
+        },
+        "title": "MoveConfirmRequest",
+        "type": "object"
+      },
       "MoveSuggestionOut": {
         "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202). `qty` is what\nconfirming would actually convert now (#204) \u2014 units already sold or\nreprocessed since the pairing are excluded, so the card never\noverstates.",
         "properties": {
@@ -3943,7 +3966,7 @@
     },
     "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/confirm": {
       "post": {
-        "description": "\"Yes, this was a move\" (ADR-0049, #201): reverses the estimated-value\nstock at the destination and moves the origin's oldest matching stock there,\ncost basis and aging intact \u2014 atomically, logged with who confirmed.",
+        "description": "\"Yes, this was a move\" (ADR-0049, #201): reverses the estimated-value\nstock at the destination and moves the origin's oldest matching stock there,\ncost basis and aging intact \u2014 atomically, logged with who confirmed. An\noptional haul cost (#205) books as a hauling expense against the move; the\nbody may be omitted entirely.",
         "operationId": "confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post",
         "parameters": [
           {
@@ -3957,6 +3980,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/MoveConfirmRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"

@@ -497,13 +497,83 @@ describe("Inventory", () => {
 
     renderInventory()
 
+    // Two-step (#205): "Yes" opens the haul-cost prompt; confirming with the
+    // field left empty books no cost.
     await u.click(
       await screen.findByRole("button", { name: "Yes, this was a move" }),
     )
-    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledWith("sug-1")
+    expect(
+      screen.getByLabelText("What did the haul cost? (optional)"),
+    ).toBeInTheDocument()
+    await u.click(screen.getByRole("button", { name: "Confirm the move" }))
+    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledWith(
+      "sug-1",
+      undefined,
+    )
     await waitFor(() =>
       expect(screen.queryByText(/was this a move\?/)).not.toBeInTheDocument(),
     )
+  })
+
+  it("passes the optional haul cost along with the confirm (#205)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions)
+      .mockResolvedValueOnce([
+        {
+          id: "sug-1", type_id: 34, type_name: "Tritanium",
+          origin_location_id: "60008494", origin_name: "Amarr VIII",
+          destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+          qty: 40, noticed_at: "2026-08-11T10:00:00Z",
+        },
+      ])
+      .mockResolvedValue([])
+    vi.mocked(accountingApi.confirmMoveSuggestion).mockResolvedValue(undefined)
+
+    renderInventory()
+
+    await u.click(
+      await screen.findByRole("button", { name: "Yes, this was a move" }),
+    )
+    await u.type(
+      screen.getByLabelText("What did the haul cost? (optional)"),
+      "1500000.25",
+    )
+    await u.click(screen.getByRole("button", { name: "Confirm the move" }))
+    expect(accountingApi.confirmMoveSuggestion).toHaveBeenCalledWith(
+      "sug-1",
+      "1500000.25",
+    )
+  })
+
+  it("cancelling the haul-cost prompt confirms nothing (#205)", async () => {
+    const u = userEvent.setup()
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY,
+    })
+    vi.mocked(accountingApi.listMoveSuggestions).mockResolvedValue([
+      {
+        id: "sug-1", type_id: 34, type_name: "Tritanium",
+        origin_location_id: "60008494", origin_name: "Amarr VIII",
+        destination_location_id: "60003760", destination_name: "Jita IV - Moon 4",
+        qty: 40, noticed_at: "2026-08-11T10:00:00Z",
+      },
+    ])
+
+    renderInventory()
+
+    await u.click(
+      await screen.findByRole("button", { name: "Yes, this was a move" }),
+    )
+    await u.click(screen.getByRole("button", { name: "Cancel" }))
+    expect(accountingApi.confirmMoveSuggestion).not.toHaveBeenCalled()
+    expect(
+      screen.queryByLabelText("What did the haul cost? (optional)"),
+    ).not.toBeInTheDocument()
   })
 
   it("dismisses a move suggestion with Not a move (#202)", async () => {
