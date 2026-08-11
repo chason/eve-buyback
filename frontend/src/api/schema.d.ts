@@ -1425,9 +1425,14 @@ export interface components {
             /** Lots */
             lots: components["schemas"]["InventoryLotOut"][];
             /** Oldest Days */
-            oldest_days: number;
+            oldest_days?: number | null;
             /** Qty */
             qty: number;
+            /**
+             * Qty Unbooked
+             * @default 0
+             */
+            qty_unbooked: number;
             /** Reprocessable */
             reprocessable: boolean;
             /** Stale */
@@ -1476,10 +1481,22 @@ export interface components {
         };
         /** InventoryOut */
         InventoryOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "hangar" | "ledger";
             /** Estimated Cost */
             estimated_cost: string;
             /** Items */
             items: components["schemas"]["InventoryItemOut"][];
+            /**
+             * Listed
+             * @default []
+             */
+            listed: components["schemas"]["ListedStockOut"][];
             /** Stale Days */
             stale_days: number;
             /** Total Cost */
@@ -1492,6 +1509,25 @@ export interface components {
             verified_cost: string;
             /** Worth Total */
             worth_total: string;
+        };
+        /**
+         * ListedStockOut
+         * @description One stack of owned stock sitting in sell-order escrow (ADR-0050) —
+         *     physically out of the hangar, shown in its own small section.
+         */
+        ListedStockOut: {
+            /** Location Id */
+            location_id: string;
+            /** Location Name */
+            location_name?: string | null;
+            /** Qty */
+            qty: number;
+            /** Type Id */
+            type_id: number;
+            /** Type Name */
+            type_name?: string | null;
+            /** Worth */
+            worth?: string | null;
         };
         /**
          * LocationCreateRequest

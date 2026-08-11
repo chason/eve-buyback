@@ -51,12 +51,16 @@ describe("Privacy", () => {
     expect(
       screen.getByText(/contract id, its status, and the issue\/complete timestamps/i),
     ).toBeInTheDocument()
-    // Hangar reading (ADR-0044): corp assets scope, marked hangars only, counts only.
+    // Hangar reading (ADR-0044/0050): corp assets scope, marked hangars only,
+    // counts only — STORED as the Stock page's snapshot, deleted on unmark.
     expect(
       screen.getByRole("heading", { name: /reading the buyback hangar/i }),
     ).toBeInTheDocument()
     expect(
       screen.getByText(/item type and quantity counts for those marked hangars/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/unmarking the last hangar deletes it/i),
     ).toBeInTheDocument()
     expect(
       screen.getByText(/never reads members' personal assets/i),

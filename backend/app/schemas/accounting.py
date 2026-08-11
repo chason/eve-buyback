@@ -4,6 +4,7 @@ buyback owns now, carried at cost, with verified and estimated cost kept apart."
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,9 +28,14 @@ class InventoryLotOut(BaseModel):
 class InventoryItemOut(BaseModel):
     type_id: int
     type_name: str | None = None
+    # On the hangar basis (ADR-0050) `qty` is what's physically in the marked
+    # hangars and `qty_unbooked` the part no ledger entry explains yet (no cost,
+    # unknown age); on the ledger basis `qty` is the open-lot sum, unbooked 0.
     qty: int
+    qty_unbooked: int = 0
     total_cost: Decimal
-    oldest_days: int
+    # None when nothing booked backs the row — the age simply isn't known.
+    oldest_days: int | None = None
     stale: bool
     any_estimated: bool
     # What the holding would fetch today and the paper gain/loss vs cost (#153);
@@ -40,6 +46,18 @@ class InventoryItemOut(BaseModel):
     # record action (#177): a type without any cannot be reprocessed.
     reprocessable: bool
     lots: list[InventoryLotOut]
+
+
+class ListedStockOut(BaseModel):
+    """One stack of owned stock sitting in sell-order escrow (ADR-0050) —
+    physically out of the hangar, shown in its own small section."""
+
+    type_id: int
+    type_name: str | None = None
+    location_id: str
+    location_name: str | None = None
+    qty: int
+    worth: Decimal | None = None
 
 
 class HangarOut(BaseModel):
@@ -299,6 +317,12 @@ class ProfitOut(BaseModel):
 
 
 class InventoryOut(BaseModel):
+    # "hangar" — items are the last physical hangar snapshot (taken `as_of`),
+    # ledger joined for cost/age, `listed` carrying sell-order stock; "ledger" —
+    # the books view, used while no snapshot exists (ADR-0050). Totals are
+    # ledger-wide on both bases.
+    basis: Literal["hangar", "ledger"]
+    as_of: datetime | None = None
     total_cost: Decimal
     verified_cost: Decimal
     estimated_cost: Decimal
@@ -310,3 +334,4 @@ class InventoryOut(BaseModel):
     unrealized_total: Decimal
     unpriced_types: int
     items: list[InventoryItemOut]
+    listed: list[ListedStockOut] = []

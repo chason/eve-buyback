@@ -11,6 +11,8 @@ from app.data.models.corp_market_order import CorpMarketOrder
 from app.data.models.corp_roster_member import CorpRosterMember
 from app.data.models.corporation import Corporation
 from app.data.models.entitlement import Entitlement
+from app.data.models.hangar_stock import HangarStock
+from app.data.models.hangar_sync import HangarSync
 from app.data.models.instance_setting import InstanceSetting
 from app.data.models.lot import Lot
 from app.data.models.lot_expense import LotExpense
@@ -44,6 +46,8 @@ __all__ = [
     "CorpRosterMember",
     "Corporation",
     "Entitlement",
+    "HangarStock",
+    "HangarSync",
     "InstanceSetting",
     "Lot",
     "LotExpense",

@@ -87,11 +87,16 @@ function StockView({ inv }: { inv: InventoryOut }) {
   // A suggestion targets a TYPE; the oldest buy of it is the FIFO-correct source.
   const oldestLotOf = (typeId: number) =>
     inv.items.find((i) => i.type_id === typeId)?.lots[0]?.id ?? null
+  const hangarBasis = inv.basis === "hangar"
   return (
     <>
       <hgroup>
         <h1>What we&apos;ve got</h1>
-        <p>Everything the buyback bought and still holds, at what we paid.</p>
+        {hangarBasis ? (
+          <p>What&apos;s sitting in the buyback hangars, at what we paid.</p>
+        ) : (
+          <p>Everything the buyback bought and still holds, at what we paid.</p>
+        )}
       </hgroup>
 
       <div className="inventory-summary">
@@ -108,11 +113,32 @@ function StockView({ inv }: { inv: InventoryOut }) {
         )}
       </div>
 
-      {inv.items.length === 0 ? (
+      {hangarBasis && inv.as_of && (
         <p>
-          Nothing in stock yet. When a buyback contract completes, what you bought
-          shows up here automatically.
+          <small className="field-hint">
+            Last looked in the hangars {checkedText(inv.as_of)}.
+          </small>
         </p>
+      )}
+      {!hangarBasis && (
+        <p>
+          <small className="field-hint">
+            This is the books view. Mark your buyback hangars below and, after the
+            next hangar check, this list shows what&apos;s actually in them —
+            minerals as minerals, not the ore they came from.
+          </small>
+        </p>
+      )}
+
+      {inv.items.length === 0 ? (
+        hangarBasis ? (
+          <p>Nothing in the buyback hangars right now.</p>
+        ) : (
+          <p>
+            Nothing in stock yet. When a buyback contract completes, what you
+            bought shows up here automatically.
+          </p>
+        )
       ) : (
         <div className="panel">
           <table>
@@ -145,6 +171,8 @@ function StockView({ inv }: { inv: InventoryOut }) {
           )}
         </div>
       )}
+
+      {inv.listed.length > 0 && <ListedSection rows={inv.listed} />}
 
       {reprocessLotId && (
         <ReprocessPanel
@@ -1300,6 +1328,60 @@ function haulText(s: ShipmentOut): string {
   return `${s.qty.toLocaleString()} ${item} on its way from ${from} to ${to} (sent ${sent}).`
 }
 
+/** When the hangar snapshot was taken (ADR-0050), in plain relative English —
+ * the check runs hourly, so "x minutes/hours ago" covers the normal case. */
+function checkedText(asOf: string): string {
+  const minutes = Math.max(
+    0,
+    Math.round((Date.now() - new Date(asOf).getTime()) / 60_000),
+  )
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return hours === 1 ? "1 hour ago" : `${hours} hours ago`
+  return `on ${new Date(asOf).toLocaleDateString()}`
+}
+
+/** Stock sitting in sell orders (ADR-0050): still ours, but physically out of the
+ * hangar — its own small section so it never silently vanishes from the page. */
+function ListedSection({ rows }: { rows: InventoryOut["listed"] }) {
+  return (
+    <section>
+      <h2>Listed for sale</h2>
+      <p>
+        <small className="field-hint">
+          Sitting in sell orders on the market — out of the hangar, still ours
+          until it sells.
+        </small>
+      </p>
+      <div className="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th className="num">How many</th>
+              <th className="num">Worth now</th>
+              <th>Where</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.location_id}-${row.type_id}`}>
+                <td>{row.type_name ?? `Type ${row.type_id}`}</td>
+                <td className="num">{row.qty.toLocaleString()}</td>
+                <td className="num isk">
+                  <WorthNow worth={row.worth} />
+                </td>
+                <td>{row.location_name ?? row.location_id}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 /** The paper gain/loss card (#153): what selling everything today would mean
  * compared to what we paid — its own line, never folded into the holdings. */
 function GainLossCard({ value }: { value: string }) {
@@ -1344,6 +1426,15 @@ function ItemRows({
         <td>{item.type_name ?? `Type ${item.type_id}`}</td>
         <td className="num">{item.qty.toLocaleString()}</td>
         <td className="num isk">
+          {item.qty_unbooked > 0 && (
+            <>
+              <StatusChip variant="info">
+                {item.qty_unbooked === item.qty
+                  ? "Not on the books yet"
+                  : `${item.qty_unbooked.toLocaleString()} not on the books yet`}
+              </StatusChip>{" "}
+            </>
+          )}
           {item.any_estimated && (
             <>
               <StatusChip variant="info">Estimated value</StatusChip>{" "}
@@ -1465,8 +1556,19 @@ function WorthNow({
 }
 
 /** Aging readout: past the stale threshold the number itself turns danger-red and
- * the plain-English explanation rides a tooltip instead of a chip. */
-function DaysHeld({ days, stale }: { days: number; stale: boolean }) {
+ * the plain-English explanation rides a tooltip instead of a chip. A dash when the
+ * age simply isn't known — hangar stock nothing on the books explains yet
+ * (ADR-0050). */
+function DaysHeld({
+  days,
+  stale,
+}: {
+  days: number | null | undefined
+  stale: boolean
+}) {
+  if (days == null) {
+    return <span title="Nothing on the books says when this arrived">—</span>
+  }
   if (!stale) return <>{daysText(days)}</>
   return (
     <span className="stale-days" title="Sitting a while">
