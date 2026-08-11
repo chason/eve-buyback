@@ -48,10 +48,13 @@ async def confirm_move(
     """Confirm one pending suggestion (ADR-0049, #201) — the happy path. Owns
     the commit; everything below is one unit of work.
 
-    Simple guards, documented for the follow-up slices:
-    - A deemed lot partially consumed since the pairing (sold or transformed)
-      converts only its `qty_remaining` — the provenance-specific handling of
-      the consumed units (frozen deemed COGS, child-lot cost) is #204.
+    Simple guards:
+    - A deemed lot partially consumed since the pairing converts only its
+      `qty_remaining` (#204). The consumed units are spoken for and stay put:
+      units SOLD keep their frozen deemed COGS on the booked sale rows (frozen
+      facts, ADR-0043 — still flagged estimated); units TRANSFORMED (ADR-0047)
+      carried their deemed cost into child lots, which keep it, still flagged
+      estimated — no retroactive re-costing, no cascade into frozen sales.
     - The origin relocates at most what its idle lots still hold; both sides
       always convert the SAME quantity, so the books stay balanced.
     - A double confirm is a no-op (idempotent); a dismissed suggestion raises

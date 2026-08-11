@@ -560,27 +560,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/dismiss": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Dismiss Move Suggestion
-         * @description "Not a move" (ADR-0049, #202): the card goes away and won't come back
-         *     while nothing changed; everything already booked stays as it is.
-         */
-        post: operations["dismiss_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__dismiss_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/corporations/me/accounting/profit": {
         parameters: {
             query?: never;
@@ -1586,7 +1565,9 @@ export interface components {
          * MoveSuggestionOut
          * @description One pending "looks like a move" card (ADR-0049, #200): a hangar check saw
          *     the same item missing at one marked hangar and appearing at another. `id`
-         *     keys the card's actions (confirm #201, dismiss #202).
+         *     keys the confirm action (#201). `qty` is what confirming would actually
+         *     convert now (#204) — units already sold or reprocessed since the pairing
+         *     are excluded, so the card never overstates.
          */
         MoveSuggestionOut: {
             /** Destination Location Id */
@@ -3008,35 +2989,6 @@ export interface operations {
         };
     };
     confirm_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suggestion_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    dismiss_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__dismiss_post: {
         parameters: {
             query?: never;
             header?: never;

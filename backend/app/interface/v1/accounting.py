@@ -236,7 +236,7 @@ def _move_suggestion_out(
         origin_name=v.origin_name,
         destination_location_id=v.record.destination_location_id,
         destination_name=v.destination_name,
-        qty=v.record.qty,
+        qty=v.convertible_qty,
         noticed_at=v.record.created_at,
     )
 
