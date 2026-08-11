@@ -24,7 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application import entitlements as entitlements_app
 from app.application import hangar as hangar_app
 from app.application.corporations import get_registered_corporation
-from app.application.errors import HangarReadUnavailable
+from app.application.errors import (
+    HangarReadUnavailable,
+    MoveSuggestionNotFound,
+    MoveSuggestionNotPending,
+)
 from app.data.records import MoveSuggestionRecord, ReconciliationEventRecord
 from app.data.repositories import buyback_config as config_repo
 from app.data.repositories import hangars as hangars_repo
@@ -119,6 +123,13 @@ async def reconcile_hangars(
             expected[slot] = max(0, expected[slot] - qty)
     deltas = reconcile(counted, expected)
     if not deltas:
+        # A clean hangar still invalidates any pending move pair: no deltas
+        # means no standing shortfall, so nothing is left for a pair to
+        # decorate — withdraw it (ADR-0049, #202) before returning.
+        await _withdraw_invalid_suggestions(
+            session, corp.id, shortfall_events={}, shortfall_slots=set(), now=now
+        )
+        await session.commit()
         return HangarCheckResult(lots_added=0, flagged=0)
 
     # A reprocessable-type shortfall + yield-consistent materials excess looks like
@@ -237,13 +248,29 @@ async def reconcile_hangars(
             shortfall_events[slot] = event.id
             flagged += 1
 
+    # A pending pair whose ends stopped holding — the excess evaporated, or the
+    # shortfall flag was resolved some other way — is withdrawn before new
+    # pairing runs (ADR-0049, #202), so a superseded suggestion never lingers
+    # next to the fresh one that replaces it.
+    shortfall_slots = {
+        (d.location_id, d.type_id) for d in deltas if d.kind == "shortfall"
+    }
+    await _withdraw_invalid_suggestions(
+        session,
+        corp.id,
+        shortfall_events=shortfall_events,
+        shortfall_slots=shortfall_slots,
+        now=now,
+    )
+
     # A same-type shortfall at one hangar + excess at another looks like a haul
     # nobody recorded (ADR-0049, #200). Suggest-only — the heart of this slice:
     # the defaults above are already booked (the shortfall flag stands, the
     # deemed-cost lot exists), and the suggestion merely decorates them so a
     # human can act later. Excess that couldn't be priced has no lot to decorate
     # yet — the pair proposes on the pass that books it. A still-pending pair is
-    # never duplicated by a later sync.
+    # never duplicated by a later sync, and a pattern a human already dismissed
+    # (same standing flag, same quantity) is never re-asked (#202).
     for pair in _move_pairs(deltas, hinted_sources, hinted_materials):
         event_id = shortfall_events.get((pair.origin_location_id, pair.type_id))
         lot_id = excess_lots.get((pair.destination_location_id, pair.type_id))
@@ -256,6 +283,14 @@ async def reconcile_hangars(
             excess_lot_id=lot_id,
         )
         if already:
+            continue
+        dismissed = await moves_repo.dismissed_exists(
+            session,
+            corporation_id=corp.id,
+            shortfall_event_id=event_id,
+            qty=pair.qty,
+        )
+        if dismissed:
             continue
         await moves_repo.add(
             session,
@@ -322,6 +357,59 @@ def _move_pairs(
     if not shortfalls or not excesses:
         return []
     return match_move_pairs(shortfalls, excesses)
+
+
+async def _withdraw_invalid_suggestions(
+    session: AsyncSession,
+    corporation_id: uuid.UUID,
+    *,
+    shortfall_events: dict[tuple[str, int], uuid.UUID],
+    shortfall_slots: set[tuple[str, int]],
+    now: datetime,
+) -> None:
+    """Withdraw pending suggestions whose pair no longer holds (ADR-0049, #202)
+    against the fresh sync: `shortfall_events` maps each still-short slot to its
+    standing flag event, `shortfall_slots` is every slot the fresh pass found
+    short. A withdrawal is bookkeeping, not a decision — it's logged with its
+    own kind so it never reads like a dismissal, and it never suppresses a
+    future pairing the way a dismissal does."""
+    pending = await moves_repo.list_pending(session, corporation_id=corporation_id)
+    for s in pending:
+        reason = _withdraw_reason(s, shortfall_events, shortfall_slots)
+        if reason is None:
+            continue
+        await moves_repo.set_status(
+            session, suggestion_id=s.id, status="withdrawn"
+        )
+        await recon_repo.add_event(
+            session,
+            corporation_id=corporation_id,
+            location_id=s.origin_location_id,
+            type_id=s.type_id,
+            kind="move_withdrawn",
+            qty=s.qty,
+            occurred_at=now,
+            note=reason,
+        )
+
+
+def _withdraw_reason(
+    s: MoveSuggestionRecord,
+    shortfall_events: dict[tuple[str, int], uuid.UUID],
+    shortfall_slots: set[tuple[str, int]],
+) -> str | None:
+    """Why a pending pair stopped holding, or None while it still does. The
+    excess end fails when the deemed lot is gone or the destination now counts
+    SHORT of the books (the found stock left again); the shortfall end fails
+    when the flag this pair decorates is no longer the slot's standing anchor —
+    resolved some other way, or superseded by a changed magnitude."""
+    if s.excess_lot_id is None:
+        return "The found stock it pointed at is no longer on the books"
+    if (s.destination_location_id, s.type_id) in shortfall_slots:
+        return "The found stock is no longer there"
+    if shortfall_events.get((s.origin_location_id, s.type_id)) != s.shortfall_event_id:
+        return "The missing-stock flag was resolved another way"
+    return None
 
 
 def _already_logged(
@@ -482,6 +570,51 @@ async def list_move_suggestions(
         for h in await hangars_repo.list_for_corp(session, corp.id)
     }
     return [_suggestion_view(r, types, hangar_names) for r in records]
+
+
+async def dismiss_move_suggestion(
+    session: AsyncSession,
+    *,
+    corporation_eve_id: int,
+    suggestion_id: uuid.UUID,
+    dismissed_by_character_name: str,
+    now: datetime | None = None,
+) -> None:
+    """"Not a move" (ADR-0049, #202): resolve the suggestion without converting
+    anything — the ADR-0044 defaults stand exactly as booked (the shortfall flag
+    keeps waiting for a human, the deemed-cost lot keeps its estimate), and the
+    decision lands in the reconciliation log with who made it. The dismissed
+    pattern is never re-suggested while the underlying flags are unchanged.
+    Idempotent on an already-dismissed suggestion; a confirmed or withdrawn one
+    is a conflict — there is nothing left for a dismissal to decide. Gated:
+    the accounting entitlement is required (ADR-0042). Owns the commit."""
+    corp = await get_registered_corporation(session, corporation_eve_id)
+    await entitlements_app.require_entitlement(
+        session, corporation_id=corp.id, feature="accounting"
+    )
+    suggestion = await moves_repo.get_for_corp(
+        session, corporation_id=corp.id, suggestion_id=suggestion_id
+    )
+    if suggestion is None:
+        raise MoveSuggestionNotFound()
+    if suggestion.status == "dismissed":
+        return
+    if suggestion.status != "pending":
+        raise MoveSuggestionNotPending()
+    await moves_repo.set_status(
+        session, suggestion_id=suggestion.id, status="dismissed"
+    )
+    await recon_repo.add_event(
+        session,
+        corporation_id=corp.id,
+        location_id=suggestion.origin_location_id,
+        type_id=suggestion.type_id,
+        kind="move_dismissed",
+        qty=suggestion.qty,
+        occurred_at=now or datetime.now(UTC),
+        note=f"Not a move — dismissed by {dismissed_by_character_name}",
+    )
+    await session.commit()
 
 
 def _suggestion_view(

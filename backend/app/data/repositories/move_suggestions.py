@@ -1,6 +1,7 @@
-"""Move-suggestion persistence (ADR-0049, #200): create the pairings the sync
-proposed, skip duplicates of a still-pending pair, and read the pending list for
-the "Needs a look" area. The application owns the commit."""
+"""Move-suggestion persistence (ADR-0049, #200/#202): create the pairings the
+sync proposed, skip duplicates of a still-pending or already-dismissed pair,
+read the pending list for the "Needs a look" area, and move a suggestion out of
+`pending` (dismiss/withdraw/confirm). The application owns the commit."""
 
 import uuid
 
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import MoveSuggestion
 from app.data.records import MoveSuggestionRecord
+from app.domain.moves import MoveSuggestionStatus
 
 
 async def add(
@@ -58,6 +60,29 @@ async def pending_exists(
     return row is not None
 
 
+async def dismissed_exists(
+    session: AsyncSession,
+    *,
+    corporation_id: uuid.UUID,
+    shortfall_event_id: uuid.UUID,
+    qty: int,
+) -> bool:
+    """Whether a human already dismissed this pattern — same standing shortfall
+    flag, same paired quantity (ADR-0049, #202). The sync must not re-ask while
+    nothing changed; a changed magnitude gets a new anchor event or a new qty
+    and may legitimately suggest again. Only `dismissed` suppresses — a
+    `withdrawn` suggestion was invalidated by the world, not decided by anyone."""
+    row = await session.scalar(
+        select(MoveSuggestion.id).where(
+            MoveSuggestion.corporation_id == corporation_id,
+            MoveSuggestion.shortfall_event_id == shortfall_event_id,
+            MoveSuggestion.qty == qty,
+            MoveSuggestion.status == "dismissed",
+        )
+    )
+    return row is not None
+
+
 async def get_for_corp(
     session: AsyncSession,
     *,
@@ -79,10 +104,14 @@ async def get_for_corp(
 
 
 async def set_status(
-    session: AsyncSession, *, suggestion_id: uuid.UUID, status: str
+    session: AsyncSession,
+    *,
+    suggestion_id: uuid.UUID,
+    status: MoveSuggestionStatus,
 ) -> None:
-    """Advance a suggestion's lifecycle (pending → confirmed/dismissed). The
-    application decides the transition rules; this only writes it."""
+    """Advance a suggestion's lifecycle (pending → confirmed/dismissed/
+    withdrawn). The application decides the transition rules; this only
+    writes it."""
     row = (
         await session.execute(
             select(MoveSuggestion).where(MoveSuggestion.id == suggestion_id)

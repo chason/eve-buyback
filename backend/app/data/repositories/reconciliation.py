@@ -13,6 +13,12 @@ from app.data.models import ReconciliationEvent
 from app.data.records import ReconciliationEventRecord
 from app.domain.reconciliation import ReconciliationKind
 
+# Log entries about a move suggestion's fate (ADR-0049, #202), not about the
+# slot's stock: the sync's "already logged?" dedupe must look past them, or a
+# dismissal at a slot would make the standing shortfall look new again — spam
+# re-flagged, and the anchor event id the pairing keys on silently replaced.
+_MOVE_ANNOTATION_KINDS = ("move_dismissed", "move_withdrawn")
+
 
 async def add_event(
     session: AsyncSession,
@@ -71,12 +77,16 @@ async def latest_by_slot(
     session: AsyncSession, *, corporation_id: uuid.UUID
 ) -> dict[tuple[str, int], ReconciliationEventRecord]:
     """The most recent event per `(location_id, type_id)` — the sync compares against
-    this so an unchanged shortfall isn't re-logged every run (ADR-0044)."""
+    this so an unchanged shortfall isn't re-logged every run (ADR-0044). Move
+    annotations are skipped: they decorate a suggestion, not the slot's state."""
     rows = (
         (
             await session.execute(
                 select(ReconciliationEvent)
-                .where(ReconciliationEvent.corporation_id == corporation_id)
+                .where(
+                    ReconciliationEvent.corporation_id == corporation_id,
+                    ReconciliationEvent.kind.notin_(_MOVE_ANNOTATION_KINDS),
+                )
                 .order_by(
                     ReconciliationEvent.occurred_at,
                     ReconciliationEvent.created_at,

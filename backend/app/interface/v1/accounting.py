@@ -241,6 +241,23 @@ def _move_suggestion_out(
     )
 
 
+@router.post(
+    "/move-suggestions/{suggestion_id}/dismiss",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def dismiss_move_suggestion(
+    suggestion_id: uuid.UUID, user: ManagerUser, session: SessionDep
+) -> None:
+    """"Not a move" (ADR-0049, #202): the card goes away and won't come back
+    while nothing changed; everything already booked stays as it is."""
+    await reconciliation_app.dismiss_move_suggestion(
+        session,
+        corporation_eve_id=user.corporation_id,
+        suggestion_id=suggestion_id,
+        dismissed_by_character_name=user.character_name,
+    )
+
+
 @router.get(
     "/lots/{lot_id}/reprocess-preview", response_model=ReprocessPreviewOut
 )

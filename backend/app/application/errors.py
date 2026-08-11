@@ -233,9 +233,10 @@ class MoveSuggestionNotFound(ApplicationError):
 
 
 class MoveSuggestionNotPending(ApplicationError):
-    """The suggestion was already dismissed (ADR-0049, #201) — confirming it now
-    would contradict a decision already on record. (A double *confirm* is a
-    no-op, not this error: re-clicking an action that already happened is
-    harmless, the `clear_receivable` posture.)"""
+    """The suggestion already left `pending` in a way this action contradicts —
+    confirming a dismissed/withdrawn suggestion, or dismissing a confirmed or
+    withdrawn one (ADR-0049, #201/#202). Repeating the *same* action that
+    already happened is a no-op instead, not this error: re-clicking is
+    harmless, the `clear_receivable` posture."""
 
     default_detail = "That suggestion has already been handled"

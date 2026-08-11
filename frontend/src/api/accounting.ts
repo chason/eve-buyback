@@ -121,6 +121,16 @@ export async function confirmMoveSuggestion(id: string): Promise<void> {
   if (!res.ok) await throwApiError(res, "Confirming the move failed")
 }
 
+/** "Not a move" (ADR-0049, #202): the card goes away — and stays away while
+ * nothing changed — but everything already booked stays as it is. */
+export async function dismissMoveSuggestion(id: string): Promise<void> {
+  const res = await apiSend(
+    "POST",
+    `/corporations/me/accounting/move-suggestions/${id}/dismiss`,
+  )
+  if (!res.ok) await throwApiError(res, "Dismissing the suggestion failed")
+}
+
 /** Run a hangar check right now instead of waiting for the hourly sync. */
 export async function runHangarCheck(): Promise<HangarCheckResult> {
   const res = await apiSend("POST", "/corporations/me/accounting/hangar-check")

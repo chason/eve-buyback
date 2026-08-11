@@ -1498,7 +1498,7 @@
         "type": "object"
       },
       "MoveSuggestionOut": {
-        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the confirm action (#201).",
+        "description": "One pending \"looks like a move\" card (ADR-0049, #200): a hangar check saw\nthe same item missing at one marked hangar and appearing at another. `id`\nkeys the card's actions (confirm #201, dismiss #202).",
         "properties": {
           "destination_location_id": {
             "title": "Destination Location Id",
@@ -2847,7 +2847,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "106"
+    "version": "108"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3973,6 +3973,43 @@
           }
         },
         "summary": "Confirm Move Suggestion",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/corporations/me/accounting/move-suggestions/{suggestion_id}/dismiss": {
+      "post": {
+        "description": "\"Not a move\" (ADR-0049, #202): the card goes away and won't come back\nwhile nothing changed; everything already booked stays as it is.",
+        "operationId": "dismiss_move_suggestion_api_v1_corporations_me_accounting_move_suggestions__suggestion_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Move Suggestion",
         "tags": [
           "accounting"
         ]
