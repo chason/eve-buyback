@@ -68,6 +68,7 @@ def test_pairs_same_type_across_hangars_capped_at_smaller_side():
             origin_location_id=JITA,
             destination_location_id=AMARR,
             qty=350,
+            qty_counted=350,
         )
     ]
 
@@ -91,18 +92,21 @@ def test_two_candidate_origins_for_one_excess_both_propose():
             origin_location_id=JITA,
             destination_location_id=AMARR,
             qty=100,
+            qty_counted=100,
         ),
         MovePair(
             type_id=TRIT,
             origin_location_id="60011866",
             destination_location_id=AMARR,
             qty=50,
+            qty_counted=50,
         ),
         MovePair(
             type_id=PYE,
             origin_location_id=JITA,
             destination_location_id=AMARR,
             qty=20,
+            qty_counted=20,
         ),
     ]
 

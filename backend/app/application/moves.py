@@ -1,10 +1,14 @@
-"""Move-suggestion actions (ADR-0049, #201): a manager confirms a "looks like a
-move" pairing, and the sync's default treatment converts retroactively — in one
-unit of work: the deemed-cost excess lot at the destination is reversed for the
-paired quantity, the oldest idle lots of that type at the origin relocate (FIFO,
-splitting a lot when the move is partial — the ADR-0047 mechanic, every cost
-field carried unchanged), and the conversion lands in the reconciliation log
-under its own kind, superseding the standing shortfall flag at the origin slot.
+"""Move-suggestion actions (ADR-0049, #201/#206): a manager confirms a "looks
+like a move" pairing, and the sync's default treatment converts retroactively —
+in one unit of work: the deemed-cost excess lot at the destination is reversed
+for the counted portion, the oldest idle lots of that type at the origin
+relocate (FIFO, splitting a lot when the move is partial — the ADR-0047
+mechanic, every cost field carried unchanged), and the conversion lands in the
+reconciliation log under its own kind, superseding the standing shortfall flag
+at the origin slot. A pair's listed portion (#206 — the division's sell-order
+escrow at the destination) has no deemed lot to reverse: it relocates real lots
+exactly the same way, so subsequent fills consume the verified cost, and the
+ADR-0044 escrow offset keeps the destination's hangar sync clean.
 
 A move is not an acquisition: aging, FIFO order, and carrying value never
 change. Everything booked here is a reversing entry away from undone (ADR-0045)
@@ -19,11 +23,11 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import entitlements as entitlements_app
+from app.application import reconciliation as reconciliation_app
 from app.application.corporations import get_registered_corporation
 from app.application.errors import MoveSuggestionNotFound, MoveSuggestionNotPending
 from app.data.records import MoveSuggestionRecord
 from app.data.repositories import expenses as expenses_repo
-from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
 from app.data.repositories import move_suggestions as moves_repo
 from app.data.repositories import reconciliation as recon_repo
@@ -77,6 +81,10 @@ async def confirm_move(
       function never chooses. A confirm that fully claims the lot withdraws
       the siblings (see `_withdraw_claimed_siblings`); a partial claim leaves
       them pending at their shrunken convertible quantity.
+    - A pair's listed portion (#206) has no deemed lot to reverse — those
+      units sit in sell-order escrow at the destination. It relocates real
+      origin lots exactly like the counted portion; only the counted portion
+      drives the reversing entry (and the sibling claim above).
 
     The log entry is written at the ORIGIN slot: append-only, it supersedes the
     shortfall as that slot's latest event, which is what "resolving the flag"
@@ -97,9 +105,11 @@ async def confirm_move(
         raise MoveSuggestionNotPending()
     now = now or datetime.now(UTC)
 
-    # How much is still convertible: the paired quantity, capped by what the
-    # deemed lot still holds (see the partial-consumption guard above; a lot
-    # deleted since — SET NULL — leaves nothing to reverse).
+    # How much is still convertible, per portion (#206): the counted portion is
+    # capped by what the deemed lot still holds (see the partial-consumption
+    # guard above; a lot deleted since — SET NULL — leaves nothing to reverse);
+    # the listed portion has no deemed lot at all — those units sit in
+    # sell-order escrow, and only real origin lots move for them.
     deemed = (
         await lots_repo.get_for_corp(
             session, corporation_id=corp.id, lot_id=suggestion.excess_lot_id
@@ -107,9 +117,11 @@ async def confirm_move(
         if suggestion.excess_lot_id is not None
         else None
     )
-    convertible = min(
-        suggestion.qty, deemed.qty_remaining if deemed is not None else 0
+    qty_counted = suggestion.qty - suggestion.qty_listed
+    counted_convertible = min(
+        qty_counted, deemed.qty_remaining if deemed is not None else 0
     )
+    convertible = counted_convertible + suggestion.qty_listed
 
     # FIFO relocation plan over the origin's open lots of that type — capped
     # again by what actually sits there (plan_fifo reports the shortfall).
@@ -132,11 +144,14 @@ async def confirm_move(
             location_id=suggestion.destination_location_id,
         )
         relocated.append(destination_lot.id)
-    if moved > 0 and deemed is not None:
-        # The reversing entry: the deemed-cost units the excess pass invented
-        # are consumed back out — the relocated lots now carry the destination's
-        # stock at its real, measured cost basis.
-        await lots_repo.consume(session, lot_id=deemed.id, qty=moved)
+    # The reversing entry: the deemed-cost units the excess pass invented are
+    # consumed back out — the relocated lots now carry the destination's stock
+    # at its real, measured cost basis. The counted portion is served first by
+    # the relocation (the listed portion absorbs any origin-idle shortfall), so
+    # the reversal never exceeds what actually arrived.
+    reversal = min(counted_convertible, moved)
+    if reversal > 0 and deemed is not None:
+        await lots_repo.consume(session, lot_id=deemed.id, qty=reversal)
 
     if haul_cost and moved > 0:
         # The freight the confirmer told us about (#205): a selling expense
@@ -180,12 +195,12 @@ async def confirm_move(
             confirmed_by_name=confirmed_by_name,
         ),
     )
-    if moved > 0 and deemed is not None:
+    if reversal > 0 and deemed is not None:
         await _withdraw_claimed_siblings(
             session,
             corp.id,
             deemed_lot_id=deemed.id,
-            remaining=deemed.qty_remaining - moved,
+            remaining=deemed.qty_remaining - reversal,
             chosen=suggestion,
             now=now,
         )
@@ -211,11 +226,13 @@ async def _confirmed_note(
 ) -> str:
     """Who confirmed, and where the stock went — the log's plain-English record
     of the conversion (the acting character, per the ADR: "the log shows who
-    confirmed what"). Lowercase start: the UI splices it after a dash."""
-    hangar_names = await _hangar_names(session, corporation_id)
-    destination = hangar_names.get(
-        destination_location_id, destination_location_id
+    confirmed what"). Lowercase start: the UI splices it after a dash. A
+    sell-side destination (#206) may not be a configured hangar — the shared
+    resolver falls back to the SDE station name."""
+    names = await reconciliation_app.location_names(
+        session, corporation_id, {destination_location_id}
     )
+    destination = names.get(destination_location_id, destination_location_id)
     who = confirmed_by_name or f"character {confirmed_by_character_id}"
     return f"confirmed as a move to {destination} by {who}"
 
@@ -243,10 +260,10 @@ async def _withdraw_claimed_siblings(
     siblings = [s for s in pending if _is_sibling(s, deemed_lot_id, chosen.id)]
     if not siblings:
         return
-    hangar_names = await _hangar_names(session, corporation_id)
-    origin = hangar_names.get(
-        chosen.origin_location_id, chosen.origin_location_id
+    names = await reconciliation_app.location_names(
+        session, corporation_id, {chosen.origin_location_id}
     )
+    origin = names.get(chosen.origin_location_id, chosen.origin_location_id)
     for sibling in siblings:
         await moves_repo.set_status(
             session, suggestion_id=sibling.id, status="withdrawn"
@@ -279,19 +296,15 @@ async def _haul_note(
     destination_location_id: str,
 ) -> str:
     """The hauling expense's attribution (#205), in plain English: which move
-    the cost belongs to, named the way the confirm card named it."""
+    the cost belongs to, named the way the confirm card named it — the shared
+    resolver covers sell-side destinations (#206) via the SDE station names."""
     types = await sde_repo.get_types(session, [type_id])
     item = types[type_id].name if type_id in types else f"type {type_id}"
-    hangar_names = await _hangar_names(session, corporation_id)
-    origin = hangar_names.get(origin_location_id, origin_location_id)
-    destination = hangar_names.get(
+    names = await reconciliation_app.location_names(
+        session, corporation_id, {origin_location_id, destination_location_id}
+    )
+    origin = names.get(origin_location_id, origin_location_id)
+    destination = names.get(
         destination_location_id, destination_location_id
     )
     return f"Hauling for the move of {qty} {item} from {origin} to {destination}"
-
-
-async def _hangar_names(
-    session: AsyncSession, corporation_id: uuid.UUID
-) -> dict[str, str]:
-    hangars = await hangars_repo.list_for_corp(session, corporation_id)
-    return {h.location_id: h.location_name for h in hangars}

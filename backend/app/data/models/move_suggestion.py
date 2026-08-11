@@ -10,13 +10,15 @@ from app.domain.moves import MoveSuggestionStatus
 
 
 class MoveSuggestion(Base):
-    """One "looks like a move" pairing (ADR-0049, #200): the same type short at
-    one configured hangar and over at another within the same sync. A decoration
-    on the reconciliation artifacts it references — the shortfall flag event and
-    the deemed-cost excess lot are booked regardless (the suggest-only
-    invariant); this row only remembers the pattern so a human can act on it
-    later. SET NULL survives the excess lot; the status lifecycle is documented
-    on `MoveSuggestionStatus` (domain/moves.py)."""
+    """One "looks like a move" pairing (ADR-0049, #200/#206): the same type
+    short at one configured hangar, with excess evidence at another location —
+    stock counted in a hangar beyond the books, and/or the division's
+    sell-order escrow there beyond what idle lots explain. A decoration on the
+    reconciliation artifacts it references — the shortfall flag event and the
+    deemed-cost excess lot are booked regardless (the suggest-only invariant);
+    this row only remembers the pattern so a human can act on it later.
+    SET NULL survives the excess lot; the status lifecycle is documented on
+    `MoveSuggestionStatus` (domain/moves.py)."""
 
     __tablename__ = "move_suggestions"
 
@@ -27,11 +29,18 @@ class MoveSuggestion(Base):
     type_id: Mapped[int]
     origin_location_id: Mapped[str] = mapped_column(String)
     destination_location_id: Mapped[str] = mapped_column(String)
-    # The paired overlap — min(shortfall, excess); residuals keep the defaults.
+    # The paired overlap — min(shortfall, total excess); residuals keep the
+    # defaults. `qty_listed` of it is the sell-order-escrow portion (#206); the
+    # rest is hangar-counted excess backed by `excess_lot_id`.
     qty: Mapped[int] = mapped_column(BigInteger)
+    qty_listed: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default="0"
+    )
     shortfall_event_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("reconciliation_events.id", ondelete="CASCADE")
     )
+    # NULL when the pair has no counted portion — pure sell-side evidence has
+    # no deemed lot to decorate (#206) — or when the lot was deleted (SET NULL).
     excess_lot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("lots.id", ondelete="SET NULL")
     )

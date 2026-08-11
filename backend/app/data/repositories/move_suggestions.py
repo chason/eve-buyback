@@ -22,7 +22,8 @@ async def add(
     destination_location_id: str,
     qty: int,
     shortfall_event_id: uuid.UUID,
-    excess_lot_id: uuid.UUID,
+    excess_lot_id: uuid.UUID | None = None,
+    qty_listed: int = 0,
 ) -> MoveSuggestionRecord:
     suggestion = MoveSuggestion(
         corporation_id=corporation_id,
@@ -30,6 +31,7 @@ async def add(
         origin_location_id=origin_location_id,
         destination_location_id=destination_location_id,
         qty=qty,
+        qty_listed=qty_listed,
         shortfall_event_id=shortfall_event_id,
         excess_lot_id=excess_lot_id,
         status="pending",
@@ -45,15 +47,17 @@ async def pending_exists(
     *,
     corporation_id: uuid.UUID,
     shortfall_event_id: uuid.UUID,
-    excess_lot_id: uuid.UUID,
+    destination_location_id: str,
 ) -> bool:
-    """Whether this exact pair already has a pending suggestion — a later sync
-    must never duplicate it (ADR-0049)."""
+    """Whether this shortfall already has a pending pair toward this
+    destination — a later sync must never duplicate it (ADR-0049). Keyed by the
+    flag + destination, not the excess lot: sell-side pairs have no lot (#206),
+    and the shortfall/destination slot is what the manager is deciding about."""
     row = await session.scalar(
         select(MoveSuggestion.id).where(
             MoveSuggestion.corporation_id == corporation_id,
             MoveSuggestion.shortfall_event_id == shortfall_event_id,
-            MoveSuggestion.excess_lot_id == excess_lot_id,
+            MoveSuggestion.destination_location_id == destination_location_id,
             MoveSuggestion.status == "pending",
         )
     )

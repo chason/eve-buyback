@@ -385,8 +385,10 @@ class ReconciliationEventRecord(BaseModel):
 
 class MoveSuggestionRecord(BaseModel):
     """One "looks like a move" pairing (ADR-0049): decorates the shortfall flag
-    event and the deemed-cost excess lot the sync booked anyway. `excess_lot_id`
-    goes None if the lot is ever deleted (SET NULL)."""
+    event and (when the pair has a counted portion) the deemed-cost excess lot
+    the sync booked anyway. `qty_listed` of `qty` is sell-order-escrow evidence
+    (#206) with no lot behind it; `excess_lot_id` is None for pure sell-side
+    pairs, or if the lot is ever deleted (SET NULL)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -395,6 +397,7 @@ class MoveSuggestionRecord(BaseModel):
     origin_location_id: str
     destination_location_id: str
     qty: int
+    qty_listed: int = 0
     shortfall_event_id: uuid.UUID
     excess_lot_id: uuid.UUID | None = None
     status: MoveSuggestionStatus

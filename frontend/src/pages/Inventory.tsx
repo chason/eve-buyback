@@ -924,14 +924,23 @@ function candidateOrigin(s: MoveSuggestionOut): string {
   return `${name} (${s.qty.toLocaleString()} missing)`
 }
 
-/** A "looks like a move" suggestion (ADR-0049, #200): the same item went
- * missing in one marked hangar and turned up in another. Confirming it (#201)
- * carries what we paid — and how long we've held it — to the new hangar. */
+/** A "looks like a move" suggestion (ADR-0049, #200/#206): the same item went
+ * missing in one marked hangar and turned up somewhere else — counted in
+ * another marked hangar, and/or listed for sale by the buyback wallet (#206).
+ * Confirming it (#201) carries what we paid — and how long we've held it — to
+ * the new place. */
 function suggestionText(s: MoveSuggestionOut): string {
   const item = s.type_name ?? `Type ${s.type_id}`
   const from = s.origin_name ?? s.origin_location_id
   const to = s.destination_name ?? s.destination_location_id
-  return `Looks like ${s.qty.toLocaleString()} ${item} moved from ${from} to ${to} — was this a move?`
+  const base = `Looks like ${s.qty.toLocaleString()} ${item} moved from ${from} to ${to}`
+  if (s.qty_listed > 0 && s.qty_listed === s.qty) {
+    return `${base} — they're listed for sale there. Was this a move?`
+  }
+  if (s.qty_listed > 0) {
+    return `${base} — ${s.qty_listed.toLocaleString()} of them are listed for sale there. Was this a move?`
+  }
+  return `${base} — was this a move?`
 }
 
 function eventText(e: ReconciliationEventOut): string {
