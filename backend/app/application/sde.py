@@ -10,6 +10,14 @@ from app.data.records import SdeMetadataRecord
 from app.data.repositories import sde as sde_repo
 from app.plugins.sde_source import SdeSource
 
+# What the seed covers, stamped into `sde_metadata` on each import. Bump it whenever
+# the seed's coverage changes (new table, wider filter): `seed_if_needed` — which the
+# container entrypoint runs on every boot — re-seeds when the stamp is older, so a
+# deploy picks the change up without anyone remembering a manual re-seed.
+#   1: implicit pre-versioning coverage (ore-only `sde_type_materials`, NULL stamp)
+#   2: `sde_type_materials` for every kept type, not just ore (ADR-0047, #197)
+SEED_VERSION = 2
+
 
 async def seed_reference_data(
     session: AsyncSession, source: SdeSource, *, source_label: str
@@ -67,6 +75,7 @@ async def seed_reference_data(
         type_count=type_count,
         market_group_count=group_count,
         imported_at=datetime.now(UTC),
+        seed_version=SEED_VERSION,
     )
     await session.commit()
     return metadata
@@ -75,10 +84,14 @@ async def seed_reference_data(
 async def seed_if_needed(
     session: AsyncSession, source: SdeSource, *, source_label: str
 ) -> SdeMetadataRecord | None:
-    """Seed only when the SDE looks incomplete (any reference table empty). Returns
+    """Seed only when the SDE looks incomplete (any reference table empty) or was
+    imported by an older seed (`seed_version` stamp below `SEED_VERSION`). Returns
     the import metadata if it seeded, or `None` if it was already complete and
-    skipped. Lets the container entrypoint auto-seed on first deploy without
-    re-downloading on every restart."""
+    current. Lets the container entrypoint auto-seed on first deploy — and re-seed
+    when a deploy widens the seed's coverage — without re-downloading on every
+    restart."""
     if await sde_repo.is_seeded(session):
-        return None
+        metadata = await sde_repo.get_metadata(session)
+        if metadata is not None and (metadata.seed_version or 0) >= SEED_VERSION:
+            return None
     return await seed_reference_data(session, source, source_label=source_label)

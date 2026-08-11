@@ -8,11 +8,12 @@ set -e
 echo "Applying database migrations (alembic upgrade head)…"
 alembic upgrade head
 
-# Auto-seed SDE reference data (types, market groups, ore yields, NPC stations) when
-# it's missing/incomplete (ADR-0009, ADR-0028). Runs in the background so the app
+# Auto-seed SDE reference data (types, market groups, reprocess yields, NPC stations)
+# when it's missing/incomplete (ADR-0009, ADR-0028). Runs in the background so the app
 # serves immediately; `--if-needed` makes it a cheap no-op once seeded, so restarts
-# and redeploys don't re-download. A newly added reference table (empty) triggers a
-# one-off re-seed. Disable with BUYBACK_AUTO_SEED=0.
+# and redeploys don't re-download. A newly added reference table (empty) or an older
+# `seed_version` stamp (the seed's coverage changed) triggers a one-off re-seed.
+# Disable with BUYBACK_AUTO_SEED=0.
 if [ "${BUYBACK_AUTO_SEED:-1}" != "0" ]; then
     echo "Auto-seeding SDE reference data if needed (background)…"
     python -m app.sde.seed --if-needed &

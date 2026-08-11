@@ -56,7 +56,9 @@ unions the ore's mineral ids into its single price fetch.
 > [ADR-0047](0047-lot-transformations-reprocessing.md)'s source-agnostic reprocess
 > recording depends on yields existing for modules/ships/salvage, and the presence of
 > yield rows is what tells the inventory UI a type can be reprocessed at all. The
-> ore-only pricing behavior of this ADR is unchanged. Re-run the seed after deploying.
+> ore-only pricing behavior of this ADR is unchanged. Deployed instances re-seed
+> themselves on the next boot: the seed stamps a `seed_version` into `sde_metadata`,
+> and the entrypoint's `--if-needed` re-seeds when the stamp is older than the code's.
 
 ## Consequences
 
