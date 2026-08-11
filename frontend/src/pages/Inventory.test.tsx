@@ -25,6 +25,7 @@ const INVENTORY: InventoryOut = {
   stale_days: 30,
   worth_total: "4600000000.00",
   unrealized_total: "400000000.00",
+  anything_priced: true,
   unpriced_types: 0,
   listed: [],
   items: [
@@ -178,7 +179,7 @@ describe("Inventory", () => {
       access: true,
       inventory: { ...INVENTORY, items: [], estimated_cost: "0", total_cost: "0",
         verified_cost: "0", worth_total: "0", unrealized_total: "0",
-        unpriced_types: 0 },
+        anything_priced: false, unpriced_types: 0 },
     })
 
     renderInventory()
@@ -1104,6 +1105,7 @@ describe("Inventory", () => {
         ...INVENTORY,
         worth_total: "0",
         unrealized_total: "0",
+        anything_priced: false,
         unpriced_types: 1,
         items: [{ ...INVENTORY.items[0], worth: null, unrealized: null }],
       },
@@ -1184,6 +1186,52 @@ describe("Inventory", () => {
       .getAllByText("—")
       .find((el) => el.title.includes("when this arrived"))
     expect(dash).toBeTruthy()
+  })
+
+  it("chips the unbooked part of a partially booked row (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: "2026-07-14T12:00:00Z",
+        items: [
+          {
+            ...INVENTORY.items[0],
+            qty: 250,
+            qty_unbooked: 100,
+          },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByText("100 not on the books yet"),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps the valuation cards when the hangar is empty but the books are priced (ADR-0050)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: "2026-07-14T12:00:00Z",
+        items: [],
+        unpriced_types: 0,
+      },
+    })
+
+    renderInventory()
+
+    expect(
+      await screen.findByText("Nothing in the buyback hangars right now."),
+    ).toBeInTheDocument()
+    // The cards follow the ledger-wide totals, not the (empty) table.
+    expect(screen.getByText("If we sold it all today")).toBeInTheDocument()
+    expect(screen.getByText("4.6B ISK")).toBeInTheDocument()
   })
 
   it("lists sell-order stock in its own section (ADR-0050)", async () => {

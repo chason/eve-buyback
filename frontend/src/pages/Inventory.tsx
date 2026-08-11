@@ -82,8 +82,10 @@ function StockView({ inv }: { inv: InventoryOut }) {
   // The manual-entry form's prefill (#158); bumping the key remounts the form.
   const [manualPrefill, setManualPrefill] = useState<ManualPrefill | null>(null)
   const [manualKey, setManualKey] = useState(0)
-  // Valuation cards only make sense once something is priced (#153).
-  const anythingPriced = inv.items.length > inv.unpriced_types
+  // Valuation cards only make sense once something is priced (#153) — judged
+  // over the same open-lot population as the totals they show, so an empty
+  // hangar never hides a priced ledger (ADR-0050).
+  const anythingPriced = inv.anything_priced
   // A suggestion targets a TYPE; the oldest buy of it is the FIFO-correct source.
   const oldestLotOf = (typeId: number) =>
     inv.items.find((i) => i.type_id === typeId)?.lots[0]?.id ?? null
@@ -164,9 +166,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
           </table>
           {inv.unpriced_types > 0 && (
             <small className="field-hint">
-              {inv.unpriced_types === 1
-                ? "1 item has no current market price, so it isn't counted in the totals."
-                : `${inv.unpriced_types} items have no current market price, so they aren't counted in the totals.`}
+              {unpricedText(inv.unpriced_types, hangarBasis)}
             </small>
           )}
         </div>
@@ -1326,6 +1326,21 @@ function haulText(s: ShipmentOut): string {
   const to = s.destination_name ?? s.destination_location_id
   const sent = new Date(s.sent_at).toLocaleDateString()
   return `${s.qty.toLocaleString()} ${item} on its way from ${from} to ${to} (sent ${sent}).`
+}
+
+/** The unpriced-rows footnote. On the ledger basis the table rows ARE the
+ * totals' population, so "not counted in the totals" is literally true; on the
+ * hangar basis the totals cover the books, not the table, so the footnote only
+ * explains the dashes (ADR-0050). */
+function unpricedText(count: number, hangarBasis: boolean): string {
+  const what =
+    count === 1
+      ? "1 item has no current market price"
+      : `${count} items have no current market price`
+  if (hangarBasis) return `${what}.`
+  return count === 1
+    ? `${what}, so it isn't counted in the totals.`
+    : `${what}, so they aren't counted in the totals.`
 }
 
 /** When the hangar snapshot was taken (ADR-0050), in plain relative English —

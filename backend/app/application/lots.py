@@ -14,6 +14,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,8 +138,11 @@ class InventoryView(BaseModel):
     cost, with verified and estimated cost kept apart so they never silently blend.
     `worth_total` is "if we sold it all today" (net of sales tax) and
     `unrealized_total` the paper gain/loss — its OWN line, never folded into assets;
-    both cover only the types the market cache can price (`unpriced_types` counts
-    the rest).
+    both cover only the OPEN LOTS the market cache can price. `anything_priced`
+    says whether any open lot is priced at all (the valuation cards' gate) —
+    ledger-wide, like the totals it gates. `unpriced_types` counts the DISPLAYED
+    table rows without a price (the table's footnote), which on the hangar basis
+    is a different population than the totals'.
 
     Two bases (ADR-0050): `hangar` — `items` are what the last hangar snapshot
     actually counted in the marked buyback hangars (taken `as_of`), with the ledger
@@ -148,7 +152,7 @@ class InventoryView(BaseModel):
     are ALWAYS ledger-wide ("everything we hold", wherever it sits) so switching
     basis never changes what the corp owns on paper."""
 
-    basis: str  # "hangar" | "ledger"
+    basis: Literal["hangar", "ledger"]
     as_of: datetime | None = None
     total_cost: Decimal
     verified_cost: Decimal
@@ -156,6 +160,7 @@ class InventoryView(BaseModel):
     stale_days: int
     worth_total: Decimal
     unrealized_total: Decimal
+    anything_priced: bool
     unpriced_types: int
     items: list[InventoryItemView]
     listed: list[ListedStockView] = []
@@ -231,6 +236,9 @@ async def get_inventory(
         stale_days=stale_days,
         worth_total=totals["worth"],
         unrealized_total=totals["unrealized"],
+        # The cards' gate follows the totals' population (open lots), not the
+        # table's — an empty hangar must not hide a priced ledger (ADR-0050).
+        anything_priced=any(lot.item_type_id in nrv for lot in lots),
         unpriced_types=sum(1 for item in items if item.worth is None),
         items=items,
         listed=listed,

@@ -1095,6 +1095,10 @@
       },
       "InventoryOut": {
         "properties": {
+          "anything_priced": {
+            "title": "Anything Priced",
+            "type": "boolean"
+          },
           "as_of": {
             "anyOf": [
               {
@@ -1172,6 +1176,7 @@
           "stale_days",
           "worth_total",
           "unrealized_total",
+          "anything_priced",
           "unpriced_types",
           "items"
         ],

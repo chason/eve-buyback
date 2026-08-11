@@ -88,13 +88,13 @@ class AssetsEsi:
             raise CorporationAssetsForbidden()
         from app.plugins.esi import CorporationAsset
 
-        return [
-            CorporationAsset(
+        stacks = []
+        for tid, qty in self.hangar.items():
+            stacks.append(CorporationAsset(
                 item_id=next(self._item_id), type_id=tid, quantity=qty,
                 location_id=int(JITA), location_flag="CorpSAG2",
-            )
-            for tid, qty in self.hangar.items()
-        ]
+            ))
+        return stacks
 
 
 def _user() -> AuthenticatedUser:
@@ -307,6 +307,78 @@ async def test_stock_with_no_ledger_entry_shows_unbooked_with_unknown_age():
     # Worth prices what's there; unrealized has no booked basis to move against.
     assert item.worth == 250 * Decimal("8.00") * (1 - TAX)
     assert item.unrealized == Decimal(0)
+
+
+async def test_a_partially_booked_row_shows_matched_cost_and_the_unbooked_rest():
+    """More in the hangar than the books explain: the row carries the matched
+    portion's cost and age plus the unbooked remainder (ADR-0050)."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    await _add_lot(TRIT, 600, "5.25", acquired=NOW - timedelta(days=10))
+    async with SessionLocal() as session:
+        corp_id = await _corp_id()
+        await hangar_stock_repo.replace_for_corp(
+            session, corporation_id=corp_id,
+            counts={(JITA, TRIT): 1000}, synced_at=NOW,
+        )
+        await session.commit()
+
+    inv = await _inventory()
+
+    (item,) = inv.items
+    assert (item.qty, item.qty_unbooked) == (1000, 400)
+    assert item.total_cost == Decimal("3150.00")  # the booked 600 × 5.25
+    assert item.oldest_days == 10  # age comes from what IS booked
+    assert (item.lots[0].qty, len(item.lots)) == (600, 1)
+    # Unrealized moves only the booked portion against its cost.
+    unit = Decimal("4.00") * (1 - TAX)
+    assert item.worth == 1000 * unit
+    assert item.unrealized == 600 * unit - Decimal("3150.00")
+
+
+async def test_one_type_across_two_hangars_merges_into_one_fifo_row():
+    """The same mineral in two marked hangars is one table row: quantities sum,
+    and the backing lots interleave oldest-first across locations (ADR-0050)."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    old = NOW - timedelta(days=30)
+    new = NOW - timedelta(days=3)
+    await _add_lot(TRIT, 100, "5.00", acquired=old, location=JITA)
+    await _add_lot(TRIT, 200, "6.00", acquired=new, location=AMARR)
+    async with SessionLocal() as session:
+        corp_id = await _corp_id()
+        await hangar_stock_repo.replace_for_corp(
+            session, corporation_id=corp_id,
+            counts={(JITA, TRIT): 100, (AMARR, TRIT): 200}, synced_at=NOW,
+        )
+        await session.commit()
+
+    inv = await _inventory()
+
+    (item,) = inv.items
+    assert (item.qty, item.qty_unbooked) == (300, 0)
+    assert item.total_cost == Decimal("1700.00")  # 100×5 + 200×6
+    assert item.oldest_days == 30
+    assert [lot.qty for lot in item.lots] == [100, 200]  # oldest first
+    assert item.lots[0].acquired_at == old
+
+
+async def test_valuation_cards_follow_the_ledger_not_the_table():
+    """An empty hangar must not hide a priced ledger (review fix): the cards'
+    gate and the totals share the open-lot population."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    await _add_lot(TRIT, 1000, "5.25")
+    esi.hangar = {}  # everything hauled off / listed — hangar photographs empty
+
+    # The reconcile flags the shortfall; the empty snapshot still persists.
+    await _run(esi)
+    inv = await _inventory()
+
+    assert inv.basis == "hangar" and inv.items == []
+    assert inv.anything_priced is True
+    assert inv.worth_total == 1000 * Decimal("4.00") * (1 - TAX)
+    assert inv.unpriced_types == 0  # no table rows → nothing to footnote
 
 
 async def test_sell_order_stock_rides_in_its_own_listed_section():
