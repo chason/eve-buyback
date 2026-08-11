@@ -419,6 +419,68 @@ async def test_reprocess_pattern_is_recorded_automatically_with_lineage():
     assert len(events) == 1
 
 
+async def test_auto_reprocess_records_whole_batches_and_flags_the_remainder():
+    """250 Veldspar short with portion 100: only 200 (2 whole batches) can have
+    fed the reprocess — the 50-unit remainder really is missing, so it stays a
+    flagged shortfall instead of vanishing into the minerals' basis (review
+    fix, ADR-0050)."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    await _seed_veldspar(lots=[(250, "10.00", NOW)])
+    esi.hangar = {TRIT: 750}  # ≤ 2 batches × 400 — yield-consistent
+
+    result = await _run(esi)
+
+    assert result.flagged == 1  # the remainder, nothing else
+    lots, events = await _state()
+    open_lots = {lot.item_type_id: lot for lot in lots if lot.qty_remaining > 0}
+    # 200 ore consumed into the minerals; the unexplained 50 stay on the books.
+    assert open_lots[VELD].qty_remaining == 50
+    assert open_lots[TRIT].qty_remaining == 750
+    carried = open_lots[TRIT].qty_remaining * open_lots[TRIT].unit_purchase_cost
+    assert carried.quantize(Decimal("0.01")) == Decimal("2000.00")  # 200 × 10
+    by_kind = {e.kind: e for e in events}
+    assert by_kind["reprocess_recorded"].qty == 200
+    assert (by_kind["shortfall"].qty, by_kind["shortfall"].flagged) == (50, True)
+
+    # The standing remainder shortfall doesn't re-log every sync.
+    await _run(esi)
+    _, events = await _state()
+    assert len(events) == 2
+
+
+async def test_reprocess_falls_back_to_the_hint_when_the_record_refuses(
+    monkeypatch,
+):
+    """The defensive fallback branch (ADR-0050): when the automatic record can't
+    apply, the pass keeps the suggest-only hint — flagged, nothing consumed,
+    repeats without spamming."""
+    esi = AssetsEsi()
+    await _seed(esi, prices={TRIT: "4.00"})
+    await _seed_veldspar(lots=[(600, "10.00", NOW)])
+    esi.hangar = {TRIT: 2175}
+
+    async def refuse(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr(
+        recon_app.transformations_app, "record_observed_reprocess", refuse
+    )
+    result = await _run(esi)
+
+    assert result.lots_added == 0 and result.flagged == 1
+    lots, events = await _state()
+    assert [(lot.item_type_id, lot.qty_remaining) for lot in lots] == [(VELD, 600)]
+    (event,) = events
+    assert event.kind == "reprocess_hint"
+    assert (event.qty, event.flagged) == (600, True)
+
+    # The suggestion repeats-without-spamming while the record keeps refusing.
+    await _run(esi)
+    _, events = await _state()
+    assert len(events) == 1
+
+
 async def test_auto_reprocess_flows_each_lot_s_own_cost_and_age():
     """Two ore lots of different vintage and price → the observed minerals split
     pro-rata across them, each child carrying its OWN source lot's cost and age

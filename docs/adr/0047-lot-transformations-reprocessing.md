@@ -1,6 +1,9 @@
 # 0047. Lot transformations: reprocessing flows cost into child lots
 
 - **Status:** Proposed
+- **Amended by:** [ADR-0050](0050-asset-first-stock-view.md) §4 — the reconciliation's
+  reprocess hint is now RECORDED automatically when it applies cleanly (whole batches,
+  observed outputs); the suggest-only stance below survives only as the fallback
 - **Date:** 2026-07-11
 - **Relates to:** [ADR-0043](0043-lot-based-buyback-accounting.md) (the lot ledger this
   amends — transformation joins acquisition and sale as a lot event),
@@ -86,7 +89,10 @@ allocated across the outputs pro-rata by market value at split-off.**
   transformation (surfaced in plain English as "from reprocessing").
 - The hangar reconciliation gains pattern-recognition scope (yield matching) — a
   suggestion, never an auto-action: quantities won't match yields exactly (skills,
-  structure bonuses, partial batches), so a human confirms.
+  structure bonuses, partial batches), so a human confirms. *(Amended by ADR-0050
+  §4: the pattern is now recorded automatically when it applies cleanly — the
+  outputs recorded are the observed counts, not assumed yields, and only whole
+  batches convert; the suggestion remains as the fallback.)*
 - Transformation is generic on purpose: the same event shape covers future cases
   (e.g. repackaging, manufacturing) without new machinery.
 
