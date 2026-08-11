@@ -770,7 +770,7 @@ function ReconciliationSection({
                 {group.length === 1 ? (
                   <button
                     type="button"
-                    className="linkbtn"
+                    className="suggestion-btn"
                     disabled={confirmMove.isPending || dismiss.isPending}
                     onClick={() => {
                       setConfirmingId(group[0].id)
@@ -803,7 +803,7 @@ function ReconciliationSection({
                 )}{" "}
                 <button
                   type="button"
-                  className="linkbtn"
+                  className="secondary suggestion-btn"
                   disabled={confirmMove.isPending || dismiss.isPending}
                   onClick={() => dismiss.mutate(group.map((c) => c.id))}
                 >
