@@ -32,7 +32,7 @@ from app.plugins.esi import (
 )
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, login, make_client
+from tests.helpers import CHAR_ID, CORP_ID, CeoEsi, login, make_client, office_nested_assets
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -360,12 +360,7 @@ async def test_listed_units_reduce_the_hangar_expectation():
 
     class HangarEsi(SalesEsi):
         async def get_corporation_assets(self, corp, token):
-            from app.plugins.esi import CorporationAsset
-
-            return [CorporationAsset(
-                item_id=1, type_id=TRIT, quantity=700,
-                location_id=int(JITA), location_flag="CorpSAG2",
-            )]
+            return office_nested_assets({(JITA, TRIT): 700}, iter([1]))
 
     hangar_esi = HangarEsi()
     async with SessionLocal() as session:

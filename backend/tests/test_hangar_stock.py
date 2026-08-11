@@ -26,10 +26,10 @@ from app.data.repositories import hangars as hangars_repo
 from app.data.repositories import lots as lots_repo
 from app.data.repositories import sde as sde_repo
 from app.main import app
-from app.plugins.esi import CharacterInfo, CorporationAssetsForbidden, CorporationInfo
+from app.plugins.esi import CorporationAssetsForbidden
 from app.plugins.sso import OAuthToken, VerifiedCharacter
 from app.plugins.token_cipher import get_token_cipher
-from tests.helpers import CHAR_ID, CORP_ID
+from tests.helpers import CHAR_ID, CORP_ID, HangarAssetsEsi
 
 NOW = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
 JITA = "60003760"
@@ -62,47 +62,6 @@ class FakeSso:
         return OAuthToken(access_token="fresh", refresh_token=refresh_token)
 
 
-class AssetsEsi:
-    """ESI fake (the test_reconciliation harness): `hangar` is the stock in the
-    marked hangar (CorpSAG2 at Jita) as {type_id: qty}."""
-
-    def __init__(self):
-        self.hangar: dict[int, int] = {}
-        self.forbid = False
-        self._item_id = iter(range(7_000_000, 8_000_000))
-
-    async def get_character(self, character_id):
-        return CharacterInfo(name="Boss", corporation_id=CORP_ID)
-
-    async def get_character_corporation(self, character_id):
-        return CORP_ID
-
-    async def get_corporation(self, corporation_id):
-        return CorporationInfo(name="Test Corp", ceo_id=CHAR_ID, ticker="T")
-
-    async def get_character_roles(self, character_id, access_token):
-        return []
-
-    async def get_corporation_assets(self, corporation_id, access_token):
-        if self.forbid:
-            raise CorporationAssetsForbidden()
-        from app.plugins.esi import CorporationAsset
-
-        # The real ESI shape: hangar rows hang under the corp's OFFICE at the
-        # station — only the office row points at the station itself.
-        office_id = 1_027_000_000_001
-        stacks = [CorporationAsset(
-            item_id=office_id, type_id=27, quantity=1,
-            location_id=int(JITA), location_flag="OfficeFolder",
-        )]
-        for tid, qty in self.hangar.items():
-            stacks.append(CorporationAsset(
-                item_id=next(self._item_id), type_id=tid, quantity=qty,
-                location_id=office_id, location_flag="CorpSAG2",
-            ))
-        return stacks
-
-
 def _user() -> AuthenticatedUser:
     return AuthenticatedUser(
         character_id=CHAR_ID, character_name="Boss", corporation_id=CORP_ID,
@@ -111,7 +70,7 @@ def _user() -> AuthenticatedUser:
     )
 
 
-async def _seed(esi: AssetsEsi, *, prices: dict[int, str] | None = None) -> None:
+async def _seed(esi: HangarAssetsEsi, *, prices: dict[int, str] | None = None) -> None:
     async with SessionLocal() as session:
         corp = await corporations_repo.create_corporation(
             session, eve_corporation_id=CORP_ID, name="Test Corp",
@@ -158,7 +117,7 @@ async def _seed(esi: AssetsEsi, *, prices: dict[int, str] | None = None) -> None
         )
 
 
-async def _run(esi: AssetsEsi):
+async def _run(esi: HangarAssetsEsi):
     async with SessionLocal() as session:
         return await recon_app.reconcile_hangars(
             session, FakeSso(), esi, corporation_eve_id=CORP_ID,
@@ -196,10 +155,10 @@ async def _inventory() -> lots_app.InventoryView:
 
 
 async def test_reconcile_persists_the_snapshot_it_counted():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _add_lot(TRIT, 1000, "5.25")
-    esi.hangar = {TRIT: 1000}  # matches the books: no deltas at all
+    esi.stock = {(JITA, TRIT): 1000}  # matches the books: no deltas at all
 
     await _run(esi)
 
@@ -212,9 +171,9 @@ async def test_reconcile_persists_the_snapshot_it_counted():
 
 
 async def test_an_empty_hangar_is_a_valid_snapshot():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi)
-    esi.hangar = {}
+    esi.stock = {}
 
     await _run(esi)
 
@@ -226,9 +185,9 @@ async def test_an_empty_hangar_is_a_valid_snapshot():
 
 
 async def test_a_failed_read_leaves_the_previous_snapshot_in_place():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 700}
+    esi.stock = {(JITA, TRIT): 700}
     await _run(esi)
 
     esi.forbid = True
@@ -242,9 +201,9 @@ async def test_a_failed_read_leaves_the_previous_snapshot_in_place():
 
 
 async def test_unmarking_the_last_hangar_deletes_the_snapshot():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
-    esi.hangar = {TRIT: 500}
+    esi.stock = {(JITA, TRIT): 500}
     await _run(esi)
 
     async with SessionLocal() as session:
@@ -262,7 +221,7 @@ async def test_unmarking_the_last_hangar_deletes_the_snapshot():
 
 
 async def test_inventory_shows_the_ledger_until_a_snapshot_exists():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _add_lot(TRIT, 1000, "5.25")
 
@@ -273,11 +232,11 @@ async def test_inventory_shows_the_ledger_until_a_snapshot_exists():
 
 
 async def test_hangar_rows_show_whats_physically_there_with_ledger_cost_and_age():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     old = NOW - timedelta(days=90)
     await _add_lot(TRIT, 1000, "5.25", acquired=old)
-    esi.hangar = {TRIT: 600}  # 400 units left off-app: the row shows the 600
+    esi.stock = {(JITA, TRIT): 600}  # 400 units left off-app: the row shows the 600
     await _run(esi)
 
     inv = await _inventory()
@@ -294,7 +253,7 @@ async def test_hangar_rows_show_whats_physically_there_with_ledger_cost_and_age(
 
 
 async def test_stock_with_no_ledger_entry_shows_unbooked_with_unknown_age():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={PYE: "8.00"})
     async with SessionLocal() as session:  # snapshot without booking: bypass the
         corp_id = await _corp_id()  # reconcile (it would book a deemed lot)
@@ -318,7 +277,7 @@ async def test_stock_with_no_ledger_entry_shows_unbooked_with_unknown_age():
 async def test_a_partially_booked_row_shows_matched_cost_and_the_unbooked_rest():
     """More in the hangar than the books explain: the row carries the matched
     portion's cost and age plus the unbooked remainder (ADR-0050)."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _add_lot(TRIT, 600, "5.25", acquired=NOW - timedelta(days=10))
     async with SessionLocal() as session:
@@ -345,7 +304,7 @@ async def test_a_partially_booked_row_shows_matched_cost_and_the_unbooked_rest()
 async def test_one_type_across_two_hangars_merges_into_one_fifo_row():
     """The same mineral in two marked hangars is one table row: quantities sum,
     and the backing lots interleave oldest-first across locations (ADR-0050)."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     old = NOW - timedelta(days=30)
     new = NOW - timedelta(days=3)
@@ -372,10 +331,10 @@ async def test_one_type_across_two_hangars_merges_into_one_fifo_row():
 async def test_valuation_cards_follow_the_ledger_not_the_table():
     """An empty hangar must not hide a priced ledger (review fix): the cards'
     gate and the totals share the open-lot population."""
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _add_lot(TRIT, 1000, "5.25")
-    esi.hangar = {}  # everything hauled off / listed — hangar photographs empty
+    esi.stock = {}  # everything hauled off / listed — hangar photographs empty
 
     # The reconcile flags the shortfall; the empty snapshot still persists.
     await _run(esi)
@@ -388,10 +347,10 @@ async def test_valuation_cards_follow_the_ledger_not_the_table():
 
 
 async def test_sell_order_stock_rides_in_its_own_listed_section():
-    esi = AssetsEsi()
+    esi = HangarAssetsEsi()
     await _seed(esi, prices={TRIT: "4.00"})
     await _add_lot(TRIT, 1000, "5.25")
-    esi.hangar = {TRIT: 1000}
+    esi.stock = {(JITA, TRIT): 1000}
     await _run(esi)
     async with SessionLocal() as session:
         corp_id = await _corp_id()
