@@ -25,6 +25,16 @@ class InventoryLotOut(BaseModel):
     source: str
 
 
+class StockLocationOut(BaseModel):
+    """Where a hangar-basis stock row physically sits: one entry per marked hangar
+    location holding the type, with the snapshot's count there. `location_name`
+    is None when neither a configured hangar nor the seeded SDE names the id."""
+
+    location_id: str
+    location_name: str | None = None
+    qty: int
+
+
 class InventoryItemOut(BaseModel):
     type_id: int
     type_name: str | None = None
@@ -48,6 +58,9 @@ class InventoryItemOut(BaseModel):
     # Whether the type is an ore (SDE category 25) — the table folds small
     # leftover ore stacks (under 100 units) out of view, revealable as a group.
     is_ore: bool
+    # Which hangar(s) the stack physically sits in, biggest count first — hangar
+    # basis only (empty on the ledger basis, where rows aren't placed).
+    locations: list[StockLocationOut] = []
     lots: list[InventoryLotOut]
 
 

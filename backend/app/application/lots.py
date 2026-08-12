@@ -92,6 +92,17 @@ class InventoryLotView(BaseModel):
     source: LotSource
 
 
+class StockLocationView(BaseModel):
+    """Where a hangar-basis row physically sits: one entry per marked hangar
+    location the snapshot counted the type at, named the way the reconciliation
+    names locations (configured hangar name, else seeded station; None when
+    neither resolves and the UI falls back to the raw id)."""
+
+    location_id: str
+    location_name: str | None
+    qty: int
+
+
 class InventoryItemView(BaseModel):
     """One item type's holdings: its open lots plus the rollup the table row shows.
     `type_name` is None when the type is missing from the seeded SDE. `worth` /
@@ -120,6 +131,9 @@ class InventoryItemView(BaseModel):
     # Whether the type is an ore (SDE category 25) — lets the table fold small
     # leftover ore stacks out of view.
     is_ore: bool
+    # Which hangar(s) the stack physically sits in, biggest count first — hangar
+    # basis only (empty on the ledger basis, where rows aren't placed).
+    locations: list[StockLocationView] = []
     lots: list[InventoryLotView]
 
 
@@ -221,8 +235,11 @@ async def get_inventory(
     )
 
     if synced_at is not None:
+        places = await location_names(
+            session, corp.id, {row.location_id for row in snapshot}
+        )
         items = _hangar_items(
-            lots, snapshot, names, reprocessable_ids, nrv, now, stale_days
+            lots, snapshot, places, names, reprocessable_ids, nrv, now, stale_days
         )
         listed = await _listed_stock(session, corp.id, listed_map, names, nrv)
     else:
@@ -280,6 +297,7 @@ def _item_view(
     names: dict,
     reprocessable_ids: set[int],
     nrv: dict[int, Decimal],
+    locations: list[StockLocationView] | None = None,
 ) -> InventoryItemView:
     """The rollup a table row shows. `worth` prices the whole quantity shown;
     `unrealized` compares only the booked portion against its cost — an unbooked
@@ -305,6 +323,7 @@ def _item_view(
         unrealized=unrealized,
         reprocessable=type_id in reprocessable_ids,
         is_ore=sde_type is not None and sde_type.category_id == ORE_CATEGORY_ID,
+        locations=locations or [],
         lots=views,
     )
 
@@ -334,6 +353,7 @@ def _ledger_items(
 def _hangar_items(
     lots: Sequence[LotRecord],
     snapshot: Sequence[HangarStockRecord],
+    places: dict[str, str],
     names: dict,
     reprocessable_ids: set[int],
     nrv: dict[int, Decimal],
@@ -354,6 +374,7 @@ def _hangar_items(
     qty_by_type: dict[int, int] = {}
     unbooked_by_type: dict[int, int] = {}
     views_by_type: dict[int, list[InventoryLotView]] = {}
+    locations_by_type: dict[int, list[StockLocationView]] = {}
     for row in snapshot:
         remaining = row.qty
         views = views_by_type.setdefault(row.type_id, [])
@@ -367,11 +388,20 @@ def _hangar_items(
         unbooked_by_type[row.type_id] = (
             unbooked_by_type.get(row.type_id, 0) + remaining
         )
+        locations_by_type.setdefault(row.type_id, []).append(
+            StockLocationView(
+                location_id=row.location_id,
+                location_name=places.get(row.location_id),
+                qty=row.qty,
+            )
+        )
 
     items = []
     for type_id, qty in qty_by_type.items():
         views = views_by_type[type_id]
         views.sort(key=lambda v: (v.acquired_at, v.id))  # FIFO across hangars
+        locations = locations_by_type[type_id]
+        locations.sort(key=_location_sort_key)  # biggest count first
         items.append(
             _item_view(
                 type_id,
@@ -381,9 +411,14 @@ def _hangar_items(
                 names,
                 reprocessable_ids,
                 nrv,
+                locations,
             )
         )
     return items
+
+
+def _location_sort_key(loc: StockLocationView):
+    return (-loc.qty, loc.location_name or "", loc.location_id)
 
 
 async def _listed_stock(
