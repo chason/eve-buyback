@@ -42,6 +42,7 @@ const INVENTORY: InventoryOut = {
       unrealized: "400000000.00",
       reprocessable: true,
       is_ore: false,
+      locations: [],
       lots: [
         {
           id: "lot-old",
@@ -1276,6 +1277,59 @@ describe("Inventory", () => {
     expect(
       await screen.findByText("100 not on the books yet"),
     ).toBeInTheDocument()
+  })
+
+  it("says which hangar each row sits in (hangar basis)", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: {
+        ...INVENTORY,
+        basis: "hangar",
+        as_of: "2026-07-14T12:00:00Z",
+        items: [
+          {
+            ...INVENTORY.items[0],
+            locations: [
+              { location_id: "60003760", location_name: "Jita IV - Moon 4",
+                qty: 150 },
+            ],
+          },
+          {
+            ...INVENTORY.items[0],
+            type_id: 35,
+            type_name: "Pyerite",
+            // Split across two hangars: each named with its count there.
+            locations: [
+              { location_id: "60008494", location_name: "Amarr VIII (Oris)",
+                qty: 200 },
+              { location_id: "60003760", location_name: "Jita IV - Moon 4",
+                qty: 100 },
+            ],
+          },
+        ],
+      },
+    })
+
+    renderInventory()
+
+    expect(await screen.findByText("Where")).toBeInTheDocument()
+    // One hangar: just its name. Several: each with its count.
+    expect(screen.getByText("Jita IV - Moon 4")).toBeInTheDocument()
+    expect(
+      screen.getByText("Amarr VIII (Oris) (200), Jita IV - Moon 4 (100)"),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps the Where column off the books view", async () => {
+    vi.mocked(accountingApi.getInventory).mockResolvedValue({
+      access: true,
+      inventory: INVENTORY, // basis "ledger" — rows aren't placed
+    })
+
+    renderInventory()
+
+    await screen.findByText("Tritanium")
+    expect(screen.queryByText("Where")).not.toBeInTheDocument()
   })
 
   it("keeps the valuation cards when the hangar is empty but the books are priced (ADR-0050)", async () => {

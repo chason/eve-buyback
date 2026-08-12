@@ -947,6 +947,14 @@
             "title": "Is Ore",
             "type": "boolean"
           },
+          "locations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/StockLocationOut"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
           "lots": {
             "items": {
               "$ref": "#/components/schemas/InventoryLotOut"
@@ -2819,6 +2827,36 @@
         "title": "StationSearchResult",
         "type": "object"
       },
+      "StockLocationOut": {
+        "description": "Where a hangar-basis stock row physically sits: one entry per marked hangar\nlocation holding the type, with the snapshot's count there. `location_name`\nis None when neither a configured hangar nor the seeded SDE names the id.",
+        "properties": {
+          "location_id": {
+            "title": "Location Id",
+            "type": "string"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "location_id",
+          "qty"
+        ],
+        "title": "StockLocationOut",
+        "type": "object"
+      },
       "StructureAuthorizeRequest": {
         "description": "The OAuth callback payload completing the structure-access grant.",
         "properties": {
@@ -3104,7 +3142,7 @@
   },
   "info": {
     "title": "Buyback API",
-    "version": "120"
+    "version": "122"
   },
   "openapi": "3.1.0",
   "paths": {

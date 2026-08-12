@@ -33,6 +33,7 @@ import type {
   MoveSuggestionOut,
   ReconciliationEventOut,
   ShipmentOut,
+  StockLocationOut,
 } from "../api/accounting"
 import { listLocations } from "../api/locations"
 import { searchTypes } from "../api/sde"
@@ -162,6 +163,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
                 <th className="num">What we paid</th>
                 <th className="num">Worth now</th>
                 <th>Sitting for</th>
+                {hangarBasis && <th>Where</th>}
                 <th />
               </tr>
             </thead>
@@ -170,6 +172,7 @@ function StockView({ inv }: { inv: InventoryOut }) {
                 <ItemRows
                   key={item.type_id}
                   item={item}
+                  showWhere={hangarBasis}
                   onReprocess={setReprocessLotId}
                 />
               ))}
@@ -1354,6 +1357,20 @@ function haulText(s: ShipmentOut): string {
   return `${s.qty.toLocaleString()} ${item} on its way from ${from} to ${to} (sent ${sent}).`
 }
 
+/** The "Where" cell (hangar basis): the hangar the stack sits in — when it's
+ * split across several, each hangar with its count so the split is visible. */
+function whereText(locations: StockLocationOut[]): string {
+  if (locations.length === 0) return "—"
+  if (locations.length === 1) {
+    return locations[0].location_name ?? locations[0].location_id
+  }
+  return locations
+    .map(
+      (l) => `${l.location_name ?? l.location_id} (${l.qty.toLocaleString()})`,
+    )
+    .join(", ")
+}
+
 /** The folded-ores footnote: how many small ore stacks are tucked away (or
  * currently shown), in plain English. */
 function smallOreText(count: number, shown: boolean): string {
@@ -1464,9 +1481,11 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 
 function ItemRows({
   item,
+  showWhere,
   onReprocess,
 }: {
   item: InventoryItemOut
+  showWhere: boolean
   onReprocess: (lotId: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -1501,6 +1520,7 @@ function ItemRows({
         <td>
           <DaysHeld days={item.oldest_days} stale={item.stale} />
         </td>
+        {showWhere && <td>{whereText(item.locations)}</td>}
         <td>
           {multiple ? (
             <button
@@ -1568,6 +1588,7 @@ function ItemRows({
                 <DaysHeld days={lot.days_held} stale={lot.stale} />
               </small>
             </td>
+            {showWhere && <td />}
             <td>
               {item.reprocessable && (
                 <button

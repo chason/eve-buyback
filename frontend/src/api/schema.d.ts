@@ -1424,6 +1424,11 @@ export interface components {
             any_estimated: boolean;
             /** Is Ore */
             is_ore: boolean;
+            /**
+             * Locations
+             * @default []
+             */
+            locations: components["schemas"]["StockLocationOut"][];
             /** Lots */
             lots: components["schemas"]["InventoryLotOut"][];
             /** Oldest Days */
@@ -2166,6 +2171,20 @@ export interface components {
             station_id: number;
             /** System Name */
             system_name: string;
+        };
+        /**
+         * StockLocationOut
+         * @description Where a hangar-basis stock row physically sits: one entry per marked hangar
+         *     location holding the type, with the snapshot's count there. `location_name`
+         *     is None when neither a configured hangar nor the seeded SDE names the id.
+         */
+        StockLocationOut: {
+            /** Location Id */
+            location_id: string;
+            /** Location Name */
+            location_name?: string | null;
+            /** Qty */
+            qty: number;
         };
         /**
          * StructureAuthorizeRequest

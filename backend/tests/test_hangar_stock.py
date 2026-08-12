@@ -229,6 +229,8 @@ async def test_inventory_shows_the_ledger_until_a_snapshot_exists():
 
     assert inv.basis == "ledger" and inv.as_of is None
     assert [(i.type_id, i.qty) for i in inv.items] == [(TRIT, 1000)]
+    # The ledger view doesn't place rows — "which hangar" is a snapshot answer.
+    assert inv.items[0].locations == []
 
 
 async def test_hangar_rows_show_whats_physically_there_with_ledger_cost_and_age():
@@ -248,6 +250,10 @@ async def test_hangar_rows_show_whats_physically_there_with_ledger_cost_and_age(
     assert item.total_cost == Decimal("3150.00")  # 600 × 5.25
     assert item.oldest_days == 90 and item.stale is True
     assert item.lots[0].qty == 600
+    # The row says which hangar it sits in, by the marked hangar's name.
+    assert [(p.location_id, p.location_name, p.qty) for p in item.locations] == [
+        (JITA, "Jita IV - Moon 4", 600)
+    ]
     # The cards stay ledger-wide: all 1000 units are still owned on paper.
     assert inv.total_cost == Decimal("5250.00")
 
@@ -312,6 +318,10 @@ async def test_one_type_across_two_hangars_merges_into_one_fifo_row():
     await _add_lot(TRIT, 200, "6.00", acquired=new, location=AMARR)
     async with SessionLocal() as session:
         corp_id = await _corp_id()
+        await hangars_repo.add(
+            session, corporation_id=corp_id, location_id=AMARR,
+            location_name="Amarr VIII (Oris)", division=2,
+        )
         await hangar_stock_repo.replace_for_corp(
             session, corporation_id=corp_id,
             counts={(JITA, TRIT): 100, (AMARR, TRIT): 200}, synced_at=NOW,
@@ -326,6 +336,11 @@ async def test_one_type_across_two_hangars_merges_into_one_fifo_row():
     assert item.oldest_days == 30
     assert [lot.qty for lot in item.lots] == [100, 200]  # oldest first
     assert item.lots[0].acquired_at == old
+    # The merged row still says where the units sit — biggest count first.
+    assert [(p.location_name, p.qty) for p in item.locations] == [
+        ("Amarr VIII (Oris)", 200),
+        ("Jita IV - Moon 4", 100),
+    ]
 
 
 async def test_valuation_cards_follow_the_ledger_not_the_table():

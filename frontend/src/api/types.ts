@@ -44,6 +44,7 @@ export type BillingSettingsOut = Schemas["BillingSettingsOut"]
 // Accounting add-on: the "What we've got" inventory view (ADR-0043, #152).
 export type InventoryOut = Schemas["InventoryOut"]
 export type InventoryItemOut = Schemas["InventoryItemOut"]
+export type StockLocationOut = Schemas["StockLocationOut"]
 export type ListedStockOut = Schemas["ListedStockOut"]
 export type InventoryLotOut = Schemas["InventoryLotOut"]
 // Buyback-hangar config for the hangar check (ADR-0044, #154).
